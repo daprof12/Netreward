@@ -17,6 +17,7 @@ interface DeviceInfo {
 
 let isDeviceRegistrationRunning = false;
 let registeredUserId: string | null = null;
+let cachedDeviceInfo: DeviceInfo | null = null; // persist across remounts
 
 export function useDeviceManager() {
   const { user } = useAuthStore();
@@ -25,9 +26,15 @@ export function useDeviceManager() {
 
   useEffect(() => {
     if (!user) return;
-    
+
+    // If we already have cached device info for this user, restore it immediately
+    if (registeredUserId === user.id && cachedDeviceInfo) {
+      setCurrentDevice(cachedDeviceInfo);
+      return;
+    }
+
     // Prevent duplicate concurrent executions
-    if (isDeviceRegistrationRunning || registeredUserId === user.id) return;
+    if (isDeviceRegistrationRunning) return;
 
     const detectAndRegisterDevice = async () => {
       isDeviceRegistrationRunning = true;
@@ -124,6 +131,7 @@ export function useDeviceManager() {
         };
 
         setCurrentDevice(finalDeviceInfo);
+        cachedDeviceInfo = finalDeviceInfo; // cache for future remounts
 
         if (isLinkedToCurrentUser) {
           // Update existing device info (keep it fresh)

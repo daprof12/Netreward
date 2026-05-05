@@ -7,7 +7,7 @@ interface NrtLoaderProps {
 
 /**
  * Premium NetReward splash / loading screen built around the NRT logo.
- * Uses pure CSS animations so no extra dependencies are needed.
+ * Green gradient theme matching the NetReward brand.
  */
 const NrtLoader: React.FC<NrtLoaderProps> = ({
   message = 'Loading…',
@@ -32,18 +32,18 @@ const NrtLoader: React.FC<NrtLoaderProps> = ({
     >
       {/* ── Glowing ring + spinning logo ── */}
       <div style={{ position: 'relative', width: dim + 40, height: dim + 40 }}>
-        {/* Outer pulsing glow */}
+        {/* Outer pulsing glow — green */}
         <div
           style={{
             position: 'absolute',
             inset: 0,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(124,58,237,0.35) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(16,185,129,0.35) 0%, transparent 70%)',
             animation: 'nrt-pulse 2s ease-in-out infinite',
           }}
         />
 
-        {/* Spinning arc track */}
+        {/* Spinning arc — green linear gradient */}
         <svg
           viewBox="0 0 120 120"
           width={dim + 40}
@@ -56,9 +56,9 @@ const NrtLoader: React.FC<NrtLoaderProps> = ({
         >
           <defs>
             <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#7C3AED" stopOpacity="0" />
-              <stop offset="50%" stopColor="#A78BFA" stopOpacity="1" />
-              <stop offset="100%" stopColor="#7C3AED" stopOpacity="0" />
+              <stop offset="0%"   stopColor="#10b981" stopOpacity="0" />
+              <stop offset="50%"  stopColor="#34d399" stopOpacity="1" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
             </linearGradient>
           </defs>
           <circle
@@ -73,7 +73,7 @@ const NrtLoader: React.FC<NrtLoaderProps> = ({
           />
         </svg>
 
-        {/* Counter-spinning inner arc */}
+        {/* Counter-spinning inner arc — lighter green */}
         <svg
           viewBox="0 0 120 120"
           width={dim + 40}
@@ -89,7 +89,7 @@ const NrtLoader: React.FC<NrtLoaderProps> = ({
             cy="60"
             r="46"
             fill="none"
-            stroke="rgba(167,139,250,0.4)"
+            stroke="rgba(52,211,153,0.4)"
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeDasharray="60 300"
@@ -113,7 +113,7 @@ const NrtLoader: React.FC<NrtLoaderProps> = ({
         />
       </div>
 
-      {/* ── Brand name ── */}
+      {/* ── Brand name — green gradient text ── */}
       <div style={{ textAlign: 'center' }}>
         <p
           style={{
@@ -121,7 +121,7 @@ const NrtLoader: React.FC<NrtLoaderProps> = ({
             fontSize: '22px',
             fontWeight: 700,
             letterSpacing: '-0.02em',
-            background: 'linear-gradient(135deg, #A78BFA 0%, #7C3AED 100%)',
+            background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
@@ -144,7 +144,7 @@ const NrtLoader: React.FC<NrtLoaderProps> = ({
         </p>
       </div>
 
-      {/* ── Dot progress bar ── */}
+      {/* ── Dot progress bar — green dots ── */}
       <div style={{ display: 'flex', gap: '8px' }}>
         {[0, 1, 2, 3].map((i) => (
           <div
@@ -153,14 +153,14 @@ const NrtLoader: React.FC<NrtLoaderProps> = ({
               width: 6,
               height: 6,
               borderRadius: '50%',
-              background: '#7C3AED',
+              background: '#10b981',
               animation: `nrt-dot 1.2s ${i * 0.2}s ease-in-out infinite`,
             }}
           />
         ))}
       </div>
 
-      {/* ── Keyframe styles injected once ── */}
+      {/* ── Keyframe styles ── */}
       <style>{`
         @keyframes nrt-spin {
           to { transform: rotate(360deg); }
