@@ -5,8 +5,10 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { useNavigate } from 'react-router-dom';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function AdminLogin() {
+  usePageTitle('Admin Login');
   const navigate = useNavigate();
   const { setUser } = useAuthStore();
   const { showToast } = useToastStore();

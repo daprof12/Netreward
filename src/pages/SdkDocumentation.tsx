@@ -2,8 +2,10 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, Code, Terminal, Key, FileJson, Layers, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function SdkDocumentation() {
+  usePageTitle('SDK Docs');
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'installation' | 'configuration' | 'events'>('overview');
 

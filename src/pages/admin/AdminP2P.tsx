@@ -4,6 +4,7 @@ import { Search, MessageSquare, AlertCircle, CheckCircle2, X, Tags, ArrowLeftRig
 import LocationSearch from '@/components/LocationSearch';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const TAB_OPTIONS = [
   { id: 'disputes', label: 'Disputes', icon: MessageSquare },
@@ -513,6 +514,7 @@ function PaymentMethodsTab() {
 }
 
 export default function AdminP2P() {
+  usePageTitle('Admin — P2P');
   const [activeTab, setActiveTab] = useState<typeof TAB_OPTIONS[number]['id']>('disputes');
 
   return (

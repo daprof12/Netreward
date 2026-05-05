@@ -8,8 +8,10 @@ import { useWalletStore } from '@/stores/useWalletStore';
 import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { useToastStore } from '@/stores/useToastStore';
 import MapSelectionModal from '@/components/MapSelectionModal';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function EditCampaign() {
+  usePageTitle('Edit Campaign');
   const { campaignId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();

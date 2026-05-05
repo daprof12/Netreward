@@ -4,8 +4,10 @@ import { Search, Play, Pause, Trash2, Target, Activity, Coins, RefreshCw, Loader
 import { useToastStore } from '@/stores/useToastStore';
 import { adminCampaignApi } from '@/lib/adminApi';
 import MapSelectionModal from '@/components/MapSelectionModal';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function AdminCampaigns() {
+  usePageTitle('Admin — Campaigns');
   const { showToast } = useToastStore();
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

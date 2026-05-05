@@ -5,6 +5,7 @@ import LocationSearch from '@/components/LocationSearch';
 import { exchangerApi, type DbExchanger } from '@/lib/adminApi';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const STATUS_COLORS: Record<string, string> = { verified: '#10B981', pending: '#F59E0B', suspended: '#EF4444' };
 
@@ -14,6 +15,7 @@ const EMPTY_FORM = {
 };
 
 export default function AdminExchangers() {
+  usePageTitle('Admin — Exchangers');
   const { showToast } = useToastStore();
   const [exchangers, setExchangers] = useState<DbExchanger[]>([]);
   const [loading, setLoading] = useState(true);

@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Layers, CheckCircle2, XCircle, Trash2, Eye, Globe, Smartphone, Play, Terminal, Info, X, ShieldAlert, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { adminServiceApi } from '@/lib/adminApi';
 import { useToastStore } from '@/stores/useToastStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function AdminServices() {
+  usePageTitle('Admin — Services');
   const { showToast } = useToastStore();
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

@@ -10,8 +10,10 @@ import { useP2PStore } from '@/stores/useP2PStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { useTokenPrice } from '@/hooks/useTokenPrice';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function CreateP2POffer() {
+  usePageTitle('Create P2P Offer');
   const navigate = useNavigate();
   const location = useLocation();
   const editOffer = location.state?.editOffer;

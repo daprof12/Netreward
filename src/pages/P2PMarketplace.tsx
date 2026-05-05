@@ -10,10 +10,12 @@ import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { useTokenPrice } from '@/hooks/useTokenPrice';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useLocation } from 'react-router-dom';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 // Removed hardcoded NRT_LIVE_PRICE
 
 export default function P2PMarketplace() {
+  usePageTitle('P2P Marketplace');
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthStore();

@@ -17,6 +17,7 @@ import { useThemeStore, type Theme } from '@/stores/useThemeStore';
 import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { useProfile } from '@/hooks/useProfile';
 import LogoutConfirmModal from '@/components/ui/LogoutConfirmModal';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 interface MenuItem {
   icon: LucideIcon;
@@ -34,6 +35,7 @@ interface MenuGroup {
 }
 
 export default function Settings() {
+  usePageTitle('Settings');
   const navigate = useNavigate();
   const { user, role, setUser, setHasOnboarded, signOut } = useAuthStore();
   const { services, paymentIntegration, setPaymentIntegration, profileLogo: spLogo } = useSpStore();

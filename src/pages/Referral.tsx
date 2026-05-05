@@ -4,8 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Copy, Check, Share2, Users, Gift, TrendingUp, Inbox } from 'lucide-react';
 import { useReferrals } from '@/hooks/useReferrals';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function Referral() {
+  usePageTitle('Referrals');
   const navigate = useNavigate();
   const { referrals, referralCode, isLoading, totalReferred, totalEarned, pendingRewards } = useReferrals();
   const [copied, setCopied] = useState(false);

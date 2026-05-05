@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion';
 import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function PrivacyPolicyFull() {
+  usePageTitle('Privacy Policy');
   const navigate = useNavigate();
 
   return (

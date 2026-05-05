@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Search, Smartphone, Laptop, Tablet, MapPin, Wifi, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { useIspDevices } from '@/hooks/useAdminDevices';
 import { useIspStore } from '@/stores/useIspStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 function SignalBars({ strength }: { strength: number }) {
   return (
@@ -19,6 +20,7 @@ function SignalBars({ strength }: { strength: number }) {
 }
 
 export default function IspDevicesView() {
+  usePageTitle('ISP Devices');
   const { devices, isLoading } = useIspDevices();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'network' | 'campaign'>('all');

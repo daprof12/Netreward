@@ -8,6 +8,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useSpStore, type SpCampaign } from '@/stores/useSpStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { useCampaignAnalytics } from '@/hooks/useCampaignAnalytics';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { 
   AreaChart, 
   Area, 
@@ -19,6 +20,7 @@ import {
 } from 'recharts';
 
 export default function SpCampaignsView() {
+  usePageTitle('SP Campaigns');
   const { services, campaigns, updateCampaign, deleteCampaign, deleteService } = useSpStore();
   const { showToast } = useToastStore();
 

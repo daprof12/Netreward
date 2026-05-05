@@ -9,8 +9,10 @@ import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
 import { useSpStore } from '@/stores/useSpStore';
 import { useIspStore } from '@/stores/useIspStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function ProfileSettings() {
+  usePageTitle('Profile');
   const navigate = useNavigate();
   const { user, profile } = useAuthStore();
   const { updateProfile, isUpdating } = useProfile();

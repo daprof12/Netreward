@@ -9,6 +9,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToastStore } from '@/stores/useToastStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 interface Preferences {
   push: boolean;
@@ -23,6 +24,7 @@ interface Preferences {
 }
 
 export default function NotificationSettings() {
+  usePageTitle('Notifications');
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { showToast } = useToastStore();

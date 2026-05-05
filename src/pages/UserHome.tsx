@@ -18,6 +18,7 @@ import { useTelemetry } from '@/hooks/useTelemetry';
 import EmptyState from '@/components/ui/EmptyState';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const quickActions = [
   { icon: ArrowRightLeft, label: 'P2P', to: '/wallet/deposit/p2p', color: '#3b82f6', bg: 'bg-blue-500/10' },
@@ -48,6 +49,7 @@ function HomeSkeleton() {
 }
 
 export default function UserHome() {
+  usePageTitle('Home');
   const { user, profile } = useAuthStore();
   const { wallet, isLoading: isWalletLoading, claimRewards, isClaiming } = useWallet();
   const { userEnrollments, isLoading: isCampaignsLoading } = useCampaigns();

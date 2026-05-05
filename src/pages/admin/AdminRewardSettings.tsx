@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Save, Settings, DollarSign, Loader2 } from 'lucide-react';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 function RewardTab() {
   const { showToast } = useToastStore();
@@ -251,6 +252,7 @@ function FeesTab() {
 }
 
 export default function AdminRewardSettings() {
+  usePageTitle('Admin — Rewards');
   const [activeTab, setActiveTab] = useState<'rewards' | 'fees'>('rewards');
 
   return (

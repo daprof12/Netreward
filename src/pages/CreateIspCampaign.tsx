@@ -10,8 +10,10 @@ import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { useToastStore } from '@/stores/useToastStore';
 import MapSelectionModal from '@/components/MapSelectionModal';
 import { useFormStore } from '@/stores/useFormStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function CreateIspCampaign() {
+  usePageTitle('Create ISP Campaign');
   const navigate = useNavigate();
   const { user, profile } = useAuthStore();
   const { networks, addCampaign } = useIspStore();

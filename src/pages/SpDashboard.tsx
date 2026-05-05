@@ -13,12 +13,14 @@ import { useAnalyticsStore } from '@/stores/useAnalyticsStore';
 import AnalyticsChart from '@/components/ui/AnalyticsChart';
 import { useTelemetry } from '@/hooks/useTelemetry';
 import EmptyState from '@/components/ui/EmptyState';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 type TimeFilter = '24H' | '7D' | '3M' | 'All';
 
 // Removed mockChartData in favor of live DB aggregated stats
 
 export default function SpDashboard() {
+  usePageTitle('SP Dashboard');
   const { user, profile, refreshProfile, signOut, setHasOnboarded } = useAuthStore();
   const { campaigns, profileLogo } = useSpStore();
   const { convertNrt, getCurrencyDetails } = useCurrencyStore();

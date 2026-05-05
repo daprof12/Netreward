@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, AlertTriangle, CheckCircle, Clock, XCircle, MoreVertical, Key, Activity, Smartphone, Server, Eye, Settings } from 'lucide-react';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 type TabType = 'sessions' | 'anomalies' | 'sdk_keys';
 
 export default function AdminTracking() {
+  usePageTitle('Admin — Tracking');
   const { showToast } = useToastStore();
   const [trackingSessions, setTrackingSessions] = useState<any[]>([]);
   const [trackingAnomalies, setTrackingAnomalies] = useState<any[]>([]);

@@ -16,6 +16,7 @@ import AnalyticsChart from '@/components/ui/AnalyticsChart';
 import { useTransactions } from '@/hooks/useTransactions';
 import WithdrawModal from '@/components/wallet/WithdrawModal';
 import { useWalletAutomation } from '@/hooks/useWalletAutomation';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 function WalletSkeleton() {
   return (
@@ -31,6 +32,7 @@ function WalletSkeleton() {
 }
 
 export default function WalletPage() {
+  usePageTitle('Wallet');
   const { wallet, isLoading } = useWallet();
   const { balanceNRT, fetchBalance, subscribeToWallet } = useWalletStore();
   const { user } = useAuthStore();

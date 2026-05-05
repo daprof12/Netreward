@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { ArrowRight, Coins, ShieldCheck, Wifi } from 'lucide-react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const slides = [
   {
@@ -22,6 +23,7 @@ const slides = [
 ];
 
 export default function Onboarding() {
+  usePageTitle('Welcome');
   const [currentSlide, setCurrentSlide] = useState(0);
   const { setHasOnboarded } = useAuthStore();
 

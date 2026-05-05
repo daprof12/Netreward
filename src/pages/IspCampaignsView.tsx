@@ -8,6 +8,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useIspStore, type IspCampaign } from '@/stores/useIspStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { useCampaignAnalytics } from '@/hooks/useCampaignAnalytics';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { 
   AreaChart, 
   Area, 
@@ -19,6 +20,7 @@ import {
 } from 'recharts';
 
 export default function IspCampaignsView() {
+  usePageTitle('ISP Campaigns');
   const { networks, campaigns, updateCampaign, deleteCampaign, deleteNetwork } = useIspStore();
   const { showToast } = useToastStore();
 

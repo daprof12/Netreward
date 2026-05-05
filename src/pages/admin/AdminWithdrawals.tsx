@@ -4,6 +4,7 @@ import { Search, Wallet, CheckCircle, XCircle, AlertCircle, Clock, FileText, X, 
 import { supabase } from '@/lib/supabase';
 import LocationSearch from '@/components/LocationSearch';
 import { useToastStore } from '@/stores/useToastStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 interface WithdrawalRequest {
   id: string;
@@ -43,6 +44,7 @@ interface DepositTransaction {
 }
 
 export default function AdminWithdrawals() {
+  usePageTitle('Admin — Withdrawals');
   const [requests, setRequests] = useState<WithdrawalRequest[]>([]);
   const [deposits, setDeposits] = useState<DepositTransaction[]>([]);
   const [activeTab, setActiveTab] = useState<'withdrawals' | 'deposits'>('withdrawals');

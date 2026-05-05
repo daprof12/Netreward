@@ -5,6 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, 
 import { adminDashboardApi } from '@/lib/adminApi';
 import { supabase } from '@/lib/supabase';
 import LocationSearch from '@/components/LocationSearch';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const USER_ROLE_COLORS: Record<string, string> = { user: '#6366f1', sp: '#10B981', isp: '#3B82F6', admin: '#F59E0B' };
 const ROLE_LABELS: Record<string, string> = { user: 'Standard', sp: 'SP', isp: 'ISP', admin: 'Admin' };
@@ -29,6 +30,7 @@ function KpiCard({ label, value, sub, icon: Icon, color, loading }: { label: str
 }
 
 export default function AdminDashboard() {
+  usePageTitle('Admin Dashboard');
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState({ totalUsers: 0, activeCampaigns: 0, activeDevices: 0, openDisputes: 0 });
   const [userRoleData, setUserRoleData] = useState<{ name: string; value: number }[]>([]);

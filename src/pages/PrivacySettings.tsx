@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ShieldCheck, Activity, Database, AlertCircle } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function PrivacySettings() {
+  usePageTitle('Privacy');
   const navigate = useNavigate();
   const [dataTrackingEnabled, setDataTrackingEnabled] = useState(true);
 

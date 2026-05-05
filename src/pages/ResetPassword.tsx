@@ -4,8 +4,10 @@ import { Lock, Eye, EyeOff, CheckCircle2, Loader2, AlertCircle, ArrowRight } fro
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useToastStore } from '@/stores/useToastStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function ResetPassword() {
+  usePageTitle('Reset Password');
   const navigate = useNavigate();
   const { showToast } = useToastStore();
 

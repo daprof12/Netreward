@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Delete, CheckCircle2, Shield } from 'lucide-react';
 import { useSecurityStore } from '@/stores/useSecurityStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function PinSetupPage() {
+  usePageTitle('PIN Setup');
   const navigate = useNavigate();
   const { setPin, pin: currentPin } = useSecurityStore();
   const [pin, setPinState] = useState('');

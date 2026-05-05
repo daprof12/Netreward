@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Users2, Zap, ShieldCheck, Wallet } from 'lucide-react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const methods = [
   {
@@ -50,6 +51,7 @@ const methods = [
 ];
 
 export default function DepositHub() {
+  usePageTitle('Deposit');
   const navigate = useNavigate();
 
   return (

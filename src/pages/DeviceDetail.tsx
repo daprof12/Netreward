@@ -12,6 +12,7 @@ import { useUserDeviceStats, useDeviceAppUsage, useDeviceById } from '@/hooks/us
 type TimeFilter = '24H' | '7D' | '1M' | 'ALL';
 import EmptyState from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 function SignalBars({ strength }: { strength: number }) {
   return (
@@ -30,6 +31,7 @@ function SignalBars({ strength }: { strength: number }) {
 }
 
 export default function DeviceDetail() {
+  usePageTitle('Device Details');
   const { deviceId } = useParams<{ deviceId: string }>();
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24H');
   const [showFilters, setShowFilters] = useState(false);

@@ -7,10 +7,12 @@ import {
 } from 'lucide-react';
 import { adminTreasuryApi } from '@/lib/adminApi';
 import { useToastStore } from '@/stores/useToastStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 type Tab = 'overview' | 'liquidity' | 'audits';
 
 export default function AdminTreasury() {
+  usePageTitle('Admin — Treasury');
   const { showToast } = useToastStore();
   const [tab, setTab] = useState<Tab>('overview');
   const [loading, setLoading] = useState(true);

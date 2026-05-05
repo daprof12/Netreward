@@ -4,8 +4,10 @@ import { ChevronLeft, Fingerprint, KeyRound, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSecurityStore } from '@/stores/useSecurityStore';
 import BiometricSetupModal from '@/components/ui/BiometricSetupModal';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function SecuritySettings() {
+  usePageTitle('Security');
   const navigate = useNavigate();
   const { 
     biometricsEnabled, 

@@ -4,6 +4,7 @@ import { Search, Smartphone, Laptop, Tablet, MapPin, Wifi, CheckCircle2, AlertCi
 
 import { useSpDevices } from '@/hooks/useAdminDevices';
 import { useSpStore } from '@/stores/useSpStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 function SignalBars({ strength }: { strength: number }) {
   return (
@@ -20,6 +21,7 @@ function SignalBars({ strength }: { strength: number }) {
 }
 
 export default function SpDevicesView() {
+  usePageTitle('SP Devices');
   const { sessions, isLoading } = useSpDevices();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'service' | 'campaign'>('all');

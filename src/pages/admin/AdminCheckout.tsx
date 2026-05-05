@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ShoppingCart, DollarSign, Users, Loader2 } from 'lucide-react';
 import LocationSearch from '@/components/LocationSearch';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function AdminCheckout() {
+  usePageTitle('Admin — Checkout');
   const [checkouts, setCheckouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

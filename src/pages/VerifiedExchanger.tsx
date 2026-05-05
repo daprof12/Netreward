@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ExternalLink, ShieldCheck, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 interface Exchanger {
   id: string;
@@ -18,6 +19,7 @@ interface Exchanger {
 }
 
 export default function VerifiedExchanger() {
+  usePageTitle('Verified Exchangers');
   const navigate = useNavigate();
   const [exchangers, setExchangers] = useState<Exchanger[]>([]);
   const [loading, setLoading] = useState(true);

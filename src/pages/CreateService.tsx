@@ -8,8 +8,10 @@ import { useToastStore } from '@/stores/useToastStore';
 const CATEGORIES = ['Streaming', 'AI Service', 'Gaming', 'Social', 'Browsing', 'Cloud', 'Other'];
 
 import { useFormStore } from '@/stores/useFormStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function CreateService() {
+  usePageTitle('Create Service');
   const navigate = useNavigate();
   const { addService } = useSpStore();
   const { showToast } = useToastStore();

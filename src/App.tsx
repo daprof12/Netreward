@@ -42,6 +42,7 @@ import PrivacyPolicyFull from '@/pages/PrivacyPolicyFull';
 import AboutPage from '@/pages/AboutPage';
 import PinSetupPage from '@/pages/PinSetupPage';
 import ToastContainer from '@/components/ui/ToastContainer';
+import NrtLoader from '@/components/ui/NrtLoader';
 import AppLock from '@/components/ui/AppLock';
 import NetworkStatusManager from '@/components/NetworkStatusManager';
 import ThemeManager from '@/components/ThemeManager';
@@ -209,11 +210,7 @@ function App() {
   }, [user, role, initSp, initIsp]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-bg-primary">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-primary"></div>
-      </div>
-    );
+    return <NrtLoader message="Authenticating…" />;
   }
 
   if (!isOnboarded) {

@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion';
 import { ChevronLeft, ShieldCheck, Globe, Zap, Database, Lock, Gift, Star, Activity, Link as LinkIcon, Cpu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function AboutPage() {
+  usePageTitle('About');
   const navigate = useNavigate();
 
   const sections = [

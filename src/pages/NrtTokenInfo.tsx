@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion';
 import { ChevronLeft, ExternalLink, Activity, Layers, Droplets, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function NrtTokenInfo() {
+  usePageTitle('NRT Token Info');
   const navigate = useNavigate();
 
   // Mock data representing Solana on-chain state

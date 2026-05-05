@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, UserSquare, Loader2, MessageSquare, ShieldAlert, Users, Send, Target, Phone, Mail, Flag, CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToastStore } from '@/stores/useToastStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 type ActiveTab = 'directory' | 'leads' | 'communications' | 'audits';
 
 export default function AdminCRM() {
+  usePageTitle('Admin — CRM');
   const { showToast } = useToastStore();
   const [activeTab, setActiveTab] = useState<ActiveTab>('directory');
   const [loading, setLoading] = useState(true);

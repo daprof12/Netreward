@@ -7,6 +7,7 @@ import { useToastStore } from '@/stores/useToastStore';
 
 import LocationSearch from '@/components/LocationSearch';
 import * as z from 'zod';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const CATEGORIES = ['Telecommunication', 'Satellite', 'Fiber', 'Mobile Network', 'Broadband', 'Other'];
 
@@ -23,6 +24,7 @@ const networkSchema = z.object({
 });
 
 export default function EditNetwork() {
+  usePageTitle('Edit Network');
   const { networkId } = useParams();
   const navigate = useNavigate();
   const { networks, updateNetwork, isLoading: isStoreLoading } = useIspStore();

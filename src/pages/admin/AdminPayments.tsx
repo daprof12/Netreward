@@ -4,10 +4,12 @@ import { CreditCard, Shield, Plus, Edit2, Trash2, X, Search, Landmark, CheckCirc
 import LocationSearch from '@/components/LocationSearch';
 import { supabase } from '@/lib/supabase';
 import { useToastStore } from '@/stores/useToastStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 type ActiveTab = 'gateways' | 'banks' | 'integrations' | 'tax';
 
 export default function AdminPayments() {
+  usePageTitle('Admin — Payments');
   const { showToast } = useToastStore();
   const [gateways, setGateways] = useState<any[]>([]);
   const [localBanks, setLocalBanks] = useState<any[]>([]);

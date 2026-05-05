@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const TABS = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -27,6 +28,7 @@ interface FeatureFlag {
 }
 
 export default function AdminSettings() {
+  usePageTitle('Admin — Settings');
   const { user } = useAuthStore();
   const { showToast } = useToastStore();
   const [activeTab, setActiveTab] = useState('profile');

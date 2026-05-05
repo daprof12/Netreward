@@ -10,8 +10,10 @@ import { useToastStore } from '@/stores/useToastStore';
 import MapSelectionModal from '@/components/MapSelectionModal';
 
 import { useFormStore } from '@/stores/useFormStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function CreateCampaign() {
+  usePageTitle('Create Campaign');
   const navigate = useNavigate();
   const { user, profile } = useAuthStore();
   const { services, addCampaign } = useSpStore();

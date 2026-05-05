@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useP2PStore } from '@/stores/useP2PStore';
 import { useSystemStore } from '@/stores/useSystemStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 type P2PStep =
   | 'onboarding'
@@ -41,6 +42,7 @@ function useCountdown(seconds: number, active: boolean) {
 }
 
 export default function P2PFlow() {
+  usePageTitle('P2P Trade');
   const navigate = useNavigate();
   const location = useLocation();
   const { user, profile } = useAuthStore();

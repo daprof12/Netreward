@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import SpCampaignsView from './SpCampaignsView';
 import IspCampaignsView from './IspCampaignsView';
 import { useClaimRewards } from '@/hooks/useRewardEngine';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 // No static mock data needed here anymore
 
@@ -35,6 +36,7 @@ function SignalBars({ strength }: { strength: number }) {
 }
 
 export default function Campaigns() {
+  usePageTitle('Campaigns');
   const { role } = useAuthStore();
   const { showToast } = useToastStore();
 

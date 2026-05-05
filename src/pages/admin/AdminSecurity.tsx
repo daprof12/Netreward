@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function AdminSecurity() {
+  usePageTitle('Admin — Security');
   const [securityLogs, setSecurityLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

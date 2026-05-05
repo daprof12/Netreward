@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Coins, TrendingUp, Users, Zap, ChevronDown, Search, Loader2 } from 'lucide-react';
 import LocationSearch from '@/components/LocationSearch';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function AdminEarnings() {
+  usePageTitle('Admin — Earnings');
   const [earnings, setEarnings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

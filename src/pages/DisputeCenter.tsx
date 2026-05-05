@@ -8,8 +8,10 @@ import {
 } from 'lucide-react';
 import { useDisputes, type P2PDispute } from '@/hooks/useDisputes';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function DisputeCenter() {
+  usePageTitle('Dispute Center');
   const navigate = useNavigate();
   const { disputes, isLoading, sendMessage, isSending } = useDisputes();
   const [search, setSearch] = useState('');

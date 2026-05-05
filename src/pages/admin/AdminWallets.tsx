@@ -4,6 +4,7 @@ import { Search, Lock, Unlock, QrCode, Wallet, Coins, RefreshCw, Loader2 } from 
 import LocationSearch from '@/components/LocationSearch';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 interface AdminWallet {
   id: string;
@@ -21,6 +22,7 @@ interface AdminWallet {
 }
 
 export default function AdminWallets() {
+  usePageTitle('Admin — Wallets');
   const { showToast } = useToastStore();
   const [wallets, setWallets] = useState<AdminWallet[]>([]);
   const [loading, setLoading] = useState(true);

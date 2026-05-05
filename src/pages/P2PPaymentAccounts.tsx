@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import LocationSearch from '@/components/LocationSearch';
 import * as z from 'zod';
 import { AlertCircle } from 'lucide-react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const accountSchema = z.object({
   type: z.enum(['bank', 'mobile_money', 'fintech']),
@@ -22,6 +23,7 @@ const accountSchema = z.object({
 });
 
 export default function P2PPaymentAccounts() {
+  usePageTitle('Payment Accounts');
   const navigate = useNavigate();
   const { paymentAccounts, addPaymentAccount, deletePaymentAccount } = useP2PStore();
   const { showToast } = useToastStore();

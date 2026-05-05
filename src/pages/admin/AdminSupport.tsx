@@ -3,11 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, MessageSquare, CheckCircle2, X, AlertCircle, Clock, Loader2, RefreshCw } from 'lucide-react';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const STATUS_COLORS: Record<string, string> = { open: '#EF4444', in_progress: '#F59E0B', resolved: '#10B981', closed: '#6B7280' };
 const PRIORITY_COLORS: Record<string, string> = { low: '#6B7280', medium: '#3B82F6', high: '#F59E0B', critical: '#EF4444' };
 
 export default function AdminSupport() {
+  usePageTitle('Admin — Support');
   const { showToast } = useToastStore();
   const [supportTickets, setSupportTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

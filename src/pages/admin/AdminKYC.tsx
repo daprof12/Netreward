@@ -4,6 +4,7 @@ import { CheckCircle2, XCircle, Clock, X, FileText, Search, Filter, Globe, User 
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
 import { logAuditAction } from '@/lib/audit';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 interface KycSubmission {
   id: string;
@@ -27,6 +28,7 @@ interface KycSubmission {
 }
 
 export default function AdminKYC() {
+  usePageTitle('Admin — KYC');
   const { showToast } = useToastStore();
   const [submissions, setSubmissions] = useState<KycSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(true);

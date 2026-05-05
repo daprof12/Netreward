@@ -6,6 +6,7 @@ import { useIspStore, type IspNetwork } from '@/stores/useIspStore';
 import { useToastStore } from '@/stores/useToastStore';
 import LocationSearch from '@/components/LocationSearch';
 import * as z from 'zod';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const CATEGORIES = ['Telecommunication', 'Satellite', 'Fiber', 'Mobile Network', 'Broadband', 'Other'];
 
@@ -22,6 +23,7 @@ const networkSchema = z.object({
 });
 
 export default function CreateNetwork() {
+  usePageTitle('Create Network');
   const navigate = useNavigate();
   const { addNetwork } = useIspStore();
   const { showToast } = useToastStore();

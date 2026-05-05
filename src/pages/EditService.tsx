@@ -4,10 +4,12 @@ import { ChevronLeft, Globe, Smartphone, Play, Image as ImageIcon, CheckCircle2,
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSpStore, type SpService } from '@/stores/useSpStore';
 import { useToastStore } from '@/stores/useToastStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const CATEGORIES = ['Streaming', 'AI Service', 'Gaming', 'Social', 'Browsing', 'Cloud', 'Other'];
 
 export default function EditService() {
+  usePageTitle('Edit Service');
   const { serviceId } = useParams();
   const navigate = useNavigate();
   const { services, updateService, isLoading: isStoreLoading } = useSpStore();

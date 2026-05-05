@@ -10,6 +10,7 @@ import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { supabase } from '@/lib/supabase';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 type Step = 'enter' | 'confirm' | 'processing' | 'success';
 
@@ -20,6 +21,7 @@ const DEPOSIT_METHODS = [
 ];
 
 export default function InstantPurchase() {
+  usePageTitle('Instant Purchase');
   const navigate = useNavigate();
   const NRT_RATE = useTokenPrice();
   const { user, profile } = useAuthStore();

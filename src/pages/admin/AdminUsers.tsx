@@ -4,6 +4,7 @@ import { Search, Plus, Edit2, Trash2, X, Smartphone, Lock, KeySquare, Fingerprin
 import LocationSearch from '@/components/LocationSearch';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 interface AdminUser {
   id: string;
@@ -36,6 +37,7 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 
 export default function AdminUsers() {
+  usePageTitle('Admin — Users');
   const { showToast } = useToastStore();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);

@@ -8,6 +8,7 @@ import * as z from 'zod';
 import { useSupportTickets } from '@/hooks/useSupportTickets';
 import { useToastStore } from '@/stores/useToastStore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const supportSchema = z.object({
   category: z.string().min(1, 'Please select a category'),
@@ -18,6 +19,7 @@ const supportSchema = z.object({
 type SupportFormValues = z.infer<typeof supportSchema>;
 
 export default function Support() {
+  usePageTitle('Support');
   const [view, setView] = useState<'list' | 'create'>('list');
   const { tickets, isLoading, createTicket, isCreating } = useSupportTickets();
   const { showToast } = useToastStore();

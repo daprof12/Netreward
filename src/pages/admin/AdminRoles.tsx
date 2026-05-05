@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit2, Trash2, X, Shield, Loader2, Users, Key } from 'lucide-react';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const ALL_PERMISSIONS = ['users', 'transactions', 'wallets', 'earnings', 'campaigns', 'services', 'networks', 'devices', 'referrals', 'support', 'crm', 'p2p', 'config', 'system', 'fees', 'api'];
 
@@ -52,6 +53,7 @@ const togglePerm = (perms: string[], perm: string) =>
   perms.includes(perm) ? perms.filter(p => p !== perm) : [...perms, perm];
 
 export default function AdminRoles() {
+  usePageTitle('Admin — Roles');
   const { showToast } = useToastStore();
   const [adminRoles, setAdminRoles] = useState<any[]>([]);
   const [adminCount, setAdminCount] = useState(0);

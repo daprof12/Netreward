@@ -9,6 +9,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 type KycStatus = 'none' | 'pending' | 'verified' | 'rejected';
 type TargetRole = 'user' | 'sp' | 'isp';
@@ -38,6 +39,7 @@ const LIVENESS_STEPS: { key: LivenessStep; label: string; instruction: string; e
 ];
 
 export default function KYCVerification() {
+  usePageTitle('KYC Verification');
   const navigate = useNavigate();
   const location = useLocation();
   const { user, profile } = useAuthStore();

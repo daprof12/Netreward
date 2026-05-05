@@ -7,6 +7,7 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { PublicKey, Transaction, ComputeBudgetProgram } from '@solana/web3.js';
 import { createMintToInstruction, getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const DEFAULT_CONFIG = {
   tokenName: 'NetReward Token',
@@ -24,6 +25,7 @@ const DEFAULT_CONFIG = {
 };
 
 export default function AdminTokenConfig() {
+  usePageTitle('Admin — Token Config');
   const { showToast } = useToastStore();
   const [tokenConfig, setTokenConfig] = useState(DEFAULT_CONFIG);
   const [form, setForm] = useState(DEFAULT_CONFIG);

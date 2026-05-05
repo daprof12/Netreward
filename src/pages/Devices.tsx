@@ -13,6 +13,7 @@ type TimeFilter = '24H' | '7D' | '1M' | 'ALL';
 import EmptyState from '@/components/ui/EmptyState';
 import { useDeviceManager } from '@/hooks/useDeviceManager';
 import { Trash2, AlertTriangle } from 'lucide-react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 // Device icons mapping helper
 const getDeviceIcon = (type: string) => {
@@ -466,6 +467,7 @@ function UserDevicesView() {
 }
 
 export default function Devices() {
+  usePageTitle('My Devices');
   const { role } = useAuthStore();
   
   if (role === 'sp') {

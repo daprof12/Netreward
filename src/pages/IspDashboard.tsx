@@ -14,6 +14,7 @@ import AnalyticsChart from '@/components/ui/AnalyticsChart';
 import { Loader2 } from 'lucide-react';
 import { useTelemetry } from '@/hooks/useTelemetry';
 import EmptyState from '@/components/ui/EmptyState';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 type TimeFilter = '24H' | '7D' | '3M' | 'All';
 
@@ -21,6 +22,7 @@ type TimeFilter = '24H' | '7D' | '3M' | 'All';
 // Removed mockChartData in favor of live DB aggregated stats
 
 export default function IspDashboard() {
+  usePageTitle('ISP Dashboard');
   const { user, profile, refreshProfile, signOut, setHasOnboarded } = useAuthStore();
   const { campaigns, profileLogo, ispName } = useIspStore();
   const { getCurrencyDetails } = useCurrencyStore();

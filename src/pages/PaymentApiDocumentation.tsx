@@ -2,8 +2,10 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, Code, CreditCard, Webhook, Key, ShieldCheck, CheckCircle2, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function PaymentApiDocumentation() {
+  usePageTitle('Payment API Docs');
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'authentication' | 'endpoints' | 'webhooks'>('overview');
 

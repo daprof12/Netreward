@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Smartphone, X, Activity, Clock, Zap, Coins, Wifi, RefreshCw } from 'lucide-react';
 import LocationSearch from '@/components/LocationSearch';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 interface AdminDevice {
   id: string;
@@ -27,6 +28,7 @@ interface AdminDevice {
 }
 
 export default function AdminDevices() {
+  usePageTitle('Admin — Devices');
   const [devices, setDevices] = useState<AdminDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

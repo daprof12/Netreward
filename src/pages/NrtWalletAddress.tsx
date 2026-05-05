@@ -5,10 +5,12 @@ import { ChevronLeft, Copy, Check, AlertTriangle, Share2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useWallet } from '@/hooks/useWallet';
 import { useWalletAutomation } from '@/hooks/useWalletAutomation';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 
 
 export default function NrtWalletAddress() {
+  usePageTitle('NRT Wallet');
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { wallet, isLoading: isFetching } = useWallet();

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ArrowUpRight, ArrowDownLeft, Repeat, Gift, Coins, AlertCircle, ChevronDown, QrCode, Users, Loader2, RefreshCw } from 'lucide-react';
 import LocationSearch from '@/components/LocationSearch';
 import { supabase } from '@/lib/supabase';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 interface AdminTransaction {
   id: string;
@@ -64,6 +65,7 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 
 export default function AdminTransactions() {
+  usePageTitle('Admin — Transactions');
   const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Search, Filter, Clock, User, Shield, Info, ArrowRight, Calendar } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToastStore } from '@/stores/useToastStore';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 interface AuditLog {
   id: string;
@@ -21,6 +22,7 @@ interface AuditLog {
 }
 
 export default function AdminAudit() {
+  usePageTitle('Admin — Audit Log');
   const { showToast } = useToastStore();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);

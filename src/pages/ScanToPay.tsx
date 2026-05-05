@@ -13,10 +13,12 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { supabase } from '@/lib/supabase';
 import PinEntryModal from '@/components/ui/PinEntryModal';
 import BiometricPromptModal from '@/components/ui/BiometricPromptModal';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 type ScanStep = 'scanning' | 'decoding' | 'detected' | 'authenticating' | 'success' | 'failed' | 'timeout';
 
 export default function ScanToPay() {
+  usePageTitle('Scan to Pay');
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { nrtBalance, fiatValue, fetchBalance } = useWalletStore();

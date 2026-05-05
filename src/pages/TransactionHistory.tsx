@@ -9,6 +9,7 @@ import {
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useTransactions, type Transaction } from '@/hooks/useTransactions';
 import EmptyState from '@/components/ui/EmptyState';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const TYPE_OPTIONS = [
   { value: 'reward',         label: 'Rewards',     icon: TrendingUp,     color: 'text-emerald-400',     bg: 'bg-emerald-500/10'     },
@@ -58,6 +59,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function TransactionHistory() {
+  usePageTitle('Transaction History');
   const navigate   = useNavigate();
   const { role }   = useAuthStore();
 

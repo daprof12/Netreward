@@ -9,6 +9,7 @@ import { deployNRT } from '@/lib/solana-deploy';
 import type { TokenLaunchConfig } from '@/lib/solana-types';
 import { Transaction, PublicKey } from '@solana/web3.js';
 import { generateNRTMetadata } from '@/lib/metadata-generator';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const STEPS = [
   { id: 1, title: 'Network Config', icon: Network, desc: 'RPC and environment' },
@@ -20,6 +21,7 @@ const STEPS = [
 ];
 
 export default function AdminTokenLaunch() {
+  usePageTitle('Admin — Token Launch');
   const [currentStep, setCurrentStep] = useState(1);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentLog, setDeploymentLog] = useState<string[]>([]);
