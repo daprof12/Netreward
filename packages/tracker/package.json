@@ -1,0 +1,32 @@
+{
+  "name": "@daprof12/tracker",
+  "version": "1.0.0",
+  "description": "Core NetReward tracking SDK for data consumption",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "keywords": [
+    "netreward",
+    "tracking",
+    "data"
+  ],
+  "author": "NetReward Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/daprof12/Web-SDK.git"
+  },
+  "bugs": {
+    "url": "https://github.com/daprof12/Web-SDK/issues"
+  },
+  "homepage": "https://netreward.online",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
