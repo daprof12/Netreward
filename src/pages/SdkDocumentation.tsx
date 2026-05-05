@@ -1,13 +1,91 @@
 import { motion } from 'framer-motion';
-import { ChevronLeft, Code, Terminal, Key, FileJson, Layers, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, Code, Terminal, Key, FileJson, Layers, ExternalLink, CheckCircle2, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useSpStore } from '@/stores/useSpStore';
+import { useIspStore } from '@/stores/useIspStore';
+import { useAuthStore } from '@/stores/useAuthStore';
+
+function useDashboardKeys() {
+  const { role } = useAuthStore();
+  const { services } = useSpStore();
+  const { networks } = useIspStore();
+
+  if (role === 'sp' && services.length > 0) {
+    const s = services[0];
+    return {
+      apiKey: s.apiKey || null,
+      secretKey: s.secretKey || null,
+      webhookSecret: s.webhookSecret || null,
+    };
+  }
+  if (role === 'isp' && networks.length > 0) {
+    const n = networks[0];
+    return {
+      apiKey: n.apiKey || null,
+      secretKey: n.apiSecret || null,
+      webhookSecret: null,
+    };
+  }
+  return { apiKey: null, secretKey: null, webhookSecret: null };
+}
+
+function KeyDisplay({ label, value, masked = true }: { label: string; value: string | null; masked?: boolean }) {
+  const [visible, setVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const display = value
+    ? (masked && !visible ? value.slice(0, 12) + '••••••••••••••••' : value)
+    : 'Not generated yet — create a service/network first';
+
+  const copy = () => {
+    if (!value) return;
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-glass-border rounded-xl p-3">
+      <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">{label}</p>
+      <div className="flex items-center gap-2">
+        <code className={`flex-1 text-xs font-mono break-all ${value ? 'text-accent-primary' : 'text-text-secondary italic'}`}>
+          {display}
+        </code>
+        {value && (
+          <div className="flex items-center gap-1 shrink-0">
+            {masked && (
+              <button
+                onClick={() => setVisible(v => !v)}
+                className="p-1.5 rounded-lg hover:bg-glass-border transition-colors text-text-secondary"
+                title={visible ? 'Hide' : 'Reveal'}
+              >
+                {visible ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            )}
+            <button
+              onClick={copy}
+              className="p-1.5 rounded-lg hover:bg-glass-border transition-colors text-text-secondary"
+              title="Copy"
+            >
+              {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function SdkDocumentation() {
   usePageTitle('SDK Docs');
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'installation' | 'configuration' | 'events'>('overview');
+  const { apiKey, secretKey } = useDashboardKeys();
+
+  // Use real key in code samples, fall back to placeholder
+  const displayApiKey = apiKey ?? 'YOUR_API_KEY';
 
   return (
     <motion.div
@@ -53,7 +131,7 @@ export default function SdkDocumentation() {
 
       {/* Content Area */}
       <div className="glass rounded-2xl border border-glass-border p-6 min-h-[400px]">
-        
+
         {activeTab === 'overview' && (
           <div className="space-y-6">
             <div className="flex items-start gap-4">
@@ -101,7 +179,7 @@ export default function SdkDocumentation() {
                   <code className="text-xs font-mono text-accent-primary">npm install @netreward/tracker-sdk</code>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-bold mb-2">iOS (CocoaPods)</h3>
                 <div className="bg-[#0f172a] rounded-xl p-4 border border-glass-border/30 relative group">
@@ -124,15 +202,24 @@ export default function SdkDocumentation() {
             <h2 className="text-xl font-bold">Initialization & Configuration</h2>
             <p className="text-sm text-text-secondary mb-4">You must initialize the SDK as early as possible in your application lifecycle (e.g., inside App.tsx or AppDelegate).</p>
 
+            {/* ── Your Keys ── */}
+            <div className="space-y-2 mb-4">
+              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <Key size={14} className="text-accent-primary" /> Your Credentials
+              </h3>
+              <KeyDisplay label="SDK / Tracker API Key" value={apiKey} />
+              <KeyDisplay label="Secret Key (backend only)" value={secretKey} />
+            </div>
+
             <div className="bg-[#0f172a] rounded-xl p-4 border border-glass-border/30 overflow-x-auto">
               <pre className="text-xs font-mono text-gray-300 leading-relaxed">
 {`import { NetRewardTracker } from '@netreward/tracker-sdk';
 
 // Initialize the tracker singleton
 NetRewardTracker.init({
-  apiKey: 'sp_live_xxxxxxxxx', // Found in your Dashboard
+  apiKey: '${displayApiKey}',
   environment: 'production',   // 'sandbox' | 'production'
-  
+
   // Optional: Advanced configuration
   config: {
     batchIntervalMs: 60000,    // Flush data every 60s
@@ -146,7 +233,7 @@ NetRewardTracker.init({
 
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mt-4">
               <h4 className="text-sm font-bold text-amber-500 mb-1">Security Warning</h4>
-              <p className="text-xs text-amber-500/80">Never expose your Secret Key on client-side applications. The `apiKey` provided above is meant for client telemetry only. For secure backend verification, utilize your Secret Key via the REST API.</p>
+              <p className="text-xs text-amber-500/80">Never expose your Secret Key on client-side applications. The <code>apiKey</code> above is for client telemetry only. For secure backend verification, use your Secret Key via the REST API.</p>
             </div>
           </div>
         )}
@@ -184,7 +271,7 @@ NetRewardTracker.logDataConsumption({
                   </pre>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-bold mb-2 border-b border-glass-border pb-1">3. Custom Events</h3>
                 <p className="text-xs text-text-secondary mb-2">Track user interactions that may trigger specific campaign bonuses.</p>
@@ -202,7 +289,7 @@ NetRewardTracker.logDataConsumption({
           </div>
         )}
       </div>
-      
+
       <div className="flex justify-center pt-4">
         <a href="#" className="flex items-center gap-2 text-sm font-bold text-accent-primary hover:underline">
           View full API Reference <ExternalLink size={14} />
