@@ -1,19 +1,27 @@
 {
   "name": "@daprof12/tracker",
   "version": "1.0.0",
-  "description": "Core NetReward tracking SDK for data consumption",
+  "description": "NetReward tracking SDK — report data consumption sessions to the NetReward reward engine",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist/",
+    "src/",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
-    "watch": "tsc -w"
+    "watch": "tsc -w",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "netreward",
+    "nrt",
     "tracking",
-    "data"
+    "data",
+    "sdk"
   ],
-  "author": "NetReward Team",
+  "author": "NetReward Team <dev@netreward.online>",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,7 +32,7 @@
   },
   "homepage": "https://netreward.online",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   },
   "devDependencies": {
     "typescript": "^5.0.0"
