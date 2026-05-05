@@ -70,10 +70,8 @@ export default function ScanToPay() {
     setStep('requesting');
     setCameraErrorMsg('');
 
-    // iOS/Android constraint fallback chain:
-    // 1. Ideal resolution + ideal facingMode (best quality)
-    // 2. Just facingMode (no resolution — avoids silent mobile failures)
-    // 3. Any video at all (ultimate fallback)
+    // Constraint fallback chain for iOS/Android:
+    // 1. Ideal facing + resolution  2. Just facing  3. Any video
     const constraintOptions: MediaStreamConstraints[] = [
       { video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
       { video: { facingMode: facing }, audio: false },
@@ -82,54 +80,37 @@ export default function ScanToPay() {
 
     let stream: MediaStream | null = null;
     let lastErr: any;
-
     for (const opts of constraintOptions) {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(opts);
-        break;
-      } catch (e) {
-        lastErr = e;
-      }
+      try { stream = await navigator.mediaDevices.getUserMedia(opts); break; }
+      catch (e) { lastErr = e; }
     }
 
     if (!stream) {
       const err = lastErr;
       console.error('Camera error:', err);
-      const msg =
-        err?.name === 'NotAllowedError'
-          ? 'Camera permission denied. Please allow camera access in your browser settings.'
-          : err?.name === 'NotFoundError'
-          ? 'No camera found on this device.'
-          : err?.name === 'NotReadableError'
-          ? 'Camera is already in use by another app.'
-          : `Camera error: ${err?.message ?? 'Unknown error'}`;
-      setCameraErrorMsg(msg);
+      setCameraErrorMsg(
+        err?.name === 'NotAllowedError' ? 'Camera permission denied. Please allow camera access in your browser settings.'
+        : err?.name === 'NotFoundError' ? 'No camera found on this device.'
+        : err?.name === 'NotReadableError' ? 'Camera is already in use by another app.'
+        : `Camera error: ${err?.message ?? 'Unknown error'}`
+      );
       setStep('camera_error');
       return;
     }
 
     streamRef.current = stream;
 
-    if (videoRef.current) {
-      const video = videoRef.current;
-      // Required attributes for iOS Safari
+    // Attach stream — videoRef is ALWAYS mounted (rendered at page root, never unmounted)
+    // so this block executes reliably every time.
+    const video = videoRef.current;
+    if (video) {
       video.setAttribute('playsinline', 'true');
-      video.setAttribute('webkit-playsinline', 'true'); // older iOS
+      video.setAttribute('webkit-playsinline', 'true');
       video.muted = true;
       video.srcObject = stream;
-
-      // iOS requires play() to be called inside loadedmetadata/canplay,
-      // not immediately after srcObject assignment.
-      await new Promise<void>((resolve) => {
-        const onReady = async () => {
-          try { await video.play(); } catch { /* autoplay policy — video may still render */ }
-          resolve();
-        };
-        video.addEventListener('loadedmetadata', onReady, { once: true });
-        video.addEventListener('canplay', onReady, { once: true });
-        // Safety timeout: if neither event fires within 3s, proceed anyway
-        setTimeout(resolve, 3000);
-      });
+      // Try to play; on iOS autoplay may require user gesture but video will
+      // still render once the element is visible.
+      try { await video.play(); } catch { /* autoplay policy — renders on user gesture */ }
     }
 
     setStep('scanning');
@@ -301,6 +282,46 @@ export default function ScanToPay() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
+      {/*
+        VIDEO ELEMENT — always mounted at the page root level.
+        ROOT CAUSE FIX: The video element was previously inside the
+        AnimatePresence conditional block (only rendered when step==='scanning').
+        During startCamera(), step is 'requesting' → video element is UNMOUNTED
+        → videoRef.current is null → stream never attached → blank screen.
+        Fix: keep it always in the DOM, toggle visibility via CSS only.
+      */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: '#000',
+          // Visible only during scanning/decoding — but NEVER unmounted
+          visibility: (step === 'scanning' || step === 'decoding') ? 'visible' : 'hidden',
+          zIndex: 0,
+        }}
+      >
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            // Force own GPU compositing layer — prevents blank video inside
+            // CSS-transformed parent (Framer Motion) on iOS Safari / Android WebView
+            transform: 'translateZ(0)',
+            WebkitTransform: 'translateZ(0)',
+            display: 'block',
+          }}
+        />
+      </div>
+
+      {/* Hidden canvas for jsQR — always mounted too */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+
       {/* Header */}
       <div className="flex items-center justify-between p-4 pt-8 z-10 relative">
         <button
@@ -395,42 +416,8 @@ export default function ScanToPay() {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="flex-1 flex flex-col items-center justify-center relative"
           >
-            {/* Live video — fullscreen behind overlay.
-                iOS Safari bugs fixed:
-                1. No overflow-hidden on wrapper (clips iOS video stream)
-                2. translateZ(0) forces video onto its own GPU layer
-                   (prevents blank video inside Framer Motion transformed containers)
-                3. objectFit via inline style (Tailwind class ignored on some iOS versions)
-            */}
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background: '#000',
-              }}
-            >
-              <video
-                ref={videoRef}
-                playsInline
-                muted
-                autoPlay
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  // Force own GPU compositing layer — fixes iOS blank video
-                  // inside CSS-transform-animated parent (Framer Motion)
-                  transform: 'translateZ(0)',
-                  WebkitTransform: 'translateZ(0)',
-                  display: 'block',
-                }}
-              />
-            </div>
 
-            {/* Hidden canvas for jsQR */}
-            <canvas ref={canvasRef} className="hidden" />
-
-            {/* Overlay with viewfinder */}
+            {/* Overlay with viewfinder — on top of the always-mounted video */}
             <div className="relative z-10 flex flex-col items-center gap-8 px-6">
               <div className="text-center space-y-1">
                 <h2 className="text-2xl font-bold text-white drop-shadow">Scan QR Code</h2>
