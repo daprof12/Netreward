@@ -238,7 +238,7 @@ export default function EditIspCampaign() {
               <Calculator size={12} /> Rate: ~1 NRT per 10GB Data 
               {budgetNrt && typeof budgetNrt === 'number' && (
                 <span className="text-green-500 font-bold ml-1">
-                  (≈ {convertNrt(budgetNrt).symbol}{convertNrt(budgetNrt).amount.toFixed(2)} {selectedCurrency.split(' ')[0]})
+                  (≈ {convertNrt(budgetNrt).symbol}{convertNrt(budgetNrt).amount} {selectedCurrency.split(' ')[0]})
                 </span>
               )}
             </p>

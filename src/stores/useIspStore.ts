@@ -241,6 +241,7 @@ export const useIspStore = create<IspStore>()(
         set({ isLoading: true, error: null });
         try {
           const dbUpdates: any = {};
+          if (updates.networkId !== undefined) dbUpdates.network_id = updates.networkId;
           if (updates.name !== undefined) dbUpdates.title = updates.name;
           if (updates.status !== undefined) dbUpdates.status = updates.status;
           if (updates.spentNrt !== undefined) dbUpdates.budget_spent = updates.spentNrt;
