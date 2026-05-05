@@ -1,0 +1,290 @@
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Save, Settings, DollarSign, Loader2 } from 'lucide-react';
+import { useToastStore } from '@/stores/useToastStore';
+import { supabase } from '@/lib/supabase';
+
+function RewardTab() {
+  const { showToast } = useToastStore();
+  const [form, setForm] = useState({ gbPerNrt: 1, nrtUsdValue: 0.042, spCashbackPct: 5, ispCashbackPct: 3 });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: rewards } = await supabase.from('kv_settings').select('value').eq('key', 'reward_config').single();
+        const { data: token } = await supabase.from('kv_settings').select('value').eq('key', 'token_config').single();
+        
+        let initialForm = { gbPerNrt: 1, nrtUsdValue: 0.042, spCashbackPct: 5, ispCashbackPct: 3, instantPurchasePrice: 0.005 };
+        
+        if (rewards?.value) { 
+          try { initialForm = { ...initialForm, ...JSON.parse(rewards.value) }; } catch {} 
+        }
+        if (token?.value) {
+          try { 
+            const t = JSON.parse(token.value);
+            if (t.currentValue) initialForm.instantPurchasePrice = Number(t.currentValue);
+          } catch {}
+        }
+        
+        setForm(initialForm);
+      } catch (e) { /* use defaults */ }
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      // Save Reward Config
+      const rewardPayload = { ...form };
+      delete (rewardPayload as any).instantPurchasePrice;
+
+      await supabase.from('kv_settings').upsert(
+        { key: 'reward_config', value: JSON.stringify(rewardPayload), category: 'rewards', updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+
+      // Save Token Config (for Instant Purchase)
+      await supabase.from('kv_settings').upsert(
+        { 
+          key: 'token_config', 
+          value: JSON.stringify({ currentValue: form.instantPurchasePrice, lastUpdate: new Date().toISOString() }), 
+          category: 'token', 
+          updated_at: new Date().toISOString() 
+        },
+        { onConflict: 'key' }
+      );
+
+      showToast('Reward and Instant Purchase settings updated.', 'success');
+    } catch (e: any) { showToast(e.message || 'Save failed', 'error'); }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">Reward Settings</h2>
+          <p className="text-sm text-text-secondary">Configure global platform reward rates</p>
+        </div>
+        <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-accent-primary/20 hover:opacity-90 transition-opacity">
+          <Save size={16} /> Save Changes
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-bg-card border border-glass-border rounded-xl p-5 space-y-4">
+          <h3 className="font-bold border-b border-glass-border pb-3">Data to NRT Rate</h3>
+          
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">GB per NRT</label>
+            <div className="flex items-center gap-3">
+              <input type="number" value={form.gbPerNrt} onChange={e => setForm({ ...form, gbPerNrt: Number(e.target.value) })}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
+              <span className="text-sm font-bold text-text-secondary">GB = 1 NRT</span>
+            </div>
+            <p className="text-xs text-text-secondary mt-1">Amount of data consumed to earn 1 NRT.</p>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">NRT Base USD Value (Reference)</label>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-text-secondary">1 NRT = $</span>
+              <input type="number" step="0.001" value={form.nrtUsdValue} onChange={e => setForm({ ...form, nrtUsdValue: Number(e.target.value) })}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
+            </div>
+            <p className="text-xs text-text-secondary mt-1">Global reference value for earnings display.</p>
+          </div>
+        </div>
+
+        <div className="bg-bg-card border border-glass-border rounded-xl p-5 space-y-4">
+          <h3 className="font-bold border-b border-glass-border pb-3">Instant Purchase Settlement</h3>
+          
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Instant Purchase Price (USD)</label>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-text-secondary">1 NRT = $</span>
+              <input type="number" step="0.0001" value={(form as any).instantPurchasePrice} onChange={e => setForm({ ...form, instantPurchasePrice: Number(e.target.value) } as any)}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
+            </div>
+            <p className="text-xs text-text-secondary mt-1">The actual rate used for the user side "Instant Purchase" flow.</p>
+          </div>
+
+          <div className="pt-2">
+            <div className="bg-accent-primary/5 rounded-lg p-3 border border-accent-primary/10">
+              <p className="text-[10px] font-bold text-accent-primary uppercase tracking-wider mb-1">Live Preview</p>
+              <p className="text-sm text-text-primary font-bold">$100.00 USD ≈ {((100 / (form as any).instantPurchasePrice)).toLocaleString(undefined, { maximumFractionDigits: 2 })} NRT</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-bg-card border border-glass-border rounded-xl p-5 space-y-4">
+          <h3 className="font-bold border-b border-glass-border pb-3">Cashback / Revenue Share</h3>
+          
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">SP Cashback %</label>
+            <div className="flex items-center gap-3">
+              <input type="number" value={form.spCashbackPct} onChange={e => setForm({ ...form, spCashbackPct: Number(e.target.value) })}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
+              <span className="text-sm font-bold text-text-secondary">%</span>
+            </div>
+            <p className="text-xs text-text-secondary mt-1">Percentage of NRT earned by users returned to SP.</p>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">ISP Cashback %</label>
+            <div className="flex items-center gap-3">
+              <input type="number" value={form.ispCashbackPct} onChange={e => setForm({ ...form, ispCashbackPct: Number(e.target.value) })}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
+              <span className="text-sm font-bold text-text-secondary">%</span>
+            </div>
+            <p className="text-xs text-text-secondary mt-1">Percentage of NRT earned by users returned to ISP.</p>
+          </div>
+        </div>
+
+        <div className="bg-bg-card border border-glass-border rounded-xl p-5 space-y-4">
+          <h3 className="font-bold border-b border-glass-border pb-3">Network Health Score (NHS)</h3>
+          
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Base NHS Multiplier</label>
+            <div className="flex items-center gap-3">
+              <input type="number" step="0.1" value={(form as any).nhsMultiplier || 1.0} onChange={e => setForm({ ...form, nhsMultiplier: Number(e.target.value) } as any)}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
+              <span className="text-sm font-bold text-text-secondary">x</span>
+            </div>
+            <p className="text-xs text-text-secondary mt-1">Manual scaling factor for global rewards. 1.0 is neutral.</p>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Target NHS Score</label>
+            <div className="flex items-center gap-3">
+              <input type="number" value={(form as any).targetNhsScore || 65} onChange={e => setForm({ ...form, targetNhsScore: Number(e.target.value) } as any)}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
+              <span className="text-sm font-bold text-text-secondary">/ 100</span>
+            </div>
+            <p className="text-xs text-text-secondary mt-1">Desired ecosystem health score. Impacts dynamic inflation.</p>
+          </div>
+
+          <div className="pt-2">
+            <div className="bg-blue-500/5 rounded-lg p-3 border border-blue-500/10">
+              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">Calculation Logic</p>
+              <p className="text-[11px] text-text-secondary leading-relaxed">
+                NRT Earned = (Data GB / Rate) × <span className="text-blue-400 font-bold">{ (form as any).nhsMultiplier || 1.0 }</span>
+                <br/>
+                <span className="opacity-50">Higher multipliers encourage usage during periods of high demand.</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeesTab() {
+  const { showToast } = useToastStore();
+  const [fees, setFees] = useState<any[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from('processing_fees').select('*').order('fee_name');
+        setFees((data || []).map((f: any) => ({ ...f, type: f.fee_name, feeType: f.calc_type })));
+      } catch (e) { console.error(e); }
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      for (const f of fees) {
+        await supabase.from('processing_fees').update({ calc_type: f.feeType || f.calc_type, value: f.value, updated_at: new Date().toISOString() }).eq('id', f.id);
+      }
+      showToast('Processing fees updated.', 'success');
+    } catch (e: any) { showToast(e.message || 'Save failed', 'error'); }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">Processing Fees</h2>
+          <p className="text-sm text-text-secondary">Configure flat and percentage-based fees</p>
+        </div>
+        <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-accent-primary/20 hover:opacity-90 transition-opacity">
+          <Save size={16} /> Save Changes
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {fees.map((fee, i) => (
+          <div key={fee.type} className="bg-bg-card border border-glass-border rounded-xl p-5 space-y-4">
+            <h3 className="font-bold border-b border-glass-border pb-3">{fee.type} Fee</h3>
+            
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Fee Type</label>
+                <select value={fee.feeType} onChange={e => {
+                  const newFees = [...fees];
+                  newFees[i].feeType = e.target.value as 'flat' | 'percent';
+                  setFees(newFees);
+                }} className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm outline-none">
+                  <option value="percent">Percentage (%)</option>
+                  <option value="flat">Flat Rate (NRT)</option>
+                </select>
+              </div>
+
+              <div className="flex-1">
+                <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Amount / Rate</label>
+                <div className="flex items-center gap-3">
+                  <input type="number" step={fee.feeType === 'percent' ? '0.1' : '1'} value={fee.value} onChange={e => {
+                    const newFees = [...fees];
+                    newFees[i].value = Number(e.target.value);
+                    setFees(newFees);
+                  }} className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
+                  <span className="font-bold text-text-secondary text-sm">{fee.feeType === 'percent' ? '%' : 'NRT'}</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-text-secondary">Applied automatically to all {fee.type.toLowerCase()} transactions.</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function AdminRewardSettings() {
+  const [activeTab, setActiveTab] = useState<'rewards' | 'fees'>('rewards');
+
+  return (
+    <motion.div className="space-y-5" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <div>
+        <h1 className="text-2xl font-black">Rewards & Fees</h1>
+        <p className="text-sm text-text-secondary">Manage global reward settings and processing fees</p>
+      </div>
+
+      <div className="flex bg-bg-secondary p-1 rounded-xl w-full max-w-sm">
+        <button
+          onClick={() => setActiveTab('rewards')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-lg transition-all ${
+            activeTab === 'rewards' ? 'bg-bg-primary shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          <Settings size={16} /> Rewards
+        </button>
+        <button
+          onClick={() => setActiveTab('fees')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-lg transition-all ${
+            activeTab === 'fees' ? 'bg-bg-primary shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          <DollarSign size={16} /> Fees
+        </button>
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+          {activeTab === 'rewards' && <RewardTab />}
+          {activeTab === 'fees' && <FeesTab />}
+        </motion.div>
+      </AnimatePresence>
+    </motion.div>
+  );
+}

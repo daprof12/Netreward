@@ -1,0 +1,2 @@
+-- Seed mock data removed to allow app to run in default state with zero data
+-- (Original seed data previously populated auth users, campaigns, transactions, etc.)
