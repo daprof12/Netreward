@@ -35,22 +35,38 @@ export function useCampaigns() {
   // Helper to extract a single object from potential array (Supabase join behavior)
   const getSingle = (val: any) => Array.isArray(val) ? val[0] : val;
 
+  // Helper to resolve creator name — same pattern as adminApi.ts
+  // If the profile was auto-created with the 'Alpha SP/ISP' sentinel name,
+  // fall through to the linked user's display_name instead.
+  const resolveCreatorName = (sp: any, isp: any, svc: any, net: any): string => {
+    if (sp) {
+      return sp.company_name === 'Alpha SP'
+        ? sp.users?.display_name || sp.company_name
+        : sp.company_name;
+    }
+    if (isp) {
+      return isp.isp_name === 'Alpha ISP'
+        ? isp.users?.display_name || isp.isp_name
+        : isp.isp_name;
+    }
+    return svc?.name || net?.name || 'NetReward Partner';
+  };
+
   // Fetch all active campaigns
   const { data: activeCampaigns, isLoading: isLoadingCampaigns } = useQuery({
     queryKey: ['campaigns', 'active'],
     queryFn: async () => {
-      // Use explicit joins to get branding data
       const { data, error } = await supabase
         .from('campaigns')
         .select(`
           *,
-          sp:sp_profiles (company_name, logo_url),
-          isp:isp_profiles (isp_name, logo_url),
+          sp:sp_profiles (company_name, logo_url, users (display_name)),
+          isp:isp_profiles (isp_name, logo_url, users (display_name)),
           svc:services (name, logo_url, category),
           net:networks (name, logo_url, category)
         `)
         .eq('status', 'active');
-      
+
       if (error) {
         console.error('Error fetching campaigns:', error);
         throw error;
@@ -62,21 +78,17 @@ export function useCampaigns() {
         const svc = getSingle(camp.svc);
         const net = getSingle(camp.net);
 
-        // Debug: Log if ISP logo is missing but profile exists
-        if (isp && !isp.logo_url) {
-           console.warn('ISP profile found but missing logo_url:', isp.isp_name);
-        }
+        // Resolve users sub-object (may also be wrapped in array by Supabase)
+        if (sp && Array.isArray(sp.users)) sp.users = sp.users[0];
+        if (isp && Array.isArray(isp.users)) isp.users = isp.users[0];
 
         return {
           ...camp,
-          // Derive target_app: priority is service name, then network name, then campaign title
           target_app: svc?.name || net?.name || camp.title || 'App Service',
-          // Priority: Service Logo > Network Logo > Profile Logo (SP or ISP) > Fallback null
           logo_url: svc?.logo_url || net?.logo_url || sp?.logo_url || isp?.logo_url || null,
-          creator_name: sp?.company_name || isp?.isp_name || svc?.name || net?.name || 'NetReward Partner',
+          creator_name: resolveCreatorName(sp, isp, svc, net),
           creator_logo: sp?.logo_url || isp?.logo_url || null,
           category: svc?.category || net?.category || (sp ? 'Service' : isp ? 'Network' : 'General'),
-          // Ensure target_locations is preserved
           target_locations: camp.target_locations || []
         };
       });
@@ -91,21 +103,21 @@ export function useCampaigns() {
     queryKey: ['user_campaigns', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      
+
       const { data, error } = await supabase
         .from('user_campaigns')
         .select(`
           *,
           campaigns:campaigns!campaign_id (
             *,
-            sp:sp_profiles (company_name, logo_url),
-            isp:isp_profiles (isp_name, logo_url),
+            sp:sp_profiles (company_name, logo_url, users (display_name)),
+            isp:isp_profiles (isp_name, logo_url, users (display_name)),
             svc:services (name, logo_url, category),
             net:networks (name, logo_url, category)
           )
         `)
         .eq('user_id', user.id);
-      
+
       if (error) {
         console.error('Error fetching user enrollments:', error);
         throw error;
@@ -119,13 +131,16 @@ export function useCampaigns() {
         const svc = getSingle(camp.svc);
         const net = getSingle(camp.net);
 
+        if (sp && Array.isArray(sp.users)) sp.users = sp.users[0];
+        if (isp && Array.isArray(isp.users)) isp.users = isp.users[0];
+
         return {
           ...en,
           campaigns: {
             ...camp,
             target_app: svc?.name || net?.name || camp.title || 'App Service',
             logo_url: svc?.logo_url || net?.logo_url || sp?.logo_url || isp?.logo_url || null,
-            creator_name: sp?.company_name || isp?.isp_name || svc?.name || net?.name || 'NetReward Partner',
+            creator_name: resolveCreatorName(sp, isp, svc, net),
             creator_logo: sp?.logo_url || isp?.logo_url || null,
             category: svc?.category || net?.category || (sp ? 'Service' : isp ? 'Network' : 'General'),
             target_locations: camp.target_locations || []
