@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, QrCode, CheckCircle2, ShoppingCart,
-  ArrowRight, Fingerprint, Loader2, AlertCircle, RefreshCw, XCircle, Camera, CameraOff
+  ArrowRight, Fingerprint, Loader2, AlertCircle, RefreshCw, XCircle,
+  Camera, CameraOff, SwitchCamera, FlipHorizontal2
 } from 'lucide-react';
 import jsQR from 'jsqr';
 import { useWalletStore } from '@/stores/useWalletStore';
@@ -279,20 +280,31 @@ export default function ScanToPay() {
           <ChevronLeft size={20} className="text-text-primary" />
         </button>
         <h1 className="text-lg font-bold">Scan2Pay</h1>
-        {step === 'scanning' && (
+        {step === 'scanning' ? (
           <button
             onClick={() => {
               const next = facingMode === 'environment' ? 'user' : 'environment';
               setFacingMode(next);
               startCamera(next);
             }}
-            className="p-2 bg-bg-secondary rounded-full"
-            title="Flip camera"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-bg-secondary rounded-full border border-glass-border"
+            title={facingMode === 'environment' ? 'Switch to front camera' : 'Switch to rear camera'}
           >
-            <Camera size={18} className="text-text-primary" />
+            {facingMode === 'environment' ? (
+              <>
+                <SwitchCamera size={16} className="text-accent-primary" />
+                <span className="text-[10px] font-bold text-accent-primary">Rear</span>
+              </>
+            ) : (
+              <>
+                <FlipHorizontal2 size={16} className="text-amber-400" />
+                <span className="text-[10px] font-bold text-amber-400">Front</span>
+              </>
+            )}
           </button>
+        ) : (
+          <div className="w-10" />
         )}
-        {step !== 'scanning' && <div className="w-10" />}
       </div>
 
       <AnimatePresence mode="wait">

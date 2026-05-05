@@ -20,6 +20,7 @@ import OPayReturn from '@/pages/OPayReturn';
 import VerifiedExchanger from '@/pages/VerifiedExchanger';
 import TransactionHistory from './pages/TransactionHistory';
 import ScanToPay from '@/pages/ScanToPay';
+import PaymentAuthorize from '@/pages/PaymentAuthorize';
 import P2PMarketplace from '@/pages/P2PMarketplace';
 import CreateP2POffer from '@/pages/CreateP2POffer';
 import P2PPaymentAccounts from '@/pages/P2PPaymentAccounts';
@@ -111,7 +112,8 @@ function BottomNav() {
     location.pathname.includes('/edit-service') ||
     location.pathname.includes('/edit-campaign') ||
     location.pathname.includes('/edit-network') ||
-    location.pathname.includes('/edit-isp-campaign');
+    location.pathname.includes('/edit-isp-campaign') ||
+    location.pathname === '/pay';
   const isAdmin = location.pathname.startsWith('/admin');
   if (isFullScreenFlow || isAdmin) return null;
 
@@ -349,6 +351,7 @@ function App() {
               <Route path="/wallet/deposit/exchanger" element={<VerifiedExchanger />} />
               <Route path="/wallet/deposit/address" element={<NrtWalletAddress />} />
               <Route path="/wallet/scan-to-pay" element={<ScanToPay />} />
+              <Route path="/pay" element={<PaymentAuthorize />} />
               <Route path="/wallet/referral" element={<Referral />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<Settings />} />
