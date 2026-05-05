@@ -10,6 +10,7 @@ export interface Device {
   os?: string;
   mac_address?: string;
   ip_address?: string;
+  fingerprint?: string;
   status: 'active' | 'offline' | 'disconnected';
   country?: string;
   isp_name?: string;
@@ -49,11 +50,41 @@ export function useDevices() {
     enabled: !!user,
   });
 
-  // Mutation to add a device
+  // Mutation to add (or re-activate) a device — upsert on fingerprint
+  // so the same physical device can never be linked twice.
   const addDeviceMutation = useMutation({
-    mutationFn: async (devicePayload: Partial<Device>) => {
-      if (!user) throw new Error("Must be logged in to add device");
+    mutationFn: async (devicePayload: Partial<Device> & { fingerprint?: string }) => {
+      if (!user) throw new Error('Must be logged in to add device');
 
+      const fingerprint = devicePayload.fingerprint
+        || localStorage.getItem('nrt_device_fingerprint')
+        || undefined;
+
+      // Check if this fingerprint already exists for THIS user — re-activate if so
+      if (fingerprint) {
+        const { data: existing } = await supabase
+          .from('devices')
+          .select('id, user_id')
+          .eq('fingerprint', fingerprint)
+          .maybeSingle();
+
+        if (existing) {
+          if (existing.user_id !== user.id) {
+            throw new Error('This device is already linked to another account.');
+          }
+          // Already linked to this user — just refresh status
+          const { data, error } = await supabase
+            .from('devices')
+            .update({ status: 'active', updated_at: new Date().toISOString() })
+            .eq('id', existing.id)
+            .select()
+            .single();
+          if (error) throw error;
+          return data;
+        }
+      }
+
+      // New device — insert
       const { data, error } = await supabase
         .from('devices')
         .insert({
@@ -63,6 +94,8 @@ export function useDevices() {
           status: 'active',
           os: devicePayload.os || 'Unknown',
           isp_name: devicePayload.isp_name || 'Unknown ISP',
+          country: devicePayload.country,
+          fingerprint: fingerprint,
           signal_strength: 100,
         })
         .select()
@@ -73,7 +106,7 @@ export function useDevices() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices', user?.id] });
-    }
+    },
   });
 
   // Mutation to disconnect/delete a device

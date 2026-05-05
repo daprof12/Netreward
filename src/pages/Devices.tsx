@@ -15,6 +15,11 @@ import { useDeviceManager } from '@/hooks/useDeviceManager';
 import { Trash2, AlertTriangle } from 'lucide-react';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
+// Exposed so Devices.tsx can patch the cache after linking
+declare module '@/hooks/useDeviceManager' {
+  export let _patchCache: ((patch: { isLinkedToCurrentUser: boolean; isLinkedToOtherUser: boolean; deviceId?: string }) => void) | undefined;
+}
+
 // Device icons mapping helper
 const getDeviceIcon = (type: string) => {
   switch (type) {
@@ -45,18 +50,24 @@ function UserDevicesView() {
   const handleLinkDevice = async () => {
     if (!currentDevice || isAdding) return;
     try {
-      await addDevice({ 
-        device_name: currentDevice.name, 
-        device_type: currentDevice.type, 
+      await addDevice({
+        device_name: currentDevice.name,
+        device_type: currentDevice.type,
         os: currentDevice.os,
         isp_name: currentDevice.isp,
         country: currentDevice.country,
+        fingerprint: currentDevice.fingerprint, // pass fingerprint for dedup
       });
+
+      // Patch the module-level cache so the button immediately reflects
+      // isLinkedToCurrentUser = true without requiring a full remount
+      if (typeof (window as any).__nrtPatchDeviceCache === 'function') {
+        (window as any).__nrtPatchDeviceCache({ isLinkedToCurrentUser: true, isLinkedToOtherUser: false });
+      }
+
       setAddSuccess(true);
-      setTimeout(() => {
-        setAddSuccess(false);
-      }, 1800);
-    } catch (err) {
+      setTimeout(() => setAddSuccess(false), 1800);
+    } catch (err: any) {
       console.error('Failed to link device', err);
     }
   };

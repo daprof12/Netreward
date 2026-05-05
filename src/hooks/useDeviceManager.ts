@@ -19,6 +19,16 @@ let isDeviceRegistrationRunning = false;
 let registeredUserId: string | null = null;
 let cachedDeviceInfo: DeviceInfo | null = null; // persist across remounts
 
+// Bridge so Devices.tsx can update the cache immediately after linking
+// without needing a full hook remount.
+if (typeof window !== 'undefined') {
+  (window as any).__nrtPatchDeviceCache = (patch: Partial<DeviceInfo>) => {
+    if (cachedDeviceInfo) {
+      cachedDeviceInfo = { ...cachedDeviceInfo, ...patch };
+    }
+  };
+}
+
 // ── Device & OS detection ───────────────────────────────────────────────────
 
 function detectDeviceType(): DeviceInfo['type'] {
