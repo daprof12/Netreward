@@ -70,39 +70,69 @@ export default function ScanToPay() {
     setStep('requesting');
     setCameraErrorMsg('');
 
-    try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: { ideal: facing },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      };
+    // iOS/Android constraint fallback chain:
+    // 1. Ideal resolution + ideal facingMode (best quality)
+    // 2. Just facingMode (no resolution — avoids silent mobile failures)
+    // 3. Any video at all (ultimate fallback)
+    const constraintOptions: MediaStreamConstraints[] = [
+      { video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { facingMode: facing }, audio: false },
+      { video: true, audio: false },
+    ];
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
+    let stream: MediaStream | null = null;
+    let lastErr: any;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute('playsinline', 'true'); // iOS Safari requirement
-        await videoRef.current.play();
+    for (const opts of constraintOptions) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(opts);
+        break;
+      } catch (e) {
+        lastErr = e;
       }
+    }
 
-      setStep('scanning');
-    } catch (err: any) {
+    if (!stream) {
+      const err = lastErr;
       console.error('Camera error:', err);
       const msg =
-        err.name === 'NotAllowedError'
+        err?.name === 'NotAllowedError'
           ? 'Camera permission denied. Please allow camera access in your browser settings.'
-          : err.name === 'NotFoundError'
+          : err?.name === 'NotFoundError'
           ? 'No camera found on this device.'
-          : err.name === 'NotReadableError'
+          : err?.name === 'NotReadableError'
           ? 'Camera is already in use by another app.'
-          : `Camera error: ${err.message}`;
+          : `Camera error: ${err?.message ?? 'Unknown error'}`;
       setCameraErrorMsg(msg);
       setStep('camera_error');
+      return;
     }
+
+    streamRef.current = stream;
+
+    if (videoRef.current) {
+      const video = videoRef.current;
+      // Required attributes for iOS Safari
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true'); // older iOS
+      video.muted = true;
+      video.srcObject = stream;
+
+      // iOS requires play() to be called inside loadedmetadata/canplay,
+      // not immediately after srcObject assignment.
+      await new Promise<void>((resolve) => {
+        const onReady = async () => {
+          try { await video.play(); } catch { /* autoplay policy — video may still render */ }
+          resolve();
+        };
+        video.addEventListener('loadedmetadata', onReady, { once: true });
+        video.addEventListener('canplay', onReady, { once: true });
+        // Safety timeout: if neither event fires within 3s, proceed anyway
+        setTimeout(resolve, 3000);
+      });
+    }
+
+    setStep('scanning');
   }, [stopCamera]);
 
   // Start camera on mount
@@ -365,14 +395,35 @@ export default function ScanToPay() {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="flex-1 flex flex-col items-center justify-center relative"
           >
-            {/* Live video fullscreen behind the overlay */}
-            <div className="absolute inset-0 bg-black overflow-hidden">
+            {/* Live video — fullscreen behind overlay.
+                iOS Safari bugs fixed:
+                1. No overflow-hidden on wrapper (clips iOS video stream)
+                2. translateZ(0) forces video onto its own GPU layer
+                   (prevents blank video inside Framer Motion transformed containers)
+                3. objectFit via inline style (Tailwind class ignored on some iOS versions)
+            */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: '#000',
+              }}
+            >
               <video
                 ref={videoRef}
-                className="w-full h-full object-cover"
                 playsInline
                 muted
                 autoPlay
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  // Force own GPU compositing layer — fixes iOS blank video
+                  // inside CSS-transform-animated parent (Framer Motion)
+                  transform: 'translateZ(0)',
+                  WebkitTransform: 'translateZ(0)',
+                  display: 'block',
+                }}
               />
             </div>
 
