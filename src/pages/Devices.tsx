@@ -321,7 +321,7 @@ function UserDevicesView() {
                     <div className="glass border border-glass-border rounded-xl p-4 space-y-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-accent-primary/10 text-accent-primary flex items-center justify-center">
-                          {getDeviceIcon(currentDevice.type)({ size: 20 })}
+                          {(() => { const CurIcon = getDeviceIcon(currentDevice.type); return <CurIcon size={20} />; })()}
                         </div>
                         <div>
                           <p className="font-bold text-text-primary">{currentDevice.name}</p>
