@@ -8,6 +8,7 @@ interface UserProfile {
   id: string;
   email: string;
   role: UserRole;
+  active_role: UserRole;
   display_name: string | null;
   avatar_url: string | null;
   kyc_verified: boolean;
@@ -19,6 +20,7 @@ interface AuthState {
   user: User | null;
   profile: UserProfile | null;
   role: UserRole;
+  active_role: UserRole;
   session: Session | null;
   isOnboarded: boolean;
   isLoading: boolean;
@@ -35,12 +37,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   profile: null,
   role: 'user',
+  active_role: 'user',
   session: null,
   isOnboarded: localStorage.getItem('hasOnboarded') === 'true',
   isLoading: true,
   setUser: (user, role) => set((state) => ({ 
     user, 
-    role: role || (user?.user_metadata?.role as UserRole) || 'user' 
+    role: role || (user?.user_metadata?.role as UserRole) || 'user',
+    active_role: (user?.user_metadata?.active_role as UserRole) || role || (user?.user_metadata?.role as UserRole) || 'user'
   })),
   setSession: (session) => set({ session }),
   setHasOnboarded: (status) => {
@@ -58,19 +62,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       if (!session?.user) {
-        set({ session: null, user: null, profile: null, role: 'user', isLoading: false });
+        set({ session: null, user: null, profile: null, role: 'user', active_role: 'user', isLoading: false });
         return;
       }
       
       const role = (session.user.user_metadata?.role as UserRole) || 'user';
+      const active_role = (session.user.user_metadata?.active_role as UserRole) || role;
       const { profile } = get();
       
       // ONLY set isLoading to true if we don't have a profile yet.
       // This prevents the global "spinner" from clearing the UI during navigations.
       if (!profile) {
-        set({ session, user: session.user, role, isLoading: true });
+        set({ session, user: session.user, role, active_role, isLoading: true });
       } else {
-        set({ session, user: session.user, role });
+        set({ session, user: session.user, role, active_role });
       }
       
       try {
@@ -81,7 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           .maybeSingle();
           
         if (!error && data) {
-          set({ profile: data, role: data.role as UserRole });
+          set({ profile: data, role: data.role as UserRole, active_role: (data.active_role || data.role) as UserRole });
           
           // Fetch and subscribe to wallet
           const { useWalletStore } = await import('./useWalletStore');
@@ -143,7 +148,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .single();
         
       if (!error && data) {
-        set({ profile: data, role: data.role as UserRole });
+        set({ profile: data, role: data.role as UserRole, active_role: (data.active_role || data.role) as UserRole });
       }
     } catch (e) {
       console.error('Error refreshing profile', e);
@@ -152,6 +157,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signOut: async () => {
     set({ isLoading: true });
     await supabase.auth.signOut();
-    set({ user: null, profile: null, session: null, role: 'user', isLoading: false });
+    set({ user: null, profile: null, session: null, role: 'user', active_role: 'user', isLoading: false });
   }
 }));

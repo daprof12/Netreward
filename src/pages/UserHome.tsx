@@ -378,7 +378,10 @@ export default function UserHome() {
                         
                         <div className="mt-3 flex items-center justify-between gap-4">
                           <div className="flex-1 h-1.5 bg-bg-secondary rounded-full overflow-hidden">
-                            <div className="h-full bg-accent-primary rounded-full" style={{ width: '45%' }} />
+                            <div 
+                              className="h-full bg-accent-primary rounded-full transition-all duration-500" 
+                              style={{ width: `${(camp?.budget_spent / camp?.total_budget) * 100 || 0}%` }} 
+                            />
                           </div>
                           <span className="text-[10px] font-black text-accent-primary">+{en.nrt_earned.toFixed(2)} NRT</span>
                         </div>

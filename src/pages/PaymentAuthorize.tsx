@@ -86,7 +86,7 @@ export default function PaymentAuthorize() {
     try {
       const { data, error } = await supabase
         .from('scan2pay_sessions')
-        .select('id, merchant_id, amount_nrt, description, status, expires_at')
+        .select('id, merchant_id, amount_nrt, description, status, expires_at, success_url, cancel_url')
         .eq('id', sessionId!)
         .single();
 
@@ -117,7 +117,8 @@ export default function PaymentAuthorize() {
         description: data.description,
         status: data.status,
         expiresAt: data.expires_at,
-        successUrl: returnTo || undefined,
+        successUrl: returnTo || data.success_url || undefined,
+        cancelUrl: data.cancel_url || undefined,
       });
       setStep('review');
     } catch {

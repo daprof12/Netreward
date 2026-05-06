@@ -34,40 +34,66 @@ export default function AdminDevices() {
   const [search, setSearch] = useState('');
   const [countryFilter, setCountryFilter] = useState('Global');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [selectedDevice, setSelectedDevice] = useState<AdminDevice | null>(null);
-
-  const fetchData = useCallback(async () => {
+  const [selectedDevice, setSelectedDevice] = useState<AdminDevice | null>(null);  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('devices')
-        .select('*, users!devices_user_id_fkey(email, country)')
+        .select(`
+          *, 
+          users!user_id(email, country),
+          campaigns!last_campaign_id(title)
+        `)
         .order('created_at', { ascending: false });
-      if (error) throw error;
-      setDevices((data || []).map((d: any) => ({
-        ...d,
-        deviceName: d.device_name || d.name || 'Unknown Device',
-        userEmail: d.users?.email || 'Unknown',
-        country: d.users?.country || 'Global',
-        isp: d.isp_name || d.isp || '',
-        dataUsedGb: Number(d.data_used_gb || d.total_data_gb || 0),
-        nrtEarned: Number(d.nrt_earned || d.total_nrt || 0),
-        claimedNrt: Number(d.claimed_nrt || 0),
-        unclaimedNrt: Number(d.unclaimed_nrt || d.nrt_earned || 0),
-        duration: d.duration || 'N/A',
-        createdAt: d.created_at,
-        activeEarnings: d.active_earnings || [],
-        pastEarnings: d.past_earnings || [],
-      })));
+      
+      if (error) {
+        console.error('Fetch devices error:', error);
+        // Fallback for different join syntax
+        const { data: fallbackData } = await supabase
+          .from('devices')
+          .select('*, users:user_id(email, country)')
+          .order('created_at', { ascending: false });
+        if (fallbackData) {
+          processDevices(fallbackData);
+        }
+      } else {
+        processDevices(data);
+      }
     } catch (e: any) { console.error('Fetch devices:', e); }
     finally { setLoading(false); }
   }, []);
+
+  const processDevices = (data: any[]) => {
+    setDevices(data.map((d: any) => {
+      const totalDurationHrs = (Number(d.total_duration_seconds || 0) / 3600).toFixed(1);
+      const dataGb = Number(d.total_data_bytes || 0) / (1024 * 1024 * 1024);
+      const earned = Number(d.nrt_earned || d.total_nrt || 0);
+      const claimed = Number(d.nrt_claimed || 0);
+
+      return {
+        ...d,
+        deviceName: d.device_name || d.name || 'Unknown Device',
+        userEmail: d.users?.email || d.user_email || 'Unknown',
+        country: d.users?.country || d.country || 'Global',
+        isp: d.isp_name || d.isp || '',
+        dataUsedGb: dataGb,
+        nrtEarned: earned,
+        claimedNrt: claimed,
+        unclaimedNrt: earned - claimed,
+        duration: `${totalDurationHrs}h`,
+        campaignJoined: (d.campaigns as any)?.title || 'None',
+        createdAt: d.created_at,
+        activeEarnings: d.active_earnings || [],
+        pastEarnings: d.past_earnings || [],
+      };
+    }));
+  };
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const allCountries = useMemo(() => {
     const uniqueCountries = new Set(devices.map(d => d.country));
-    return ['All', ...Array.from(uniqueCountries).sort()];
+    return ['Global', ...Array.from(uniqueCountries).sort()];
   }, [devices]);
 
   const filtered = devices.filter(d => {
@@ -80,9 +106,14 @@ export default function AdminDevices() {
 
   return (
     <motion.div className="space-y-5" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-      <div>
-        <h1 className="text-2xl font-black">Devices</h1>
-        <p className="text-sm text-text-secondary">View all registered devices across the platform</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black">Devices</h1>
+          <p className="text-sm text-text-secondary">View and monitor all connected devices and their earnings</p>
+        </div>
+        <button onClick={fetchData} className="p-2.5 bg-bg-secondary border border-glass-border rounded-xl text-text-secondary hover:text-accent-primary transition-colors">
+          <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+        </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -109,48 +140,79 @@ export default function AdminDevices() {
             className="w-full bg-bg-secondary border border-glass-border rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
         </div>
         <div className="min-w-[200px] flex-1 sm:flex-none"><LocationSearch value={countryFilter} onChange={setCountryFilter} /></div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-bg-secondary border border-glass-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none">
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-bg-secondary border border-glass-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none min-w-[140px]">
           <option value="All">All Statuses</option>
           <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
+          <option value="offline">Offline</option>
+          <option value="disconnected">Disconnected</option>
         </select>
       </div>
 
-      <div className="bg-bg-card border border-glass-border rounded-xl overflow-hidden">
+      <div className="bg-bg-card border border-glass-border rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-glass-border bg-bg-secondary">
-                {['Device', 'User', 'ISP', 'Status', 'Data (GB)', 'NRT Earned', 'Claimed', 'Unclaimed', 'Country', 'Registered'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-wider">{h}</th>
-                ))}
+          <table className="w-full text-left text-sm">
+            <thead className="bg-bg-secondary/50 border-b border-glass-border text-[10px] font-black uppercase text-text-secondary">
+              <tr>
+                <th className="px-6 py-4">Device</th>
+                <th className="px-6 py-4">User</th>
+                <th className="px-6 py-4">Campaign</th>
+                <th className="px-6 py-4">Duration</th>
+                <th className="px-6 py-4 text-center">Data (GB)</th>
+                <th className="px-6 py-4 text-center">NRT Earned</th>
+                <th className="px-6 py-4 text-center">Claimed</th>
+                <th className="px-6 py-4 text-center">Unclaimed</th>
+                <th className="px-6 py-4 text-center">Status</th>
+                <th className="px-6 py-4 text-right">Registered</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-glass-border">
               {filtered.map(d => (
-                <tr key={d.id} onClick={() => setSelectedDevice(d)} className="hover:bg-bg-secondary/50 transition-colors cursor-pointer">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Smartphone size={16} className="text-text-secondary" />
-                      <span className="font-semibold text-text-primary">{d.deviceName}</span>
+                <tr key={d.id} onClick={() => setSelectedDevice(d)} className="hover:bg-bg-secondary/30 transition-colors cursor-pointer group">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-secondary group-hover:text-accent-primary transition-colors">
+                        <Smartphone size={16} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-text-primary">{d.deviceName}</p>
+                        <p className="text-[10px] text-text-secondary truncate max-w-[100px]">{d.isp}</p>
+                      </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-text-primary">{d.userEmail}</td>
-                  <td className="px-4 py-3 text-text-secondary">{d.isp}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${d.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>{d.status}</span>
+                  <td className="px-6 py-4">
+                    <p className="text-text-primary font-medium">{d.userEmail}</p>
+                    <p className="text-[10px] text-text-secondary uppercase">{d.country}</p>
                   </td>
-                  <td className="px-4 py-3 font-bold">{d.dataUsedGb.toFixed(2)}</td>
-                  <td className="px-4 py-3 font-bold text-accent-primary">{d.nrtEarned.toFixed(2)}</td>
-                  <td className="px-4 py-3 font-bold text-green-500">{d.claimedNrt.toFixed(2)}</td>
-                  <td className="px-4 py-3 font-bold text-amber-500">{d.unclaimedNrt.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-text-secondary">{d.country}</td>
-                  <td className="px-4 py-3 text-text-secondary text-xs">{new Date(d.createdAt).toLocaleDateString()}</td>
+                  <td className="px-6 py-4">
+                    <span className="px-2 py-1 rounded-lg bg-accent-primary/10 text-accent-primary text-[10px] font-bold uppercase truncate max-w-[120px] block">
+                      {d.campaignJoined}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-text-secondary font-medium">{d.duration}</td>
+                  <td className="px-6 py-4 text-center font-bold text-text-primary">{d.dataUsedGb.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-center font-black text-accent-primary">{d.nrtEarned.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-center font-bold text-green-500">{d.claimedNrt.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-center font-bold text-amber-500">{d.unclaimedNrt.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${d.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                      {d.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right text-text-secondary text-xs tabular-nums">
+                    {new Date(d.createdAt).toLocaleDateString()}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <div className="text-center py-12 text-text-secondary">No devices found.</div>}
+          {filtered.length === 0 && (
+            <div className="text-center py-20 bg-bg-card/50">
+              <div className="inline-flex w-12 h-12 rounded-full bg-bg-secondary items-center justify-center text-text-secondary mb-3">
+                <Smartphone size={24} />
+              </div>
+              <p className="text-sm text-text-secondary">No devices matching your filters were found.</p>
+            </div>
+          )}
         </div>
       </div>
 

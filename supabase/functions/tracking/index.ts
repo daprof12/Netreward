@@ -116,40 +116,68 @@ serve(async (req) => {
     let providerType: 'sp' | 'isp' = 'sp';
 
     if (spApiKey) {
-      // Lookup in services table
-      const { data: service, error } = await supabase
-        .from('services')
-        .select('id, sp_id, secret_key, status')
-        .eq('api_key', spApiKey)
-        .single();
+      // 1. Try centralized sp_api_keys table
+      const { data: centralKey } = await supabase
+        .from('sp_api_keys')
+        .select('webhook_secret, status')
+        .eq('sdk_key', spApiKey)
+        .maybeSingle();
 
-      if (error || !service) {
-        return jsonResponse({ error: 'Invalid SP API key' }, 401);
+      if (centralKey) {
+        if (centralKey.status !== 'active') {
+          return jsonResponse({ error: `SP account is ${centralKey.status}` }, 403);
+        }
+        secretKey = centralKey.webhook_secret;
+      } else {
+        // 2. Fallback to legacy services table
+        const { data: service, error } = await supabase
+          .from('services')
+          .select('id, sp_id, secret_key, status')
+          .eq('api_key', spApiKey)
+          .single();
+
+        if (error || !service) {
+          return jsonResponse({ error: 'Invalid SP API key' }, 401);
+        }
+
+        if (service.status !== 'active') {
+          return jsonResponse({ error: `Service is ${service.status}` }, 403);
+        }
+
+        secretKey = service.secret_key;
       }
-
-      if (service.status !== 'active') {
-        return jsonResponse({ error: `Service is ${service.status}. Only active services can submit tracking data.` }, 403);
-      }
-
-      secretKey = service.secret_key;
       providerType = 'sp';
     } else if (ispApiKey) {
-      // Lookup in networks table
-      const { data: network, error } = await supabase
-        .from('networks')
-        .select('id, isp_id, api_secret, verified')
-        .eq('api_key', ispApiKey)
-        .single();
+      // 1. Try centralized isp_api_keys table
+      const { data: centralKey } = await supabase
+        .from('isp_api_keys')
+        .select('webhook_secret, status')
+        .eq('sdk_key', ispApiKey)
+        .maybeSingle();
 
-      if (error || !network) {
-        return jsonResponse({ error: 'Invalid ISP API key' }, 401);
+      if (centralKey) {
+        if (centralKey.status !== 'active') {
+          return jsonResponse({ error: `ISP account is ${centralKey.status}` }, 403);
+        }
+        secretKey = centralKey.webhook_secret;
+      } else {
+        // 2. Fallback to legacy networks table
+        const { data: network, error } = await supabase
+          .from('networks')
+          .select('id, isp_id, api_secret, verified')
+          .eq('api_key', ispApiKey)
+          .single();
+
+        if (error || !network) {
+          return jsonResponse({ error: 'Invalid ISP API key' }, 401);
+        }
+
+        if (!network.verified) {
+          return jsonResponse({ error: 'Network is not verified' }, 403);
+        }
+
+        secretKey = network.api_secret;
       }
-
-      if (!network.verified) {
-        return jsonResponse({ error: 'Network is not verified. Complete verification before submitting data.' }, 403);
-      }
-
-      secretKey = network.api_secret;
       providerType = 'isp';
     }
 

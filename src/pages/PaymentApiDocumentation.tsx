@@ -251,10 +251,9 @@ export default function PaymentApiDocumentation() {
                   <pre className="text-xs font-mono text-gray-300 leading-relaxed">
 {`{
   "id": "cs_test_a1b2c3d4",
-  "status": "complete",
-  "amount_nrt": 125.50,
-  "payment_status": "paid",
-  "customer": "usr_998877"
+  "checkout_url": "https://netreward.online/pay?session=cs_test_a1b2c3d4",
+  "status": "pending",
+  "amount_nrt": 125.50
 }`}
                   </pre>
                 </div>
