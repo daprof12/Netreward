@@ -339,7 +339,7 @@ export const useSpStore = create<SpStore>()(
             expires_at: expiresAt,
             status: 'pending'
           })
-          .select('*, users(display_name)')
+          .select('*, users!merchant_id(display_name)')
           .single();
 
         if (error) throw error;
@@ -354,6 +354,7 @@ export const useSpStore = create<SpStore>()(
           createdAt: data.created_at,
           expiresAt: data.expires_at,
           qrPayload: JSON.stringify({
+            sessionId: data.id,
             merchantId: data.merchant_id,
             amountNrt: data.amount_nrt,
             ref: ref,
