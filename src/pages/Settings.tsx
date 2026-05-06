@@ -38,7 +38,7 @@ export default function Settings() {
   usePageTitle('Settings');
   const navigate = useNavigate();
   const { user, role, setUser, setHasOnboarded, signOut } = useAuthStore();
-  const { services, paymentIntegration, setPaymentIntegration, profileLogo: spLogo } = useSpStore();
+  const { services, paymentIntegration, setPaymentIntegration, profileLogo: spLogo, checkoutSessions, createCheckoutSession } = useSpStore();
   const { networks, profileLogo: ispLogo, initialize: initIsp } = useIspStore();
   const { profile, switchRole, isSwitchingRole } = useProfile();
 
@@ -85,6 +85,7 @@ export default function Settings() {
   const [showPaymentHub, setShowPaymentHub] = useState(false);
   const [paymentSetupStep, setPaymentSetupStep] = useState<0 | 1 | 2 | 3>(0);
   const [paymentWebhook, setPaymentWebhook] = useState('');
+  const [activeQrSession, setActiveQrSession] = useState<any | null>(null);
   
   // Preference states
   const { selectedCurrency, setCurrency } = useCurrencyStore();
@@ -684,14 +685,36 @@ export default function Settings() {
                             className="w-full bg-bg-secondary border border-glass-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent-primary"
                           />
                         </div>
-                        <button 
-                          onClick={async () => {
-                            const amount = parseFloat((document.getElementById('test-payment-amount') as HTMLInputElement)?.value || '15');
-                            const desc = (document.getElementById('test-payment-desc') as HTMLInputElement)?.value || 'Test Payment';
-                            const { createCheckoutSession } = useSpStore.getState();
-                            await createCheckoutSession(amount, desc);
-                            showToast('Test checkout session created!', 'success');
-                          }}
+                          <button 
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              const amountInput = document.getElementById('test-payment-amount') as HTMLInputElement;
+                              const descInput = document.getElementById('test-payment-desc') as HTMLInputElement;
+                              const amountValue = amountInput?.value;
+                              const desc = descInput?.value?.trim() || '';
+                              
+                              if (!amountValue || parseFloat(amountValue) <= 0) {
+                                showToast('Please enter a valid amount greater than 0', 'warning');
+                                amountInput?.focus();
+                                return;
+                              }
+
+                              if (!desc) {
+                                showToast('Please enter a payment description', 'warning');
+                                descInput?.focus();
+                                return;
+                              }
+
+                              const amount = parseFloat(amountValue);
+                              
+                              try {
+                                const session = await createCheckoutSession(amount, desc);
+                                showToast('Test checkout session created!', 'success');
+                                setActiveQrSession(session);
+                              } catch (err: any) {
+                                showToast(err.message || 'Failed to create session', 'danger');
+                              }
+                            }}
                           className="w-full py-2.5 bg-accent-primary text-primary-foreground font-bold rounded-xl text-xs shadow-lg shadow-accent-primary/10 active:scale-95 transition-all"
                         >
                           Generate Test QR Code
@@ -699,11 +722,11 @@ export default function Settings() {
                       </div>
 
                       {/* Active Sessions List */}
-                      {useSpStore.getState().checkoutSessions.length > 0 && (
+                      {checkoutSessions.length > 0 && (
                         <div className="pt-4 border-t border-glass-border space-y-3">
                           <p className="text-[10px] font-black text-text-secondary uppercase">Active Sessions</p>
                           <div className="space-y-2">
-                            {useSpStore.getState().checkoutSessions.map(session => (
+                            {checkoutSessions.map(session => (
                               <div key={session.id} className="flex items-center justify-between bg-bg-secondary/50 p-2 rounded-lg border border-glass-border">
                                 <div className="min-w-0">
                                   <p className="text-[11px] font-bold truncate">{session.description}</p>
@@ -711,7 +734,7 @@ export default function Settings() {
                                 </div>
                                 <button 
                                   onClick={() => {
-                                    // Logic to show QR would go here
+                                    setActiveQrSession(session);
                                     showToast('QR Code visible for scanning', 'info');
                                   }}
                                   className="p-1.5 bg-accent-primary/10 text-accent-primary rounded-md"
@@ -777,7 +800,21 @@ export default function Settings() {
                         <p className="text-[11px] text-text-secondary">We'll send <code className="bg-bg-secondary px-1 rounded">payment.success</code> events to this URL.</p>
                         <div className="flex gap-3">
                           <button onClick={() => setPaymentSetupStep(0)} className="flex-1 py-3 bg-bg-secondary text-text-primary font-bold rounded-xl">Back</button>
-                          <button onClick={() => { if (!paymentWebhook.trim()) { showToast('Enter a webhook URL', 'danger'); return; } setPaymentSetupStep(2); }} className="flex-1 py-3 bg-accent-primary text-primary-foreground font-bold rounded-xl">Next</button>
+                          <button onClick={() => { 
+                            const url = paymentWebhook.trim();
+                            if (!url) { 
+                              showToast('Enter a webhook URL', 'danger'); 
+                              return; 
+                            }
+                            try {
+                              const parsed = new URL(url);
+                              if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error();
+                            } catch {
+                              showToast('Enter a valid URL (must start with http:// or https://)', 'danger');
+                              return;
+                            }
+                            setPaymentSetupStep(2); 
+                          }} className="flex-1 py-3 bg-accent-primary text-primary-foreground font-bold rounded-xl">Next</button>
                         </div>
                       </motion.div>
                     )}
@@ -812,6 +849,64 @@ export default function Settings() {
                   </AnimatePresence>
                 )}
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* QR Code Display Modal */}
+      <AnimatePresence>
+        {activeQrSession && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6"
+            onClick={() => setActiveQrSession(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm glass rounded-[32px] p-8 border border-glass-border text-center space-y-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center">
+                <div className="text-left">
+                  <h3 className="font-bold text-lg">Test Scan2Pay</h3>
+                  <p className="text-xs text-text-secondary">{activeQrSession.description}</p>
+                </div>
+                <button onClick={() => setActiveQrSession(null)} className="p-2 bg-bg-secondary rounded-full">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="bg-white p-4 rounded-3xl inline-block mx-auto">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(activeQrSession.qrPayload)}`}
+                  alt="QR Code"
+                  className="w-48 h-48"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-2xl font-black text-accent-primary">{activeQrSession.amountNrt} NRT</p>
+                <p className="text-[10px] text-text-secondary uppercase font-bold tracking-widest">Pay with NetReward App</p>
+              </div>
+
+              <div className="bg-accent-primary/10 border border-accent-primary/20 rounded-2xl p-4 flex items-start gap-3 text-left">
+                <Info size={18} className="text-accent-primary shrink-0 mt-0.5" />
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Open your <span className="text-accent-primary font-bold">NetReward Mobile App</span> and scan this QR code to complete the test payment.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setActiveQrSession(null)}
+                className="w-full py-4 bg-bg-secondary text-text-primary font-bold rounded-2xl border border-glass-border"
+              >
+                Done
+              </button>
             </motion.div>
           </motion.div>
         )}
