@@ -10,8 +10,6 @@ Add this script to the `<head>` of your HTML document:
 <script
   src="https://cdn.netreward.online/tracker.js"
   data-api-key="nr_live_YOUR_API_KEY"
-  data-category="streaming"
-  data-campaign-id="your-campaign-id"
   defer
 ></script>
 ```
@@ -21,8 +19,8 @@ Add this script to the `<head>` of your HTML document:
 | Attribute | Required | Description |
 |---|---|---|
 | `data-api-key` | Yes | Your SP API key from the Dashboard. |
-| `data-category` | Yes | The category of your service. Drives the auto-detection logic. |
-| `data-campaign-id` | No | Optional. Will use 'default-campaign' if omitted. |
+
+*Note: The SDK automatically fetches your Service Category and Active Campaigns securely from the NetReward backend upon initialization. You manage everything from the dashboard, no code updates required!*
 
 ## Supported Categories
 

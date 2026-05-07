@@ -29,11 +29,10 @@ Drop this script tag anywhere on your checkout page. It will automatically rende
 Drop this script in the `<head>` of your website. It automatically detects user data consumption based on your category and reports it, earning you and your users NRT tokens.
 
 ```html
-<!-- Automatically tracks data consumption for Streaming/Video -->
+<!-- Automatically tracks data consumption based on your dashboard settings -->
 <script
   src="https://cdn.netreward.online/tracker.js"
   data-api-key="nr_live_YOUR_API_KEY"
-  data-category="streaming"
   defer
 ></script>
 ```

@@ -69,7 +69,50 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Only POST allowed
+  if (req.method === 'GET') {
+    // Dynamic SDK Initialization endpoint
+    try {
+      const spApiKey = req.headers.get('x-sp-api-key');
+      if (!spApiKey) {
+        return jsonResponse({ error: 'Missing x-sp-api-key' }, 401);
+      }
+      
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      // Try centralized keys first
+      let category = 'other';
+      const { data: centralKey } = await supabase
+        .from('sp_api_keys')
+        .select('sp_email')
+        .eq('sdk_key', spApiKey)
+        .maybeSingle();
+        
+      if (centralKey) {
+        // If they use centralized keys, they might not have a specific 'service' with a category.
+        // We default to 'other' or could look up their sp_profile category.
+        category = 'other';
+      } else {
+        // Try legacy services table
+        const { data: service } = await supabase
+          .from('services')
+          .select('category')
+          .eq('api_key', spApiKey)
+          .maybeSingle();
+        if (service && service.category) {
+          category = service.category.toLowerCase();
+        }
+      }
+
+      return jsonResponse({ category });
+    } catch (err) {
+      return jsonResponse({ error: 'Failed to initialize SDK' }, 500);
+    }
+  }
+
+  // Only POST allowed for tracking events
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405);
   }
@@ -111,9 +154,8 @@ serve(async (req) => {
       return jsonResponse({ error: `Batch too large. Max ${MAX_BATCH_SIZE} events per request.` }, 400);
     }
 
-    // ── 3. Lookup API key and verify HMAC ──────────────────────
-    let secretKey: string | null = null;
-    let providerType: 'sp' | 'isp' = 'sp';
+    let serviceId: string | null = null;
+    let networkId: string | null = null;
 
     if (spApiKey) {
       // 1. Try centralized sp_api_keys table
@@ -145,6 +187,7 @@ serve(async (req) => {
         }
 
         secretKey = service.secret_key;
+        serviceId = service.id;
       }
       providerType = 'sp';
     } else if (ispApiKey) {
@@ -177,8 +220,33 @@ serve(async (req) => {
         }
 
         secretKey = network.api_secret;
+        networkId = network.id;
       }
       providerType = 'isp';
+    }
+
+    // Dynamic Campaign Lookup if no campaign_id is provided in the events
+    let autoCampaignId: string | null = null;
+    if (serviceId) {
+      const { data: camp } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('service_id', serviceId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (camp) autoCampaignId = camp.id;
+    } else if (networkId) {
+      const { data: camp } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('network_id', networkId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (camp) autoCampaignId = camp.id;
     }
 
     // Verify HMAC signature if provided or if this is an ISP (ISPs must always use HMAC)
@@ -213,12 +281,14 @@ serve(async (req) => {
         session_end,
       } = event as Record<string, unknown>;
 
+      let finalCampaignId = campaign_id || autoCampaignId;
+
       // Validate required fields
-      if (!device_id || !campaign_id || !session_id) {
+      if (!device_id || !finalCampaignId || !session_id) {
         results.push({
           session_id: session_id || 'unknown',
           status: 'error',
-          message: 'Missing required fields: device_id, campaign_id, session_id',
+          message: 'Missing required fields: device_id, campaign_id (or no active campaign found), session_id',
         });
         errorCount++;
         continue;
@@ -227,7 +297,7 @@ serve(async (req) => {
       // Call the Reward Engine RPC
       const { data, error } = await supabase.rpc('process_tracking_report', {
         p_device_id: device_id,
-        p_campaign_id: campaign_id,
+        p_campaign_id: finalCampaignId,
         p_session_id: session_id,
         p_bytes_up: Number(bytes_up),
         p_bytes_down: Number(bytes_down),

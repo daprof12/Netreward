@@ -3,8 +3,6 @@
   if (!currentScript) return;
 
   const apiKey = currentScript.getAttribute('data-api-key');
-  const category = currentScript.getAttribute('data-category') || 'other';
-  const campaignId = currentScript.getAttribute('data-campaign-id') || 'default-campaign';
   const endpoint = currentScript.getAttribute('data-endpoint') || 'https://pmpeyfkbqipfnhokfksl.supabase.co/functions/v1/tracking';
 
   if (!apiKey) {
@@ -41,7 +39,6 @@
       
       const event = {
         device_id: deviceId,
-        campaign_id: campaignId,
         session_id: this.currentSessionId,
         bytes_up: Math.floor(this.bytesUp),
         bytes_down: Math.floor(this.bytesDown),
@@ -82,9 +79,24 @@
   const tracker = new Tracker();
   window.NetRewardTracker = tracker;
 
-  // --- Auto-Detection Logic based on Category ---
+  // --- Fetch Configuration & Auto-Detection Logic ---
   
-  if (category === 'streaming') {
+  async function initSDK() {
+    let category = 'other';
+    try {
+      const res = await fetch(endpoint, {
+        method: 'GET',
+        headers: { 'x-sp-api-key': apiKey }
+      });
+      if (res.ok) {
+        const config = await res.json();
+        if (config.category) category = config.category;
+      }
+    } catch (e) {
+      console.warn('[NetReward Tracker] Failed to fetch config, defaulting to "other".', e);
+    }
+
+    if (category === 'streaming') {
     // Monitor audio/video
     let activeMedia = new Map();
     
@@ -182,5 +194,8 @@
     }, 5000);
   }
 
-  console.log(`[NetReward Tracker] Initialized for category: ${category}`);
+    console.log(`[NetReward Tracker] Initialized for category: ${category}`);
+  }
+
+  initSDK();
 })();

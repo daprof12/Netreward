@@ -1,5 +1,5 @@
 {
-  "name": "netreward-tracker",
+  "name": "@daprof12/netreward-tracker",
   "version": "1.0.0",
   "description": "NetReward tracking SDK — report data consumption sessions to the NetReward reward engine",
   "main": "dist/index.js",
