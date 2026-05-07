@@ -43,7 +43,7 @@
     targetBtn.onmouseout = () => targetBtn.style.background = '#2D2D2D';
 
     targetBtn.innerHTML = `
-      <img src="https://cdn.netreward.online/nrt-logo.svg" width="24" height="24" style="border-radius: 50%;" alt="NRT" />
+      <img src="https://pmpeyfkbqipfnhokfksl.supabase.co/storage/v1/object/public/assets/nrt-logo.png" width="24" height="24" style="border-radius: 50%;" alt="NRT" />
       <span>Pay with NetReward</span>
     `;
 
