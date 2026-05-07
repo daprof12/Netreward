@@ -43,15 +43,19 @@
     targetBtn.onmouseout = () => targetBtn.style.background = '#2D2D2D';
 
     targetBtn.innerHTML = `
-      <img src="https://cdn.netreward.online/nrt-icon.svg" width="24" height="24" style="border-radius: 50%;" alt="NRT" />
+      <img src="https://cdn.netreward.online/nrt-logo.svg" width="24" height="24" style="border-radius: 50%;" alt="NRT" />
       <span>Pay with NetReward</span>
     `;
 
     if (containerId) {
       const container = document.querySelector(containerId);
-      if (container) container.appendChild(targetBtn);
+      if (container) {
+        if (container.querySelector('.netreward-pay-btn')) return; // Prevent double rendering in React Strict Mode
+        container.appendChild(targetBtn);
+      }
       else currentScript.parentNode.insertBefore(targetBtn, currentScript);
     } else {
+      if (currentScript.parentNode.querySelector('.netreward-pay-btn')) return;
       currentScript.parentNode.insertBefore(targetBtn, currentScript);
     }
   }
