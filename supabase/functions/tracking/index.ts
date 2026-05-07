@@ -66,10 +66,7 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 serve(async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { 
-      status: 200,
-      headers: corsHeaders 
-    });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   // Only POST allowed
@@ -199,31 +196,8 @@ serve(async (req) => {
     let successCount = 0;
     let errorCount = 0;
 
-    // Resolve Provider ID once for the batch if campaign is missing
-    let resolvedProviderId: string | null = null;
-    let resolvedProviderType: 'sp' | 'isp' | null = null;
-
-    if (spApiKey) {
-      const { data: keyData } = await supabase
-        .from('sp_api_keys')
-        .select('sp_id')
-        .eq('sdk_key', spApiKey)
-        .maybeSingle();
-      resolvedProviderId = keyData?.sp_id;
-      resolvedProviderType = 'sp';
-    } else if (ispApiKey) {
-      const { data: keyData } = await supabase
-        .from('isp_api_keys')
-        .select('isp_id')
-        .eq('sdk_key', ispApiKey)
-        .maybeSingle();
-      resolvedProviderId = keyData?.isp_id;
-      resolvedProviderType = 'isp';
-    }
-
     for (const event of events) {
-      const eventData = event as Record<string, unknown>;
-      let {
+      const {
         device_id,
         campaign_id,
         session_id,
@@ -232,30 +206,14 @@ serve(async (req) => {
         duration_seconds = 60,
         session_start,
         session_end,
-      } = eventData;
-
-      // Auto-resolve campaign_id if missing
-      if (!campaign_id && resolvedProviderId) {
-        const { data: activeCampaign } = await supabase
-          .from('campaigns')
-          .select('id')
-          .eq(resolvedProviderType === 'sp' ? 'sp_id' : 'isp_id', resolvedProviderId)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (activeCampaign) {
-          campaign_id = activeCampaign.id;
-        }
-      }
+      } = event as Record<string, unknown>;
 
       // Validate required fields
       if (!device_id || !campaign_id || !session_id) {
         results.push({
           session_id: session_id || 'unknown',
           status: 'error',
-          message: 'Missing required fields: device_id, campaign_id (and auto-resolve failed), session_id',
+          message: 'Missing required fields: device_id, campaign_id, session_id',
         });
         errorCount++;
         continue;
