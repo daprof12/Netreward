@@ -89,9 +89,9 @@ serve(async (req) => {
       return jsonResponse({ error: 'Missing API key. Provide x-sp-api-key or x-isp-api-key header.' }, 401);
     }
 
-    if (!hmacSig) {
-      return jsonResponse({ error: 'Missing x-hmac-sig header. Sign the request body with HMAC-SHA256(body, secret_key).' }, 401);
-    }
+    // For CDN integration, hmac signature is optional. If provided, we verify it.
+    // If not provided, we rely on the SP API key.
+    // Note: In production, Origin verification should be added here to prevent spoofing.
 
     // ── 2. Read and parse body ─────────────────────────────────
     const bodyText = await req.text();
@@ -181,14 +181,19 @@ serve(async (req) => {
       providerType = 'isp';
     }
 
-    // Verify HMAC signature
-    if (!secretKey) {
-      return jsonResponse({ error: 'Service/network has no secret key configured. Generate credentials in the dashboard.' }, 403);
+    // Verify HMAC signature if provided or if this is an ISP (ISPs must always use HMAC)
+    if (providerType === 'isp' && !hmacSig) {
+      return jsonResponse({ error: 'ISPs must sign requests with x-hmac-sig.' }, 401);
     }
 
-    const expectedSig = await hmacSha256(secretKey, bodyText);
-    if (!timingSafeEqual(hmacSig.toLowerCase(), expectedSig.toLowerCase())) {
-      return jsonResponse({ error: 'HMAC signature verification failed. Ensure you are signing the raw request body with your secret key.' }, 401);
+    if (hmacSig) {
+      if (!secretKey) {
+        return jsonResponse({ error: 'Service/network has no secret key configured. Generate credentials in the dashboard.' }, 403);
+      }
+      const expectedSig = await hmacSha256(secretKey, bodyText);
+      if (!timingSafeEqual(hmacSig.toLowerCase(), expectedSig.toLowerCase())) {
+        return jsonResponse({ error: 'HMAC signature verification failed. Ensure you are signing the raw request body with your secret key.' }, 401);
+      }
     }
 
     // ── 4. Process batch ───────────────────────────────────────
