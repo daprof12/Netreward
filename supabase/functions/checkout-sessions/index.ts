@@ -209,7 +209,14 @@ serve(async (req) => {
       id: session.id,
       checkout_url: `https://netreward.online/pay?session=${session.id}`,
       status: 'pending',
-      amount_nrt: nrtAmount
+      amount_nrt: nrtAmount,
+      qr_payload: JSON.stringify({
+        sessionId: session.id,
+        merchantId: merchantUserId,
+        amountNrt: nrtAmount,
+        ref: session.id,
+        exp: expiresAt
+      })
     }), { 
       status: 200, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

@@ -321,13 +321,15 @@ export default function AdminUsers() {
 
                     <div className="glass rounded-xl border border-glass-border overflow-hidden">
                       {[
+                        { label: 'User ID', value: viewUser.id },
+                        { label: 'Base Role', value: viewUser.role.toUpperCase() },
                         { label: 'Joined Date', value: new Date(viewUser.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) },
                         { label: 'Primary Email', value: viewUser.email },
                         { label: 'Region/Country', value: viewUser.country },
                         { label: 'KYC Status', value: viewUser.kyc_status.toUpperCase() },
                         { label: 'Total Referral Bonus', value: `${viewUser.referral_bonus.toFixed(2)} NRT` },
                       ].map((item, i) => (
-                        <div key={item.label} className={`flex items-center justify-between p-3.5 ${i !== 4 ? 'border-b border-glass-border' : ''}`}>
+                        <div key={item.label} className={`flex items-center justify-between p-3.5 ${i !== 6 ? 'border-b border-glass-border' : ''}`}>
                           <span className="text-[10px] font-black text-text-secondary uppercase">{item.label}</span>
                           <span className="text-xs font-bold text-text-primary">{item.value}</span>
                         </div>
@@ -422,6 +424,18 @@ export default function AdminUsers() {
                   <input value={editUser.display_name} onChange={e => setEditUser({ ...editUser, display_name: e.target.value })} className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black text-text-secondary uppercase mb-1.5 block">Base Role</label>
+                    <select value={editUser.role} onChange={e => setEditUser({ ...editUser, role: e.target.value as any })} className="w-full bg-bg-secondary border border-glass-border rounded-xl px-3 py-2.5 text-sm outline-none">
+                      {ROLES.map(r => <option key={r} value={r}>{r.toUpperCase()}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-text-secondary uppercase mb-1.5 block">Active Role</label>
+                    <select value={editUser.active_role} onChange={e => setEditUser({ ...editUser, active_role: e.target.value as any })} className="w-full bg-bg-secondary border border-glass-border rounded-xl px-3 py-2.5 text-sm outline-none">
+                      {ROLES.map(r => <option key={r} value={r}>{r.toUpperCase()}</option>)}
+                    </select>
+                  </div>
                    <div>
                     <label className="text-[10px] font-black text-text-secondary uppercase mb-1.5 block">Status</label>
                     <select value={editUser.status} onChange={e => setEditUser({ ...editUser, status: e.target.value as any })} className="w-full bg-bg-secondary border border-glass-border rounded-xl px-3 py-2.5 text-sm outline-none">
@@ -435,10 +449,20 @@ export default function AdminUsers() {
                     </select>
                   </div>
                 </div>
+                <div className="flex gap-4 p-3 bg-bg-secondary border border-glass-border rounded-xl">
+                  <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+                    <input type="checkbox" checked={editUser.is_sp} onChange={e => setEditUser({ ...editUser, is_sp: e.target.checked })} className="w-4 h-4 rounded accent-emerald-500 bg-bg-primary border-glass-border" />
+                    SP Access
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
+                    <input type="checkbox" checked={editUser.is_isp} onChange={e => setEditUser({ ...editUser, is_isp: e.target.checked })} className="w-4 h-4 rounded accent-blue-500 bg-bg-primary border-glass-border" />
+                    ISP Access
+                  </label>
+                </div>
               </div>
               <div className="p-4 border-t border-glass-border bg-bg-secondary flex gap-3">
-                <button onClick={() => setEditUser(null)} className="flex-1 py-2.5 rounded-xl bg-bg-primary border border-glass-border text-xs font-bold uppercase">Cancel</button>
-                <button onClick={() => { updateUser(editUser.id, { display_name: editUser.display_name, status: editUser.status, kyc_status: editUser.kyc_status }); setEditUser(null); }} className="flex-1 py-2.5 rounded-xl bg-accent-primary text-white text-xs font-bold uppercase">Save Changes</button>
+                <button onClick={() => setEditUser(null)} className="flex-1 py-2.5 rounded-xl bg-bg-primary border border-glass-border text-xs font-bold uppercase hover:bg-glass-bg transition-colors">Cancel</button>
+                <button onClick={() => { updateUser(editUser.id, { display_name: editUser.display_name, status: editUser.status, kyc_status: editUser.kyc_status, role: editUser.role, active_role: editUser.active_role, is_sp: editUser.is_sp, is_isp: editUser.is_isp }); setEditUser(null); }} className="flex-1 py-2.5 rounded-xl bg-accent-primary text-white text-xs font-bold uppercase hover:opacity-90 transition-opacity">Save Changes</button>
               </div>
             </motion.div>
           </motion.div>
