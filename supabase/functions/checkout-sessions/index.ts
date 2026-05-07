@@ -36,6 +36,7 @@ serve(async (req) => {
     let serviceName = 'NetReward Checkout';
     let spEmail = '';
     let spName = '';
+    let merchantDisplayName = 'Merchant';
 
     // First check the new sp_api_keys table (Centralized Keys)
     const { data: centralKey } = await supabase
@@ -56,6 +57,13 @@ serve(async (req) => {
         merchantUserId = userRecord.id;
         spEmail = centralKey.sp_email;
         spName = (userRecord.sp_profiles as any)?.[0]?.company_name || 'Service Provider';
+        // Prefer display_name over company_name for merchant display
+        const { data: userProfile } = await supabase
+          .from('users')
+          .select('display_name')
+          .eq('id', userRecord.id)
+          .maybeSingle();
+        merchantDisplayName = userProfile?.display_name || spName;
         serviceName = spName;
       } else {
         // Fallback: If the API key is valid but the user isn't in the DB (e.g. testing),
@@ -210,6 +218,8 @@ serve(async (req) => {
       checkout_url: `https://netreward.online/pay?session=${session.id}`,
       status: 'pending',
       amount_nrt: nrtAmount,
+      expires_at: expiresAt,
+      merchant_name: merchantDisplayName,
       qr_payload: JSON.stringify({
         sessionId: session.id,
         merchantId: merchantUserId,

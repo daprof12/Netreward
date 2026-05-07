@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
@@ -62,6 +62,7 @@ export default function PaymentAuthorize() {
   const [errorMsg, setErrorMsg] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [showBiometric, setShowBiometric] = useState(false);
+  const [countdown, setCountdown] = useState('');
 
   // ── Load session ────────────────────────────────────────────────
 
@@ -72,7 +73,6 @@ export default function PaymentAuthorize() {
     }
 
     if (!user) {
-      // store the intended URL so Auth can redirect back
       sessionStorage.setItem('nrt_pay_redirect', window.location.href);
       setStep('login_required');
       return;
@@ -80,6 +80,28 @@ export default function PaymentAuthorize() {
 
     loadSession();
   }, [sessionId, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Live MM:SS countdown ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!session?.expiresAt) return;
+
+    const tick = () => {
+      const diff = new Date(session.expiresAt).getTime() - Date.now();
+      if (diff <= 0) {
+        setCountdown('00:00');
+        setStep('expired');
+        return;
+      }
+      const totalSec = Math.floor(diff / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      setCountdown(`${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+    };
+
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [session?.expiresAt]);
 
   const loadSession = async () => {
     setStep('loading');
@@ -178,8 +200,10 @@ export default function PaymentAuthorize() {
   const handleCancel = () => {
     if (session?.cancelUrl) {
       window.location.href = session.cancelUrl;
-    } else {
+    } else if (window.history.length > 1) {
       navigate(-1);
+    } else {
+      navigate('/');
     }
   };
 
@@ -187,11 +211,6 @@ export default function PaymentAuthorize() {
 
   const fiat = session ? convertNrt(session.amountNrt) : null;
   const insufficientBalance = session ? balanceNRT < session.amountNrt : false;
-
-  // Minutes until expiry
-  const minutesLeft = session
-    ? Math.max(0, Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 60000))
-    : 0;
 
   // ── Render ───────────────────────────────────────────────────────
 
@@ -299,7 +318,8 @@ export default function PaymentAuthorize() {
                 <div className="flex items-center justify-center gap-1.5 relative z-10">
                   <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                   <p className="text-[10px] text-text-secondary font-medium">
-                    This request expires in {minutesLeft} minute{minutesLeft !== 1 ? 's' : ''}
+                    Expires in{' '}
+                    <span className="font-bold text-amber-400 font-mono">{countdown || '--:--'}</span>
                   </p>
                 </div>
 
@@ -491,8 +511,17 @@ export default function PaymentAuthorize() {
                   This payment request has expired. Ask the merchant to generate a new one.
                 </p>
               </div>
-              <button onClick={handleCancel} className="w-full py-3 bg-bg-secondary text-text-primary font-bold rounded-xl border border-glass-border">
-                Go Back
+              <button
+                onClick={() => {
+                  if (window.history.length > 1) {
+                    navigate(-1);
+                  } else {
+                    navigate('/');
+                  }
+                }}
+                className="w-full py-3 bg-bg-secondary text-text-primary font-bold rounded-xl border border-glass-border flex items-center justify-center gap-2 hover:bg-glass-bg transition-colors"
+              >
+                <ChevronLeft size={16} /> Go Back
               </button>
             </motion.div>
           )}
