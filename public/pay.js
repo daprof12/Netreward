@@ -1,5 +1,14 @@
 (function() {
-  const currentScript = document.currentScript;
+  let currentScript = document.currentScript;
+  if (!currentScript) {
+    const scripts = document.getElementsByTagName('script');
+    for (let i = 0; i < scripts.length; i++) {
+      if (scripts[i].src && scripts[i].src.includes('pay.js')) {
+        currentScript = scripts[i];
+        break;
+      }
+    }
+  }
   if (!currentScript) return;
 
   const apiKey = currentScript.getAttribute('data-api-key');
@@ -34,11 +43,7 @@
     targetBtn.onmouseout = () => targetBtn.style.background = '#2D2D2D';
 
     targetBtn.innerHTML = `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#F59E0B"/>
-        <path d="M2 17L12 22L22 17" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M2 12L12 17L22 12" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <img src="https://cdn.netreward.online/nrt-icon.svg" width="24" height="24" style="border-radius: 50%;" alt="NRT" />
       <span>Pay with NetReward</span>
     `;
 
