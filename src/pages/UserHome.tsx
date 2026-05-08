@@ -65,6 +65,7 @@ export default function UserHome() {
   const deviceCount = devices ? devices.length : 0;
 
   const { userHeatmap, isUserHeatmapLoading } = useTelemetry();
+  const [recentActivityRaw, setRecentActivityRaw] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   useEffect(() => {
@@ -72,10 +73,11 @@ export default function UserHome() {
       supabase.from('device_data_sessions')
         .select('*, campaigns(title)')
         .order('session_end', { ascending: false })
-        .limit(4)
+        .limit(20) // Fetch more to accurately determine active status for sorting
         .then(({ data }) => {
           if (data) {
-            setRecentActivity(data.map(d => ({
+            setRecentActivityRaw(data);
+            setRecentActivity(data.slice(0, 4).map(d => ({
               id: d.id,
               icon: Zap,
               text: `Earned ${Number(d.nrt_awarded).toFixed(2)} NRT from ${d.campaigns?.title || 'Unknown'}`,
@@ -330,7 +332,20 @@ export default function UserHome() {
           />
         ) : (
           <div className="space-y-3">
-            {(userEnrollments || []).slice(0, 2).map((en: any, i: number) => {
+            {([...(userEnrollments || [])].sort((a: any, b: any) => {
+              const aIsActive = recentActivityRaw?.some((s: any) => s.campaign_id === a.campaign_id && (new Date().getTime() - new Date(s.session_end).getTime() < 5 * 60 * 1000)) ? 1 : 0;
+              const bIsActive = recentActivityRaw?.some((s: any) => s.campaign_id === b.campaign_id && (new Date().getTime() - new Date(s.session_end).getTime() < 5 * 60 * 1000)) ? 1 : 0;
+              if (aIsActive !== bIsActive) return bIsActive - aIsActive;
+              
+              const aRecent = recentActivityRaw?.find((s: any) => s.campaign_id === a.campaign_id)?.session_end;
+              const bRecent = recentActivityRaw?.find((s: any) => s.campaign_id === b.campaign_id)?.session_end;
+              
+              if (aRecent && bRecent) return new Date(bRecent).getTime() - new Date(aRecent).getTime();
+              if (aRecent) return -1;
+              if (bRecent) return 1;
+              
+              return 0;
+            })).slice(0, 2).map((en: any, i: number) => {
               const camp = en.campaigns;
               return (
                 <Link 
@@ -367,7 +382,7 @@ export default function UserHome() {
                           <div>
                             <p className="font-bold text-text-primary text-sm truncate flex items-center gap-2">
                               {camp?.title || 'Campaign'}
-                              {recentActivity?.some((s: any) => s.campaign_id === camp.id && (new Date().getTime() - new Date(s.session_end).getTime() < 5 * 60 * 1000)) && (
+                              {recentActivityRaw?.some((s: any) => s.campaign_id === camp.id && (new Date().getTime() - new Date(s.session_end).getTime() < 5 * 60 * 1000)) && (
                                 <span className="relative flex h-2 w-2">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
