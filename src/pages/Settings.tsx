@@ -38,7 +38,7 @@ export default function Settings() {
   usePageTitle('Settings');
   const navigate = useNavigate();
   const { user, role, setUser, setHasOnboarded, signOut } = useAuthStore();
-  const { services, paymentIntegration, setPaymentIntegration, profileLogo: spLogo, checkoutSessions, createCheckoutSession } = useSpStore();
+  const { services, profileLogo: spLogo, checkoutSessions, createCheckoutSession } = useSpStore();
   const { networks, profileLogo: ispLogo, initialize: initIsp } = useIspStore();
   const { profile, switchRole, isSwitchingRole } = useProfile();
 
@@ -83,8 +83,7 @@ export default function Settings() {
   const [showServiceDetail, setShowServiceDetail] = useState(false);
   const [showNetworkDetail, setShowNetworkDetail] = useState(false);
   const [showPaymentHub, setShowPaymentHub] = useState(false);
-  const [paymentSetupStep, setPaymentSetupStep] = useState<0 | 1 | 2 | 3>(0);
-  const [paymentWebhook, setPaymentWebhook] = useState('');
+  const [selectedPaymentServiceIdx, setSelectedPaymentServiceIdx] = useState(0);
   const [activeQrSession, setActiveQrSession] = useState<any | null>(null);
   
   // Preference states
@@ -175,7 +174,7 @@ export default function Settings() {
     ...(role === 'sp' ? [{
       title: 'API & Integrations',
       items: [
-        { icon: CreditCard, label: 'Payment API', value: paymentIntegration ? 'Integrated' : 'Setup Required', highlight: !paymentIntegration, onClick: () => { setPaymentSetupStep(0); setShowPaymentHub(true); } },
+        { icon: CreditCard, label: 'Payment API', value: services.length > 0 ? `${services.length} Service${services.length > 1 ? 's' : ''} Ready` : 'No Services', highlight: services.length === 0, onClick: () => { setSelectedPaymentServiceIdx(0); setShowPaymentHub(true); } },
         { icon: Code, label: 'Service API', value: `${services.length} Integrated`, onClick: () => setShowServiceDetail(true) },
       ]
     }] : []),
@@ -574,10 +573,9 @@ export default function Settings() {
                       </div>
                       <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${svc.verified ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'}`}>{svc.verified ? 'Verified' : 'Pending'}</span>
                     </div>
-                    {svc.webDomain && <div className="text-xs text-text-secondary"><span className="font-semibold text-text-primary">Domain:</span> {svc.webDomain}</div>}
-                    {svc.androidPackageName && <div className="text-xs text-text-secondary"><span className="font-semibold text-text-primary">Android:</span> {svc.androidPackageName}</div>}
-                    {svc.iosBundleId && <div className="text-xs text-text-secondary"><span className="font-semibold text-text-primary">iOS:</span> {svc.iosBundleId}</div>}
-                    {svc.webhookUrl && <div className="text-xs text-text-secondary"><span className="font-semibold text-text-primary">Webhook:</span> {svc.webhookUrl}</div>}
+                    {svc.webUrl && <div className="text-xs text-text-secondary"><span className="font-semibold text-text-primary">Web:</span> {svc.webUrl}</div>}
+                    {svc.androidUrl && <div className="text-xs text-text-secondary"><span className="font-semibold text-text-primary">Android:</span> {svc.androidUrl}</div>}
+                    {svc.iosUrl && <div className="text-xs text-text-secondary"><span className="font-semibold text-text-primary">iOS:</span> {svc.iosUrl}</div>}
                     {svc.apiKey && (
                       <div className="bg-bg-secondary rounded-lg px-3 py-2 flex items-center justify-between gap-2 overflow-hidden">
                         <span className="text-[10px] font-mono text-text-secondary truncate flex-1">{svc.apiKey}</span>
@@ -639,7 +637,7 @@ export default function Settings() {
         )}
       </AnimatePresence>
 
-      {/* SP Payment API Hub Modal */}
+      {/* SP Payment API Hub Modal — Service-Aware */}
       <AnimatePresence>
         {showPaymentHub && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -652,201 +650,147 @@ export default function Settings() {
                   <button onClick={() => setShowPaymentHub(false)} className="p-1.5 bg-bg-secondary rounded-full"><X size={16} /></button>
                 </div>
 
-                {paymentIntegration ? (
-                  /* Integrated — show details */
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3">
-                      <Check size={18} className="text-green-600 dark:text-green-500" />
-                      <span className="text-sm font-bold text-green-700 dark:text-green-500">Payment API Active</span>
+                {services.length === 0 ? (
+                  /* No services — prompt to create one */
+                  <div className="space-y-4 text-center py-4">
+                    <div className="w-16 h-16 rounded-full bg-bg-secondary flex items-center justify-center mx-auto">
+                      <CreditCard size={28} className="text-text-secondary opacity-50" />
                     </div>
-                    
-                    {/* Scan2Pay Testing Section */}
-                    <div className="glass p-5 rounded-2xl border border-glass-border space-y-4">
-                      <h4 className="text-sm font-bold flex items-center gap-2">
-                        <QrCode size={16} className="text-accent-primary" />
-                        Test Scan2Pay
-                      </h4>
-                      <div className="space-y-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-text-secondary uppercase">Amount (NRT)</label>
-                          <input 
-                            type="number" 
-                            id="test-payment-amount"
-                            placeholder="15.00" 
-                            className="w-full bg-bg-secondary border border-glass-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent-primary"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-text-secondary uppercase">Description</label>
-                          <input 
-                            type="text" 
-                            id="test-payment-desc"
-                            placeholder="Netflix Subscription" 
-                            className="w-full bg-bg-secondary border border-glass-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent-primary"
-                          />
-                        </div>
-                          <button 
-                            onClick={async (e) => {
-                              e.preventDefault();
-                              const amountInput = document.getElementById('test-payment-amount') as HTMLInputElement;
-                              const descInput = document.getElementById('test-payment-desc') as HTMLInputElement;
-                              const amountValue = amountInput?.value;
-                              const desc = descInput?.value?.trim() || '';
-                              
-                              if (!amountValue || parseFloat(amountValue) <= 0) {
-                                showToast('Please enter a valid amount greater than 0', 'warning');
-                                amountInput?.focus();
-                                return;
-                              }
-
-                              if (!desc) {
-                                showToast('Please enter a payment description', 'warning');
-                                descInput?.focus();
-                                return;
-                              }
-
-                              const amount = parseFloat(amountValue);
-                              
-                              try {
-                                const session = await createCheckoutSession(amount, desc);
-                                showToast('Test checkout session created!', 'success');
-                                setActiveQrSession(session);
-                              } catch (err: any) {
-                                showToast(err.message || 'Failed to create session', 'danger');
-                              }
-                            }}
-                          className="w-full py-2.5 bg-accent-primary text-primary-foreground font-bold rounded-xl text-xs shadow-lg shadow-accent-primary/10 active:scale-95 transition-all"
-                        >
-                          Generate Test QR Code
-                        </button>
-                      </div>
-
-                      {/* Active Sessions List */}
-                      {checkoutSessions.length > 0 && (
-                        <div className="pt-4 border-t border-glass-border space-y-3">
-                          <p className="text-[10px] font-black text-text-secondary uppercase">Active Sessions</p>
-                          <div className="space-y-2">
-                            {checkoutSessions.map(session => (
-                              <div key={session.id} className="flex items-center justify-between bg-bg-secondary/50 p-2 rounded-lg border border-glass-border">
-                                <div className="min-w-0">
-                                  <p className="text-[11px] font-bold truncate">{session.description}</p>
-                                  <p className="text-[10px] text-text-secondary">{session.amountNrt} NRT</p>
-                                </div>
-                                <button 
-                                  onClick={() => {
-                                    setActiveQrSession(session);
-                                    showToast('QR Code visible for scanning', 'info');
-                                  }}
-                                  className="p-1.5 bg-accent-primary/10 text-accent-primary rounded-md"
-                                >
-                                  <QrCode size={14} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="glass p-3 rounded-xl border border-glass-border text-center">
-                        <p className="text-[10px] text-text-secondary font-medium uppercase">Volume</p>
-                        <p className="text-lg font-bold text-accent-primary">{paymentIntegration.totalVolume.toLocaleString()} NRT</p>
-                      </div>
-                      <div className="glass p-3 rounded-xl border border-glass-border text-center">
-                        <p className="text-[10px] text-text-secondary font-medium uppercase">Transactions</p>
-                        <p className="text-lg font-bold text-text-primary">{paymentIntegration.totalTransactions}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-xs"><span className="font-semibold text-text-secondary">Webhook:</span> <span className="text-text-primary font-mono">{paymentIntegration.webhookUrl}</span></div>
-                      <div className="bg-bg-secondary rounded-lg px-3 py-2 flex items-center justify-between gap-2 overflow-hidden">
-                        <div className="min-w-0 flex-1"><p className="text-[10px] text-text-secondary font-bold uppercase">API Key</p><p className="text-[11px] font-mono text-text-primary truncate">{paymentIntegration.apiKey}</p></div>
-                        <CopyButton text={paymentIntegration.apiKey} id="pay-api-key" />
-                      </div>
-                      <div className="bg-bg-secondary rounded-lg px-3 py-2 flex items-center justify-between gap-2 overflow-hidden">
-                        <div className="min-w-0 flex-1"><p className="text-[10px] text-text-secondary font-bold uppercase">Webhook Secret</p><p className="text-[11px] font-mono text-text-primary truncate">{paymentIntegration.webhookSecret}</p></div>
-                        <CopyButton text={paymentIntegration.webhookSecret} id="pay-webhook-secret" />
-                      </div>
-                      <Link to="/documentation/payment" className="mt-4 flex items-center justify-center w-full py-3 bg-bg-secondary text-text-primary font-bold rounded-xl border border-glass-border hover:bg-glass-border transition-colors">
-                        View Documentation
-                      </Link>
-                    </div>
+                    <h4 className="font-bold text-lg">No Services Yet</h4>
+                    <p className="text-sm text-text-secondary max-w-[280px] mx-auto">Create a service first to enable Payment API. Each service gets its own API key for both SDK tracking and payments.</p>
+                    <Link to="/campaigns/create-service" onClick={() => setShowPaymentHub(false)}
+                      className="w-full py-3.5 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2">
+                      Create Service <ArrowRight size={16} />
+                    </Link>
                   </div>
                 ) : (
-                  /* Not integrated — setup wizard */
-                  <AnimatePresence mode="wait">
-                    {paymentSetupStep === 0 && (
-                      <motion.div key="s0" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-4">
-                        <p className="text-sm text-text-secondary">Integrate NRT Checkout on your platform to accept NRT payments from users via QR code or deep-link.</p>
-                        <div className="space-y-2">
-                          {['Configure your webhook endpoint', 'Test the connection', 'Generate API keys'].map((s, i) => (
-                            <div key={i} className="flex items-center gap-3 glass p-3 rounded-xl border border-glass-border">
-                              <div className="w-7 h-7 rounded-full bg-accent-primary/10 flex items-center justify-center text-accent-primary text-xs font-bold">{i + 1}</div>
-                              <span className="text-sm font-medium">{s}</span>
-                            </div>
+                  /* Has services — show service picker + payment tools */
+                  <div className="space-y-4">
+                    {/* Service Selector */}
+                    {services.length > 1 && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Select Service</label>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {services.map((svc, idx) => (
+                            <button
+                              key={svc.id}
+                              onClick={() => setSelectedPaymentServiceIdx(idx)}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium whitespace-nowrap transition-all ${
+                                idx === selectedPaymentServiceIdx
+                                  ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
+                                  : 'bg-bg-secondary border-glass-border text-text-secondary hover:border-text-secondary'
+                              }`}
+                            >
+                              {svc.logoUrl ? (
+                                <img src={svc.logoUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full bg-accent-primary/20 flex items-center justify-center text-[8px] font-bold text-accent-primary uppercase">{svc.name[0]}</div>
+                              )}
+                              {svc.name}
+                            </button>
                           ))}
                         </div>
-                        <button onClick={() => setPaymentSetupStep(1)} className="w-full py-3.5 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2">Start Setup <ArrowRight size={16} /></button>
-                      </motion.div>
+                      </div>
                     )}
-                    {paymentSetupStep === 1 && (
-                      <motion.div key="s1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-                        <div className="flex items-center gap-2 text-xs text-text-secondary"><span className="px-2 py-0.5 bg-accent-primary text-white rounded-full text-[10px] font-bold">Step 1/3</span> Configure Webhook</div>
-                        <div>
-                          <label className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2 block">Webhook URL</label>
-                          <input value={paymentWebhook} onChange={e => setPaymentWebhook(e.target.value)} placeholder="https://your-api.com/webhooks/nrt" className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent-primary" />
-                        </div>
-                        <p className="text-[11px] text-text-secondary">We'll send <code className="bg-bg-secondary px-1 rounded">payment.success</code> events to this URL.</p>
-                        <div className="flex gap-3">
-                          <button onClick={() => setPaymentSetupStep(0)} className="flex-1 py-3 bg-bg-secondary text-text-primary font-bold rounded-xl">Back</button>
-                          <button onClick={() => { 
-                            const url = paymentWebhook.trim();
-                            if (!url) { 
-                              showToast('Enter a webhook URL', 'danger'); 
-                              return; 
-                            }
-                            try {
-                              const parsed = new URL(url);
-                              if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error();
-                            } catch {
-                              showToast('Enter a valid URL (must start with http:// or https://)', 'danger');
-                              return;
-                            }
-                            setPaymentSetupStep(2); 
-                          }} className="flex-1 py-3 bg-accent-primary text-primary-foreground font-bold rounded-xl">Next</button>
-                        </div>
-                      </motion.div>
-                    )}
-                    {paymentSetupStep === 2 && (
-                      <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4 text-center py-4">
-                        <div className="flex items-center gap-2 text-xs text-text-secondary justify-center"><span className="px-2 py-0.5 bg-accent-primary text-white rounded-full text-[10px] font-bold">Step 2/3</span> Testing Connection</div>
-                        <div className="flex justify-center py-6"><Loader2 size={40} className="text-accent-primary animate-spin" /></div>
-                        <p className="text-sm text-text-secondary">Sending test payload to your webhook...</p>
-                        {setTimeout(() => setPaymentSetupStep(3), 2500) && null}
-                      </motion.div>
-                    )}
-                    {paymentSetupStep === 3 && (
-                      <motion.div key="s3" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                        <div className="flex items-center gap-2 text-xs text-text-secondary"><span className="px-2 py-0.5 bg-green-500 text-white rounded-full text-[10px] font-bold">Step 3/3</span> Keys Generated</div>
-                        <div className="w-14 h-14 rounded-full bg-green-500/10 flex items-center justify-center mx-auto"><Check size={28} className="text-green-500" /></div>
-                        <p className="text-sm text-text-secondary text-center">Connection verified! Save your credentials below.</p>
-                        <button onClick={() => {
-                          const pi = {
-                            integrated: true,
-                            webhookUrl: paymentWebhook,
-                            apiKey: `nrt_pay_${crypto.randomUUID().replace(/-/g, '').substring(0, 20)}`,
-                            webhookSecret: `whsec_${crypto.randomUUID().replace(/-/g, '')}`,
-                            totalVolume: 0,
-                            totalTransactions: 0,
-                            createdAt: new Date().toISOString(),
-                          };
-                          setPaymentIntegration(pi);
-                          showToast('Payment API integrated successfully!', 'success');
-                        }} className="w-full py-3.5 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20">Activate & View Keys</button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+
+                    {/* Selected Service Status */}
+                    {(() => {
+                      const svc = services[selectedPaymentServiceIdx] || services[0];
+                      if (!svc) return null;
+                      return (
+                        <>
+                          <div className={`flex items-center gap-2 rounded-xl px-4 py-3 ${
+                            svc.verified ? 'bg-green-500/10 border border-green-500/20' : 'bg-amber-500/10 border border-amber-500/20'
+                          }`}>
+                            {svc.verified ? <Check size={18} className="text-green-500" /> : <AlertCircle size={18} className="text-amber-500" />}
+                            <div className="flex-1">
+                              <span className={`text-sm font-bold ${svc.verified ? 'text-green-700 dark:text-green-500' : 'text-amber-700 dark:text-amber-500'}`}>
+                                {svc.verified ? 'Payment Ready' : 'Pending Verification'}
+                              </span>
+                              <p className="text-[10px] text-text-secondary">{svc.name} • {svc.category}</p>
+                            </div>
+                          </div>
+
+                          {/* API Key for this service */}
+                          {svc.apiKey && (
+                            <div className="bg-bg-secondary rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 overflow-hidden">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] text-text-secondary font-bold uppercase">Service API Key</p>
+                                <p className="text-[11px] font-mono text-text-primary truncate">{svc.apiKey}</p>
+                              </div>
+                              <CopyButton text={svc.apiKey} id={`pay-svc-key-${svc.id}`} />
+                            </div>
+                          )}
+
+                          {/* Scan2Pay Test — only for verified services */}
+                          {svc.verified && (
+                            <div className="glass p-5 rounded-2xl border border-glass-border space-y-4">
+                              <h4 className="text-sm font-bold flex items-center gap-2">
+                                <QrCode size={16} className="text-accent-primary" />
+                                Test Scan2Pay
+                              </h4>
+                              <div className="space-y-3">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-black text-text-secondary uppercase">Amount (NRT)</label>
+                                  <input type="number" id="test-payment-amount" placeholder="15.00"
+                                    className="w-full bg-bg-secondary border border-glass-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent-primary" />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-black text-text-secondary uppercase">Description</label>
+                                  <input type="text" id="test-payment-desc" placeholder="Netflix Subscription"
+                                    className="w-full bg-bg-secondary border border-glass-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent-primary" />
+                                </div>
+                                <button
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    const amountInput = document.getElementById('test-payment-amount') as HTMLInputElement;
+                                    const descInput = document.getElementById('test-payment-desc') as HTMLInputElement;
+                                    const amountValue = amountInput?.value;
+                                    const desc = descInput?.value?.trim() || '';
+                                    if (!amountValue || parseFloat(amountValue) <= 0) { showToast('Enter a valid amount', 'warning'); return; }
+                                    if (!desc) { showToast('Enter a description', 'warning'); return; }
+                                    try {
+                                      const session = await createCheckoutSession(parseFloat(amountValue), desc);
+                                      showToast('Test checkout session created!', 'success');
+                                      setActiveQrSession(session);
+                                    } catch (err: any) {
+                                      showToast(err.message || 'Failed', 'danger');
+                                    }
+                                  }}
+                                  className="w-full py-2.5 bg-accent-primary text-primary-foreground font-bold rounded-xl text-xs shadow-lg shadow-accent-primary/10 active:scale-95 transition-all"
+                                >
+                                  Generate Test QR Code
+                                </button>
+                              </div>
+
+                              {checkoutSessions.length > 0 && (
+                                <div className="pt-4 border-t border-glass-border space-y-3">
+                                  <p className="text-[10px] font-black text-text-secondary uppercase">Active Sessions</p>
+                                  <div className="space-y-2">
+                                    {checkoutSessions.map(session => (
+                                      <div key={session.id} className="flex items-center justify-between bg-bg-secondary/50 p-2 rounded-lg border border-glass-border">
+                                        <div className="min-w-0">
+                                          <p className="text-[11px] font-bold truncate">{session.description}</p>
+                                          <p className="text-[10px] text-text-secondary">{session.amountNrt} NRT</p>
+                                        </div>
+                                        <button onClick={() => { setActiveQrSession(session); }} className="p-1.5 bg-accent-primary/10 text-accent-primary rounded-md">
+                                          <QrCode size={14} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <Link to="/documentation/payment" className="flex items-center justify-center w-full py-3 bg-bg-secondary text-text-primary font-bold rounded-xl border border-glass-border hover:bg-glass-border transition-colors">
+                            View Documentation
+                          </Link>
+                        </>
+                      );
+                    })()}
+                  </div>
                 )}
               </div>
             </motion.div>

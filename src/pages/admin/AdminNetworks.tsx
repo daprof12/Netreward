@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Network, CheckCircle2, XCircle, Trash2, RefreshCw, Loader2 } from 'lucide-react';
 import { adminNetworkApi } from '@/lib/adminApi';
+import { supabase } from '@/lib/supabase';
 import { useToastStore } from '@/stores/useToastStore';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
@@ -43,7 +44,6 @@ export default function AdminNetworks() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this network? This will affect ISP campaigns.')) return;
     try {
-      const { supabase } = await import('@/lib/supabase');
       const { error } = await supabase.from('networks').delete().eq('id', id);
       if (error) throw error;
       setNetworks(prev => prev.filter(n => n.id !== id));
@@ -55,7 +55,6 @@ export default function AdminNetworks() {
 
   const updateVerification = async (id: string, verified: boolean) => {
     try {
-      const { supabase } = await import('@/lib/supabase');
       const { error } = await supabase.from('networks').update({ verified }).eq('id', id);
       if (error) throw error;
       setNetworks(prev => prev.map(n => n.id === id ? { ...n, verified } : n));

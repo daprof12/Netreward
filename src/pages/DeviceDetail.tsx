@@ -48,13 +48,24 @@ export default function DeviceDetail() {
   const deviceStatus = deviceInfo?.status || 'offline';
   const deviceIsp = deviceInfo?.isp_name || 'Unknown ISP';
 
-  // Get unique filter options dynamically from data
-  const categories = ['All', ...Array.from(new Set(appUsage.map(a => a.campaign_id ? 'Service' : 'App')))];
+  // Derive meaningful categories from app names
+  const getCategoryForApp = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes('stream') || n.includes('netflix') || n.includes('spotify') || n.includes('youtube')) return 'Streaming';
+    if (n.includes('game') || n.includes('play')) return 'Gaming';
+    if (n.includes('social') || n.includes('chat') || n.includes('message')) return 'Social';
+    if (n.includes('ai') || n.includes('gpt') || n.includes('cloud')) return 'AI Service';
+    if (n.includes('browse') || n.includes('web') || n.includes('chrome') || n.includes('safari')) return 'Browsing';
+    return 'Other';
+  };
+
+  const categories = ['All', ...Array.from(new Set(appUsage.map(a => getCategoryForApp(a.app_name || ''))))];
   const isps = ['All', ...Array.from(new Set([deviceInfo?.isp_name || 'Unknown ISP']))];
   const statuses = ['All', ...Array.from(new Set(appUsage.map(a => a.status)))];
 
   const filteredApps = appUsage.filter(app => {
     if (filterStatus !== 'All' && app.status !== filterStatus) return false;
+    if (filterCategory !== 'All' && getCategoryForApp(app.app_name || '') !== filterCategory) return false;
     return true;
   });
 

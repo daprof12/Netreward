@@ -18,29 +18,14 @@ export interface SpService {
   webUrl?: string;
   androidUrl?: string;
   iosUrl?: string;
-  androidPackageName?: string;
-  iosBundleId?: string;
-  webDomain?: string;
-  webhookUrl?: string;
   logoUrl?: string;
   apiKey?: string;
-  secretKey?: string;
-  webhookSecret?: string;
   verified: boolean;
   status: 'pending_verification' | 'active' | 'suspended';
   country?: string;
   createdAt: string;
 }
 
-export interface PaymentIntegration {
-  integrated: boolean;
-  webhookUrl: string;
-  apiKey: string;
-  webhookSecret: string;
-  totalVolume: number;
-  totalTransactions: number;
-  createdAt: string;
-}
 
 export interface SpCampaign {
   id: string;
@@ -73,8 +58,8 @@ export interface CheckoutSession {
 interface SpStore {
   services: SpService[];
   campaigns: SpCampaign[];
+  profileId: string | null;
   profileLogo: string | null;
-  paymentIntegration: PaymentIntegration | null;
   checkoutSessions: CheckoutSession[];
   isLoading: boolean;
   error: string | null;
@@ -91,8 +76,7 @@ interface SpStore {
   updateCampaign: (id: string, updates: Partial<SpCampaign>) => Promise<void>;
   deleteCampaign: (id: string) => Promise<void>;
  
-  // Payment integration
-  setPaymentIntegration: (pi: PaymentIntegration) => void;
+  // Checkout
   createCheckoutSession: (amountNrt: number, description: string) => Promise<CheckoutSession>;
 }
 
@@ -101,8 +85,8 @@ export const useSpStore = create<SpStore>()(
     (set, get) => ({
       services: [],
       campaigns: [],
+      profileId: null,
       profileLogo: null,
-      paymentIntegration: null,
       checkoutSessions: [],
       isLoading: false,
       error: null,
@@ -117,7 +101,7 @@ export const useSpStore = create<SpStore>()(
           const { data: profile } = await supabase.from('sp_profiles').select('id, logo_url').eq('user_id', spId).single();
           if (profile) {
             profileId = profile.id;
-            set({ profileLogo: profile.logo_url });
+            set({ profileId: profile.id, profileLogo: profile.logo_url });
           } else {
             const { data: newProfile } = await supabase.from('sp_profiles').insert({ user_id: spId, company_name: 'Alpha SP' }).select().single();
             if (newProfile) profileId = newProfile.id;
@@ -321,7 +305,6 @@ export const useSpStore = create<SpStore>()(
         }
       },
 
-      setPaymentIntegration: (pi) => set(() => ({ paymentIntegration: pi })),
 
       createCheckoutSession: async (amountNrt, description) => {
         const { data: { user } } = await supabase.auth.getUser();

@@ -15,9 +15,7 @@ export interface IspNetwork {
   asn?: string; // e.g. "AS6453"
   ipRanges?: string[]; // CIDR blocks e.g. ["197.210.0.0/16"]
   handshakeUrl?: string; // ISP endpoint for BGP challenge-response
-  webhookUrl?: string; // ISP receives data flow summaries
   apiKey?: string;
-  apiSecret?: string;
   createdAt: string;
 }
 
@@ -40,6 +38,7 @@ export interface IspCampaign {
 interface IspStore {
   networks: IspNetwork[];
   campaigns: IspCampaign[];
+  profileId: string | null;
   profileLogo: string | null;
   ispName: string | null;
   isLoading: boolean;
@@ -63,6 +62,7 @@ export const useIspStore = create<IspStore>()(
     (set, get) => ({
       networks: [],
       campaigns: [],
+      profileId: null,
       profileLogo: null,
       ispName: null,
       isLoading: false,
@@ -77,7 +77,7 @@ export const useIspStore = create<IspStore>()(
           const { data: profile } = await supabase.from('isp_profiles').select('id, logo_url, isp_name').eq('user_id', ispId).single();
           if (profile) {
             profileId = profile.id;
-            set({ profileLogo: profile.logo_url, ispName: profile.isp_name });
+            set({ profileId: profile.id, profileLogo: profile.logo_url, ispName: profile.isp_name });
           } else {
             const { data: newProfile } = await supabase.from('isp_profiles').insert({ user_id: ispId, isp_name: 'Alpha ISP' }).select().single();
             if (newProfile) {
@@ -98,8 +98,8 @@ export const useIspStore = create<IspStore>()(
             id: d.id, name: d.name, category: d.category, logoUrl: d.logo_url,
             verified: d.verified, country: d.country, signalStrength: d.signal_strength,
             coverage: d.coverage, asn: d.asn, ipRanges: d.ip_ranges || [],
-            handshakeUrl: d.handshake_url, webhookUrl: d.webhook_url,
-            apiKey: d.api_key, apiSecret: d.api_secret, createdAt: d.created_at
+            handshakeUrl: d.handshake_url,
+            apiKey: d.api_key, createdAt: d.created_at
           }));
 
           const campaignsData: IspCampaign[] = campaignsRes.data.map(d => ({
@@ -131,7 +131,7 @@ export const useIspStore = create<IspStore>()(
             name: network.name, category: network.category, logo_url: network.logoUrl,
             country: network.country, signal_strength: network.signalStrength, coverage: network.coverage,
             asn: network.asn, ip_ranges: network.ipRanges as any, handshake_url: network.handshakeUrl,
-            webhook_url: network.webhookUrl, api_key: network.apiKey, api_secret: network.apiSecret
+            api_key: network.apiKey
           };
           
           const { data, error } = await supabase.from('networks').insert(dbNetwork).select().single();
@@ -163,9 +163,7 @@ export const useIspStore = create<IspStore>()(
           if (updates.asn !== undefined) dbUpdates.asn = updates.asn;
           if (updates.ipRanges !== undefined) dbUpdates.ip_ranges = updates.ipRanges;
           if (updates.handshakeUrl !== undefined) dbUpdates.handshake_url = updates.handshakeUrl;
-          if (updates.webhookUrl !== undefined) dbUpdates.webhook_url = updates.webhookUrl;
           if (updates.apiKey !== undefined) dbUpdates.api_key = updates.apiKey;
-          if (updates.apiSecret !== undefined) dbUpdates.api_secret = updates.apiSecret;
           if (updates.verified !== undefined) dbUpdates.verified = updates.verified;
           
           const { error } = await supabase.from('networks').update(dbUpdates).eq('id', id);

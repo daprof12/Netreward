@@ -267,7 +267,9 @@ export default function ProfileSettings() {
           {activeTab === 'profile' ? (
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-text-secondary ml-1">Display Name</label>
+                <label className="text-sm font-medium text-text-secondary ml-1">
+                  {role === 'sp' || role === 'isp' ? 'Company / Merchant Name' : 'Display Name'}
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <User size={18} className="text-text-secondary" />
@@ -276,7 +278,7 @@ export default function ProfileSettings() {
                     type="text" 
                     value={displayName}
                     onChange={e => setDisplayName(e.target.value)}
-                    placeholder="Enter your display name"
+                    placeholder={role === 'sp' || role === 'isp' ? 'Enter company or brand name' : 'Enter your display name'}
                     className={`w-full bg-bg-secondary border ${nameError ? 'border-red-500' : 'border-glass-border'} rounded-xl py-3.5 pl-11 pr-10 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent-primary/50`}
                   />
                   {isCheckingName && (
@@ -308,7 +310,11 @@ export default function ProfileSettings() {
                     )}
                   </div>
                 )}
-                <p className="text-xs text-text-secondary ml-1">This is how your name will appear publicly.</p>
+                <p className="text-xs text-text-secondary ml-1">
+                  {role === 'sp' || role === 'isp' 
+                    ? 'This is your company name shown to users, on payments, and across the platform.' 
+                    : 'This is how your name will appear publicly.'}
+                </p>
               </div>
 
               <div className="space-y-1.5">

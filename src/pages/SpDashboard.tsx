@@ -22,7 +22,7 @@ type TimeFilter = '24H' | '7D' | '3M' | 'All';
 export default function SpDashboard() {
   usePageTitle('SP Dashboard');
   const { user, profile, refreshProfile, signOut, setHasOnboarded } = useAuthStore();
-  const { campaigns, profileLogo } = useSpStore();
+  const { campaigns, services, profileLogo, profileId: spProfileId } = useSpStore();
   const { convertNrt, getCurrencyDetails } = useCurrencyStore();
   const { campaignStats, fetchCampaignStats, isLoading: isStatsLoading } = useAnalyticsStore();
   const { spTelemetry, spHeatmap, isSpHeatmapLoading, isSpTelemetryLoading } = useTelemetry();
@@ -33,13 +33,14 @@ export default function SpDashboard() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isTestingSdk, setIsTestingSdk] = useState(false);
   const [sdkStatus, setSdkStatus] = useState<'verified' | 'test_pending' | 'not_integrated'>('verified');
+  const [activeServiceIndex, setActiveServiceIndex] = useState(0);
 
   useEffect(() => {
     refreshProfile();
-    if (user?.id) {
-      fetchCampaignStats(user.id, timeFilter === '24H' ? 1 : timeFilter === '7D' ? 7 : 90);
+    if (spProfileId) {
+      fetchCampaignStats(spProfileId, timeFilter === '24H' ? 1 : timeFilter === '7D' ? 7 : 90);
     }
-  }, [user?.id, timeFilter, refreshProfile, fetchCampaignStats]);
+  }, [spProfileId, timeFilter, refreshProfile, fetchCampaignStats]);
 
   const runningCampaigns = campaigns.filter(c => c.status === 'active');
 
@@ -68,9 +69,9 @@ export default function SpDashboard() {
     >
       <div className="flex justify-between items-center">
         <div>
-          <p className="text-sm text-text-secondary">Partner Portal 👋</p>
+          <p className="text-sm text-text-secondary">{profile?.display_name || 'Partner Portal'} 👋</p>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-text-primary capitalize">{user?.email?.split('@')[0] || 'Partner'}</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-text-primary capitalize">{profile?.display_name || user?.email?.split('@')[0] || 'Partner'}</h1>
             <span className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-[10px] font-black rounded-md border border-blue-500/20 tracking-tighter">SP</span>
           </div>
         </div>
@@ -138,52 +139,91 @@ export default function SpDashboard() {
           </div>
         ) : (
           <>
+            {/* Top row: Status + Connected indicator (absolute positioned) */}
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="font-bold flex items-center gap-2">
                   <Code size={18} className="text-accent-primary" />
                   SDK Integration
-                  <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${
-                    sdkStatus === 'verified' ? 'bg-green-500/10 text-green-500' : 
-                    sdkStatus === 'test_pending' ? 'bg-amber-500/10 text-amber-500' : 
-                    'bg-red-500/10 text-red-500'
-                  }`}>
-                    {sdkStatus.replace('_', ' ')}
-                  </span>
                 </h3>
                 <p className="text-xs text-text-secondary mt-1 max-w-[250px]">
                   NetReward Tracker SDK must be active for your campaigns to correctly report data usage. Earn {useSystemStore.getState().settings.spCashbackPercentage}% NRT back.
                 </p>
               </div>
               
-              <button 
-                onClick={() => {
-                  setIsTestingSdk(true);
-                  setTimeout(() => { setIsTestingSdk(false); setSdkStatus('verified'); }, 2000);
-                }}
-                disabled={isTestingSdk || sdkStatus === 'verified'}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
-                  sdkStatus === 'verified' ? 'bg-bg-secondary text-text-secondary cursor-not-allowed' :
-                  isTestingSdk ? 'bg-accent-primary/50 text-white cursor-wait' :
-                  'bg-accent-primary text-white hover:opacity-90 active:scale-95 shadow-lg shadow-accent-primary/20'
-                }`}
-              >
-                {isTestingSdk ? 'Pinging...' : sdkStatus === 'verified' ? 'Connected' : 'Test Connection'}
-              </button>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${
+                  sdkStatus === 'verified' ? 'bg-green-500/10 text-green-500' : 
+                  sdkStatus === 'test_pending' ? 'bg-amber-500/10 text-amber-500' : 
+                  'bg-red-500/10 text-red-500'
+                }`}>
+                  {sdkStatus.replace('_', ' ')}
+                </span>
+                {sdkStatus === 'verified' && (
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                  </span>
+                )}
+              </div>
             </div>
 
+            {/* Service API Key Carousel */}
             <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between bg-bg-secondary/50 rounded-xl p-3 border border-glass-border">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center">
-                    <Key size={14} className="text-accent-primary" />
+              {services.length > 0 ? (
+                <>
+                  <div className="flex items-center justify-between bg-bg-secondary/50 rounded-xl p-3 border border-glass-border">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center shrink-0">
+                        {services[activeServiceIndex]?.logoUrl ? (
+                          <img src={services[activeServiceIndex].logoUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          <Key size={14} className="text-accent-primary" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5 truncate">
+                          {services[activeServiceIndex]?.name || 'Service'}
+                        </p>
+                        <code className="text-xs font-mono text-text-primary">
+                          {services[activeServiceIndex]?.apiKey 
+                            ? `${services[activeServiceIndex].apiKey.slice(0, 12)}••••${services[activeServiceIndex].apiKey.slice(-4)}`
+                            : 'No API key'}
+                        </code>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5">API Key</p>
-                    <code className="text-xs font-mono text-text-primary">sp_live_••••••••••••e5b9</code>
+
+                  {/* Dot indicators */}
+                  {services.length > 1 && (
+                    <div className="flex items-center justify-center gap-1.5">
+                      {services.map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setActiveServiceIndex(i)}
+                          className={`transition-all duration-200 rounded-full ${
+                            i === activeServiceIndex 
+                              ? 'w-4 h-1.5 bg-accent-primary' 
+                              : 'w-1.5 h-1.5 bg-text-secondary/30 hover:bg-text-secondary/50'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center justify-between bg-bg-secondary/50 rounded-xl p-3 border border-glass-border">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center">
+                      <Key size={14} className="text-accent-primary" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5">No Services</p>
+                      <p className="text-xs text-text-secondary">Create a service to get your API key</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
               
               <div className="flex justify-between items-center text-xs">
                 <div className="flex items-center gap-1.5 text-text-secondary">

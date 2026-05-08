@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Globe, Smartphone, Play, Image as ImageIcon, CheckCircle2, Loader2, ArrowRight, ChevronDown, Lock, ShieldCheck, Terminal, Copy, Save, Check } from 'lucide-react';
+import { ChevronLeft, Globe, Smartphone, Play, Image as ImageIcon, Loader2, ChevronDown, Save, Copy, Check } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSpStore, type SpService } from '@/stores/useSpStore';
 import { useToastStore } from '@/stores/useToastStore';
@@ -15,7 +15,6 @@ export default function EditService() {
   const { services, updateService, isLoading: isStoreLoading } = useSpStore();
   const { showToast } = useToastStore();
   
-  const [step, setStep] = useState<'form' | 'verifying' | 'success'>('form');
   const [isSaving, setIsSaving] = useState(false);
 
   // Form state
@@ -23,15 +22,11 @@ export default function EditService() {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [webUrl, setWebUrl] = useState('');
-  const [webDomain, setWebDomain] = useState('');
   const [androidUrl, setAndroidUrl] = useState('');
-  const [androidPackage, setAndroidPackage] = useState('');
   const [iosUrl, setIosUrl] = useState('');
-  const [iosBundle, setIosBundle] = useState('');
-  const [webhookUrl, setWebhookUrl] = useState('');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   
-  const [credentials, setCredentials] = useState<{apiKey: string, secretKey: string, webhookSecret: string} | null>(null);
+  const [apiKey, setApiKey] = useState('');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,18 +37,10 @@ export default function EditService() {
       setDescription(service.description || '');
       setCategory(service.category);
       setWebUrl(service.webUrl || '');
-      setWebDomain(service.webDomain || '');
       setAndroidUrl(service.androidUrl || '');
-      setAndroidPackage(service.androidPackageName || '');
       setIosUrl(service.iosUrl || '');
-      setIosBundle(service.iosBundleId || '');
-      setWebhookUrl(service.webhookUrl || '');
       setLogoPreview(service.logoUrl || null);
-      setCredentials({
-        apiKey: service.apiKey || '',
-        secretKey: service.secretKey || '',
-        webhookSecret: service.webhookSecret || ''
-      });
+      setApiKey(service.apiKey || '');
     } else if (!isStoreLoading) {
       showToast('Service not found', 'danger');
       navigate('/campaigns?tab=services');
@@ -72,12 +59,8 @@ export default function EditService() {
         description,
         category,
         webUrl,
-        webDomain,
         androidUrl,
-        androidPackageName: androidPackage,
         iosUrl,
-        iosBundleId: iosBundle,
-        webhookUrl,
         logoUrl: logoPreview || undefined
       });
       showToast('Service updated successfully', 'success');
@@ -235,59 +218,31 @@ export default function EditService() {
           </div>
         </div>
 
-        {/* Credentials Card (View Only) */}
-        <div className="space-y-4 pt-4 border-t border-glass-border">
-          <div>
-            <h3 className="text-sm font-bold text-text-primary mb-1">Service Credentials</h3>
-            <p className="text-xs text-text-secondary font-medium">These are required for SDK integration.</p>
-          </div>
+        {/* API Key (View Only) */}
+        {apiKey && (
+          <div className="space-y-4 pt-4 border-t border-glass-border">
+            <div>
+              <h3 className="text-sm font-bold text-text-primary mb-1">API Key</h3>
+              <p className="text-xs text-text-secondary font-medium">Used for SDK integration and payment checkout.</p>
+            </div>
 
-          <div className="glass rounded-2xl border border-glass-border p-5 space-y-4 text-left relative overflow-hidden bg-bg-secondary/30">
-            {credentials ? (
-              <div className="space-y-4 relative z-10">
-                 <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">API Key</label>
-                    <CopyButton text={credentials.apiKey} id="api-key" />
-                  </div>
-                  <div className="bg-bg-primary/50 border border-glass-border rounded-lg px-3 py-2 text-[11px] font-mono text-text-primary break-all">
-                    {credentials.apiKey}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Secret Key</label>
-                    <CopyButton text={credentials.secretKey} id="secret-key" />
-                  </div>
-                  <div className="bg-bg-primary/50 border border-glass-border rounded-lg px-3 py-2 text-[11px] font-mono text-text-primary break-all">
-                    {credentials.secretKey}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Webhook Secret</label>
-                    <CopyButton text={credentials.webhookSecret} id="webhook-secret" />
-                  </div>
-                  <div className="bg-bg-primary/50 border border-glass-border rounded-lg px-3 py-2 text-[11px] font-mono text-text-primary break-all">
-                    {credentials.webhookSecret}
-                  </div>
-                </div>
+            <div className="glass rounded-2xl border border-glass-border p-5 text-left relative overflow-hidden bg-bg-secondary/30">
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">API Key</label>
+                <CopyButton text={apiKey} id="api-key" />
               </div>
-            ) : (
-              <div className="py-4 text-center text-text-secondary text-sm italic">
-                Loading credentials...
+              <div className="bg-bg-primary/50 border border-glass-border rounded-lg px-3 py-2 text-[11px] font-mono text-text-primary break-all">
+                {apiKey}
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Integration Details */}
+        {/* Platform URLs */}
         <div className="space-y-6 pt-4 border-t border-glass-border">
           <div>
-            <h3 className="text-sm font-bold text-text-primary mb-1">Integration Details</h3>
-            <p className="text-xs text-text-secondary">Update your platform endpoints.</p>
+            <h3 className="text-sm font-bold text-text-primary mb-1">Platform URLs</h3>
+            <p className="text-xs text-text-secondary">URLs used for tracking when users visit your platform.</p>
           </div>
 
           {/* Web */}
@@ -296,19 +251,12 @@ export default function EditService() {
               <Globe size={14} className="text-accent-primary" />
               <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Web Platform</span>
             </div>
-            <div className="space-y-3 pl-4 border-l border-glass-border">
+            <div className="pl-4 border-l border-glass-border">
               <input
                 type="url"
                 value={webUrl}
                 onChange={e => setWebUrl(e.target.value)}
                 placeholder="Web App URL (https://...)"
-                className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-              />
-              <input
-                type="text"
-                value={webDomain}
-                onChange={e => setWebDomain(e.target.value)}
-                placeholder="Domain (e.g. netflix.com)"
                 className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary"
               />
             </div>
@@ -320,19 +268,12 @@ export default function EditService() {
               <Smartphone size={14} className="text-[#3DDC84]" />
               <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Android Platform</span>
             </div>
-            <div className="space-y-3 pl-4 border-l border-glass-border">
+            <div className="pl-4 border-l border-glass-border">
               <input
                 type="url"
                 value={androidUrl}
                 onChange={e => setAndroidUrl(e.target.value)}
-                placeholder="Play Store URL"
-                className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-[#3DDC84]"
-              />
-              <input
-                type="text"
-                value={androidPackage}
-                onChange={e => setAndroidPackage(e.target.value)}
-                placeholder="Package Name (e.g. com.netflix.mediaclient)"
+                placeholder="Play Store or App URL"
                 className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-[#3DDC84]"
               />
             </div>
@@ -344,37 +285,15 @@ export default function EditService() {
               <Play size={14} className="text-[#007AFF]" />
               <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">iOS Platform</span>
             </div>
-            <div className="space-y-3 pl-4 border-l border-glass-border">
+            <div className="pl-4 border-l border-glass-border">
               <input
                 type="url"
                 value={iosUrl}
                 onChange={e => setIosUrl(e.target.value)}
-                placeholder="App Store URL"
-                className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-[#007AFF]"
-              />
-              <input
-                type="text"
-                value={iosBundle}
-                onChange={e => setIosBundle(e.target.value)}
-                placeholder="Bundle ID (e.g. com.netflix.Netflix)"
+                placeholder="App Store or App URL"
                 className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-[#007AFF]"
               />
             </div>
-          </div>
-
-          {/* Webhook */}
-          <div className="space-y-3 pt-4 border-t border-glass-border">
-            <div className="flex items-center gap-2">
-              <Terminal size={14} className="text-orange-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Developer Callbacks</span>
-            </div>
-            <input
-              type="url"
-              value={webhookUrl}
-              onChange={e => setWebhookUrl(e.target.value)}
-              placeholder="Webhook URL (NRT will POST events here)"
-              className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-orange-400"
-            />
           </div>
         </div>
 

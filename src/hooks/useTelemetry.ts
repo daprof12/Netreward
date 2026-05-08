@@ -35,8 +35,8 @@ export interface IspTelemetry {
 
 export function useTelemetry() {
   const { user, role } = useAuthStore();
-  const { profile: spProfile } = useSpStore();
-  const { profile: ispProfile } = useIspStore();
+  const spProfileId = useSpStore(state => state.profileId);
+  const ispProfileId = useIspStore(state => state.profileId);
 
   // 1. User Earnings Heatmap
   const { data: userHeatmap, isLoading: isUserHeatmapLoading } = useQuery({
@@ -57,11 +57,11 @@ export function useTelemetry() {
 
   // 2. SP Platform Activity Heatmap
   const { data: spHeatmap, isLoading: isSpHeatmapLoading } = useQuery({
-    queryKey: ['spHeatmap', spProfile?.id],
+    queryKey: ['spHeatmap', spProfileId],
     queryFn: async () => {
-      if (!spProfile?.id || role !== 'sp') return [];
+      if (!spProfileId || role !== 'sp') return [];
       const { data, error } = await supabase
-        .rpc('get_sp_platform_activity_heatmap', { p_sp_id: spProfile.id });
+        .rpc('get_sp_platform_activity_heatmap', { p_sp_id: spProfileId });
       if (error) throw error;
       return data?.map((d: any) => ({
         activity_date: d.activity_date,
@@ -69,16 +69,16 @@ export function useTelemetry() {
         value: d.nrt_distributed
       })) as HeatmapData[];
     },
-    enabled: !!spProfile?.id && role === 'sp',
+    enabled: !!spProfileId && role === 'sp',
   });
 
   // 3. ISP Network Activity Heatmap
   const { data: ispHeatmap, isLoading: isIspHeatmapLoading } = useQuery({
-    queryKey: ['ispHeatmap', ispProfile?.id],
+    queryKey: ['ispHeatmap', ispProfileId],
     queryFn: async () => {
-      if (!ispProfile?.id || role !== 'isp') return [];
+      if (!ispProfileId || role !== 'isp') return [];
       const { data, error } = await supabase
-        .rpc('get_isp_network_activity_heatmap', { p_isp_id: ispProfile.id });
+        .rpc('get_isp_network_activity_heatmap', { p_isp_id: ispProfileId });
       if (error) throw error;
       return data?.map((d: any) => ({
         activity_date: d.activity_date,
@@ -86,41 +86,39 @@ export function useTelemetry() {
         value: d.data_consumed_gb
       })) as HeatmapData[];
     },
-    enabled: !!ispProfile?.id && role === 'isp',
+    enabled: !!ispProfileId && role === 'isp',
   });
 
-  // 4. SP Telemetry (Audience Insights & ROI)
+  // 4. SP Telemetry (Audience Insights & ROI) — derived from device_data_sessions via RPC
   const { data: spTelemetry, isLoading: isSpTelemetryLoading } = useQuery({
-    queryKey: ['spTelemetry', spProfile?.id],
+    queryKey: ['spTelemetry', spProfileId],
     queryFn: async () => {
-      if (!spProfile?.id || role !== 'sp') return [];
+      if (!spProfileId || role !== 'sp') return [];
       const { data, error } = await supabase
-        .from('sp_telemetry')
-        .select('*')
-        .eq('sp_id', spProfile.id)
-        .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-        .order('date', { ascending: false });
+        .rpc('get_sp_telemetry_insights', {
+          p_sp_id: spProfileId,
+          p_days: 30
+        });
       if (error) throw error;
       return data as SpTelemetry[];
     },
-    enabled: !!spProfile?.id && role === 'sp',
+    enabled: !!spProfileId && role === 'sp',
   });
 
-  // 5. ISP Telemetry (Network Health)
+  // 5. ISP Telemetry (Network Health) — derived from device_data_sessions via RPC
   const { data: ispTelemetry, isLoading: isIspTelemetryLoading } = useQuery({
-    queryKey: ['ispTelemetry', ispProfile?.id],
+    queryKey: ['ispTelemetry', ispProfileId],
     queryFn: async () => {
-      if (!ispProfile?.id || role !== 'isp') return [];
+      if (!ispProfileId || role !== 'isp') return [];
       const { data, error } = await supabase
-        .from('isp_telemetry')
-        .select('*')
-        .eq('isp_id', ispProfile.id)
-        .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-        .order('date', { ascending: false });
+        .rpc('get_isp_telemetry_insights', {
+          p_isp_id: ispProfileId,
+          p_days: 30
+        });
       if (error) throw error;
       return data as IspTelemetry[];
     },
-    enabled: !!ispProfile?.id && role === 'isp',
+    enabled: !!ispProfileId && role === 'isp',
   });
 
   return {

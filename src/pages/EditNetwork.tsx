@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Image as ImageIcon, CheckCircle2, Save, ChevronDown, Network, Signal, Globe, Key, Copy, Loader2, Check } from 'lucide-react';
+import { ChevronLeft, Image as ImageIcon, CheckCircle2, Save, ChevronDown, Network, Signal, Globe, Key, Copy, Loader2, Check, AlertCircle } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useIspStore, type IspNetwork } from '@/stores/useIspStore';
 import { useToastStore } from '@/stores/useToastStore';
@@ -49,6 +49,8 @@ export default function EditNetwork() {
   const [apiSecret, setApiSecret] = useState('');
   
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const canSave = name.trim().length >= 2 && country.trim().length > 0;
 
   useEffect(() => {
     const network = networks.find(n => n.id === networkId);

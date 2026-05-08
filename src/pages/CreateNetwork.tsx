@@ -45,6 +45,8 @@ export default function CreateNetwork() {
   
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const canContinue = name.trim().length >= 2 && country.trim().length > 0;
+
   // Generated credentials (shown after success)
   const [generatedApiKey] = useState(`nrt_isp_${crypto.randomUUID().replace(/-/g, '').substring(0, 24)}`);
   const [generatedApiSecret] = useState(`nrt_secret_${crypto.randomUUID().replace(/-/g, '')}`);

@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Layers, CheckCircle2, XCircle, Trash2, Eye, Globe, Smartphone, Play, Terminal, Info, X, ShieldAlert, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { Search, Layers, CheckCircle2, XCircle, Trash2, Eye, Globe, Smartphone, Play, Info, X, ShieldAlert, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { adminServiceApi } from '@/lib/adminApi';
+import { supabase } from '@/lib/supabase';
 import { useToastStore } from '@/stores/useToastStore';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
@@ -45,7 +46,6 @@ export default function AdminServices() {
     if (!confirm('Delete this service? This will affect attached campaigns.')) return;
     try {
       // For now we'll use a direct delete until adminServiceApi has a delete method
-      const { supabase } = await import('@/lib/supabase');
       const { error } = await supabase.from('services').delete().eq('id', id);
       if (error) throw error;
       setServices(prev => prev.filter(s => s.id !== id));
@@ -57,7 +57,6 @@ export default function AdminServices() {
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      const { supabase } = await import('@/lib/supabase');
       const { error } = await supabase.from('services').update({ 
         status, 
         verified: status === 'active' 
@@ -229,30 +228,19 @@ export default function AdminServices() {
                 {/* Integration Grid */}
                 <div className="grid grid-cols-1 gap-4">
                   {[
-                    { icon: Globe, label: 'Web Platform', url: selectedService.web_url, detail: selectedService.web_domain, detailLabel: 'Domain', color: 'text-accent-primary' },
-                    { icon: Smartphone, label: 'Android App', url: selectedService.android_url, detail: selectedService.android_package_name, detailLabel: 'Package Name', color: 'text-[#3DDC84]' },
-                    { icon: Play, label: 'iOS App', url: selectedService.ios_url, detail: selectedService.ios_bundle_id, detailLabel: 'Bundle ID', color: 'text-[#007AFF]' },
-                    { icon: Terminal, label: 'Webhook Endpoint', url: selectedService.webhook_url, detail: null, detailLabel: '', color: 'text-orange-400' },
-                  ].map((item, i) => (item.url || item.detail) && (
+                    { icon: Globe, label: 'Web Platform', url: selectedService.web_url, color: 'text-accent-primary' },
+                    { icon: Smartphone, label: 'Android App', url: selectedService.android_url, color: 'text-[#3DDC84]' },
+                    { icon: Play, label: 'iOS App', url: selectedService.ios_url, color: 'text-[#007AFF]' },
+                  ].map((item, i) => item.url && (
                     <div key={i} className="p-4 bg-bg-secondary/50 rounded-2xl border border-glass-border space-y-3">
                       <div className="flex items-center gap-2">
                         <item.icon size={16} className={item.color} />
                         <span className="text-[11px] font-bold text-text-primary">{item.label}</span>
                       </div>
-                      
-                      {item.url && (
-                        <div>
-                          <p className="text-[9px] font-bold text-text-secondary uppercase tracking-tighter mb-0.5">URL</p>
-                          <p className="text-xs text-accent-primary truncate font-mono">{item.url}</p>
-                        </div>
-                      )}
-                      
-                      {item.detail && (
-                        <div>
-                          <p className="text-[9px] font-bold text-text-secondary uppercase tracking-tighter mb-0.5">{item.detailLabel}</p>
-                          <p className="text-xs text-text-primary font-mono">{item.detail}</p>
-                        </div>
-                      )}
+                      <div>
+                        <p className="text-[9px] font-bold text-text-secondary uppercase tracking-tighter mb-0.5">URL</p>
+                        <p className="text-xs text-accent-primary truncate font-mono">{item.url}</p>
+                      </div>
                     </div>
                   ))}
                 </div>

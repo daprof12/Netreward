@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { useWalletStore } from './useWalletStore';
+import { useP2PStore } from './useP2PStore';
+import { useNotificationStore } from './useNotificationStore';
+import { useSpStore } from './useSpStore';
+import { useIspStore } from './useIspStore';
 
 export type UserRole = 'user' | 'sp' | 'isp' | 'admin';
 
@@ -89,17 +94,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ profile: data, role: data.role as UserRole, active_role: (data.active_role || data.role) as UserRole });
           
           // Fetch and subscribe to wallet
-          const { useWalletStore } = await import('./useWalletStore');
           await useWalletStore.getState().fetchBalance(session.user.id);
           walletCleanup = useWalletStore.getState().subscribeToWallet(session.user.id);
 
           // Fetch and subscribe to P2P
-          const { useP2PStore } = await import('./useP2PStore');
           await useP2PStore.getState().fetchOffers();
           await useP2PStore.getState().fetchOrders(session.user.id);
           await useP2PStore.getState().fetchPaymentAccounts(session.user.id);
           const p2pCleanup = useP2PStore.getState().subscribeToOrders(session.user.id);
-          const { useNotificationStore } = await import('./useNotificationStore');
           await useNotificationStore.getState().fetchNotifications(session.user.id);
           const notifCleanup = useNotificationStore.getState().subscribeToNotifications(session.user.id);
           
@@ -112,10 +114,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
           // Initialize Role-specific stores
           if (role === 'sp') {
-            const { useSpStore } = await import('./useSpStore');
             await useSpStore.getState().initialize(session.user.id);
           } else if (role === 'isp') {
-            const { useIspStore } = await import('./useIspStore');
             await useIspStore.getState().initialize(session.user.id);
           }
         }

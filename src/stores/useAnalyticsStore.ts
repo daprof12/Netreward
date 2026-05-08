@@ -22,8 +22,8 @@ interface AnalyticsStore {
   isLoading: boolean;
   error: string | null;
   
-  fetchCampaignStats: (providerId: string, days?: number) => Promise<void>;
-  fetchNetworkStats: (ispId: string, days?: number) => Promise<void>;
+  fetchCampaignStats: (spProfileId: string, days?: number) => Promise<void>;
+  fetchNetworkStats: (ispProfileId: string, days?: number) => Promise<void>;
 }
 
 export const useAnalyticsStore = create<AnalyticsStore>((set) => ({
@@ -32,18 +32,17 @@ export const useAnalyticsStore = create<AnalyticsStore>((set) => ({
   isLoading: false,
   error: null,
 
-  fetchCampaignStats: async (providerId: string, days: number = 7) => {
+  fetchCampaignStats: async (spProfileId: string, days: number = 7) => {
     set({ isLoading: true, error: null });
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
     try {
       const { data, error } = await supabase
-        .from('campaign_daily_stats')
-        .select('*')
-        .eq('provider_id', providerId)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .order('date', { ascending: true });
+        .rpc('get_sp_campaign_stats', {
+          p_sp_id: spProfileId,
+          p_start_date: startDate.toISOString().split('T')[0]
+        });
 
       if (error) throw error;
       set({ campaignStats: data || [], isLoading: false });
@@ -52,18 +51,17 @@ export const useAnalyticsStore = create<AnalyticsStore>((set) => ({
     }
   },
 
-  fetchNetworkStats: async (ispId: string, days: number = 7) => {
+  fetchNetworkStats: async (ispProfileId: string, days: number = 7) => {
     set({ isLoading: true, error: null });
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
     try {
       const { data, error } = await supabase
-        .from('isp_network_stats')
-        .select('*')
-        .eq('isp_id', ispId)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .order('date', { ascending: true });
+        .rpc('get_isp_network_stats', {
+          p_isp_id: ispProfileId,
+          p_start_date: startDate.toISOString().split('T')[0]
+        });
 
       if (error) throw error;
       set({ networkStats: data || [], isLoading: false });

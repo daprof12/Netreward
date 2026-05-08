@@ -11,27 +11,19 @@ import { useAuthStore } from '@/stores/useAuthStore';
 
 function useDashboardKeys() {
   const { role } = useAuthStore();
-  const { services, paymentIntegration } = useSpStore();
+  const { services } = useSpStore();
   const { networks } = useIspStore();
 
-  if (role === 'sp') {
-    // Payment API key lives on the service or paymentIntegration object
-    const apiKey = paymentIntegration?.apiKey || services[0]?.apiKey || null;
-    const secretKey = services[0]?.secretKey || null;
-    const webhookSecret = paymentIntegration?.webhookSecret || services[0]?.webhookSecret || null;
-    const webhookUrl = paymentIntegration?.webhookUrl || services[0]?.webhookUrl || null;
-    return { apiKey, secretKey, webhookSecret, webhookUrl };
+  if (role === 'sp' && services.length > 0) {
+    // Single API key per service — covers both SDK and payments
+    const apiKey = services[0]?.apiKey || null;
+    return { apiKey };
   }
   if (role === 'isp' && networks.length > 0) {
     const n = networks[0];
-    return {
-      apiKey: n.apiKey || null,
-      secretKey: n.apiSecret || null,
-      webhookSecret: null,
-      webhookUrl: n.webhookUrl || null,
-    };
+    return { apiKey: n.apiKey || null };
   }
-  return { apiKey: null, secretKey: null, webhookSecret: null, webhookUrl: null };
+  return { apiKey: null };
 }
 
 // ── Reusable key display component ───────────────────────────────────────────
@@ -86,16 +78,13 @@ function KeyDisplay({ label, value, masked = true }: { label: string; value: str
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function PaymentApiDocumentation() {
-  usePageTitle('Payment API Docs');
+  usePageTitle('Developer Docs');
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'authentication' | 'endpoints' | 'webhooks'>('overview');
-  const { apiKey, secretKey, webhookSecret, webhookUrl } = useDashboardKeys();
+  const [activeTab, setActiveTab] = useState<'overview' | 'authentication' | 'endpoints' | 'platforms' | 'webhooks'>('overview');
+  const { apiKey } = useDashboardKeys();
 
   // Values to inject into code samples — fall back to readable placeholder
-  const displayApiKey     = apiKey        ?? 'YOUR_PAYMENT_API_KEY';
-  const displaySecretKey  = secretKey     ?? 'YOUR_SECRET_KEY';
-  const displayWhSecret   = webhookSecret ?? 'YOUR_WEBHOOK_SECRET';
-  const displayWhUrl      = webhookUrl    ?? 'https://your-server.com/webhooks/nrt';
+  const displayApiKey = apiKey ?? 'YOUR_SERVICE_API_KEY';
 
   return (
     <motion.div
@@ -108,8 +97,8 @@ export default function PaymentApiDocumentation() {
           <ChevronLeft size={20} />
         </button>
         <div>
-          <h1 className="text-xl font-bold">Payment API Reference</h1>
-          <p className="text-xs text-text-secondary">v1.4.0 • Service Provider Integration</p>
+          <h1 className="text-xl font-bold">NetReward Tracker SDK & Payment Checkout</h1>
+          <p className="text-xs text-text-secondary">v2.1.0 • Developer Documentation</p>
         </div>
       </div>
 
@@ -117,8 +106,9 @@ export default function PaymentApiDocumentation() {
       <div className="flex bg-bg-secondary p-1 rounded-xl overflow-x-auto scrollbar-hide border border-glass-border">
         {[
           { id: 'overview',        label: 'Overview',        icon: CreditCard },
-          { id: 'authentication',  label: 'Authentication',  icon: Key },
-          { id: 'endpoints',       label: 'Core Endpoints',  icon: Code },
+          { id: 'authentication',  label: 'Auth & Keys',     icon: Key },
+          { id: 'endpoints',       label: 'API Reference',   icon: Code },
+          { id: 'platforms',       label: 'Platforms',        icon: Code },
           { id: 'webhooks',        label: 'Webhooks',        icon: Webhook },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -150,24 +140,35 @@ export default function PaymentApiDocumentation() {
                 <CreditCard size={24} className="text-accent-primary" />
               </div>
               <div>
-                <h2 className="text-xl font-bold">Introduction</h2>
+                <h2 className="text-xl font-bold">One API Key. Full Coverage.</h2>
                 <p className="text-sm text-text-secondary mt-2 leading-relaxed">
-                  The NetReward Payment API enables Service Providers to accept NRT (NetReward Token) payments directly within their platforms. Built on robust REST principles, the API facilitates checkout session creation, immediate payment verification, and automated refund management.
+                  The NetReward SDK is a unified integration for Service Providers and ISPs. Track user engagement, distribute NRT rewards, and accept payments — all with a single API key per service. Supports Web, Android, iOS, Linux, Flutter, and React Native.
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-4 mt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
               {[
-                { title: 'Instant Settlement', desc: 'Transactions bypass traditional waiting periods, settling instantly on the NetReward sub-ledger before batching to the mainnet.' },
-                { title: 'Multi-Currency', desc: 'Price items in USD, EUR, or GBP. The API handles real-time oracle conversions to NRT during checkout.' },
-                { title: 'Webhook Driven', desc: 'Zero polling required. Receive cryptographically signed POST requests immediately upon payment success.' },
-                { title: 'Idempotent Requests', desc: 'All state-changing endpoints support idempotent keys to safely retry failed network requests.' },
+                { title: 'Unified API Key', desc: 'One key covers SDK tracking and payment checkout. No separate secrets or webhook configuration required.' },
+                { title: 'Multi-Platform', desc: 'Native SDKs for Web (NPM/CDN), Android (Maven), iOS (SPM/CocoaPods), Flutter, React Native, and REST for Linux/servers.' },
+                { title: 'Instant Settlement', desc: 'NRT payments settle instantly on the sub-ledger before batching to Solana mainnet. Multi-currency support (USD, EUR, GBP, NGN).' },
+                { title: 'Idempotent & Secure', desc: 'All endpoints support idempotency keys. Webhook signatures use HMAC-SHA256 for tamper-proof event delivery.' },
               ].map(({ title, desc }) => (
                 <div key={title} className="bg-bg-secondary p-4 rounded-xl border border-glass-border">
                   <h3 className="font-bold flex items-center gap-2"><CheckCircle2 size={16} className="text-green-500" /> {title}</h3>
                   <p className="text-xs text-text-secondary mt-1">{desc}</p>
                 </div>
               ))}
+            </div>
+
+            <div className="bg-[#0f172a] rounded-xl p-4 border border-glass-border/30 overflow-x-auto">
+              <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">Quick Start — 5 Lines</p>
+              <pre className="text-xs font-mono text-gray-300 leading-relaxed">
+{`import { NetReward } from '@netreward/sdk';
+
+const nrt = NetReward.init({ apiKey: '${displayApiKey}' });
+
+nrt.tracker.track({ userId: 'user_123', event: 'page_view' });`}
+              </pre>
             </div>
           </div>
         )}
@@ -185,8 +186,7 @@ export default function PaymentApiDocumentation() {
               <h3 className="text-sm font-bold flex items-center gap-2">
                 <Key size={14} className="text-accent-primary" /> Your Credentials
               </h3>
-              <KeyDisplay label="Payment API Key" value={apiKey} />
-              <KeyDisplay label="Secret Key (backend only — never expose client-side)" value={secretKey} />
+              <KeyDisplay label="Service API Key (covers SDK & Payments)" value={apiKey} />
             </div>
 
             <div className="bg-[#0f172a] rounded-xl p-4 border border-glass-border/30 overflow-x-auto">
@@ -262,6 +262,82 @@ export default function PaymentApiDocumentation() {
           </div>
         )}
 
+        {/* ── Platforms ── */}
+        {activeTab === 'platforms' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold">Platform SDKs</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-glass-border">
+                    <th className="text-left py-2 px-3 text-text-secondary font-bold uppercase text-[10px]">Platform</th>
+                    <th className="text-left py-2 px-3 text-text-secondary font-bold uppercase text-[10px]">Package</th>
+                    <th className="text-left py-2 px-3 text-text-secondary font-bold uppercase text-[10px]">Install</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-glass-border">
+                  {[
+                    { platform: 'Web (NPM)', pkg: '@netreward/sdk', install: 'npm install @netreward/sdk' },
+                    { platform: 'Web (CDN)', pkg: 'nrt.min.js', install: '<script src="https://cdn.netreward.online/sdk/v2/nrt.min.js">' },
+                    { platform: 'Android', pkg: 'io.netreward:sdk', install: "implementation 'io.netreward:sdk:2.1.0'" },
+                    { platform: 'iOS (SPM)', pkg: 'NetRewardSDK', install: 'https://github.com/netreward/sdk-ios.git' },
+                    { platform: 'Flutter', pkg: 'netreward_sdk', install: 'flutter pub add netreward_sdk' },
+                    { platform: 'React Native', pkg: '@netreward/react-native', install: 'npm install @netreward/react-native' },
+                    { platform: 'Python', pkg: 'netreward-sdk', install: 'pip install netreward-sdk' },
+                    { platform: 'Go', pkg: 'sdk-go', install: 'go get github.com/netreward/sdk-go' },
+                    { platform: 'PHP', pkg: 'netreward/sdk-php', install: 'composer require netreward/sdk-php' },
+                    { platform: '.NET', pkg: 'NetReward.SDK', install: 'dotnet add package NetReward.SDK' },
+                  ].map(r => (
+                    <tr key={r.platform}>
+                      <td className="py-2.5 px-3 font-bold text-text-primary">{r.platform}</td>
+                      <td className="py-2.5 px-3 font-mono text-accent-primary">{r.pkg}</td>
+                      <td className="py-2.5 px-3 font-mono text-text-secondary text-[10px]">{r.install}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <h3 className="text-sm font-bold mt-4">Android (Kotlin)</h3>
+            <div className="bg-[#0f172a] rounded-xl p-4 border border-glass-border/30 overflow-x-auto">
+              <pre className="text-xs font-mono text-gray-300 leading-relaxed">
+{`NetReward.init(this, NrtConfig.Builder()
+    .apiKey("${displayApiKey}")
+    .build())
+
+NetReward.tracker.track(
+    userId = "user_123", event = "app_open",
+    metadata = mapOf("screen" to "home")
+)`}
+              </pre>
+            </div>
+
+            <h3 className="text-sm font-bold">iOS (Swift)</h3>
+            <div className="bg-[#0f172a] rounded-xl p-4 border border-glass-border/30 overflow-x-auto">
+              <pre className="text-xs font-mono text-gray-300 leading-relaxed">
+{`NetReward.configure(apiKey: "${displayApiKey}")
+
+NetReward.tracker.track(
+    userId: "user_123",
+    event: "content_view",
+    metadata: ["contentId": "article_42"]
+)`}
+              </pre>
+            </div>
+
+            <h3 className="text-sm font-bold">Linux / Server (cURL)</h3>
+            <div className="bg-[#0f172a] rounded-xl p-4 border border-glass-border/30 overflow-x-auto">
+              <pre className="text-xs font-mono text-gray-300 leading-relaxed">
+{`curl -X POST https://api.netreward.online/v1/track \\
+  -H "Authorization: Bearer ${displayApiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"user_id":"user_123","event":"data_session",
+       "metadata":{"bytes_down":157286400,"duration_seconds":3600}}'`}
+              </pre>
+            </div>
+          </div>
+        )}
+
         {/* ── Webhooks ── */}
         {activeTab === 'webhooks' && (
           <div className="space-y-6">
@@ -270,13 +346,12 @@ export default function PaymentApiDocumentation() {
               NetReward will send HTTP POST requests to your configured webhook URL when payment events occur. You must verify the webhook signature to prevent replay attacks.
             </p>
 
-            {/* Real webhook credentials */}
+            {/* Info about webhook setup */}
             <div className="space-y-2 mb-2">
               <h3 className="text-sm font-bold flex items-center gap-2">
-                <Webhook size={14} className="text-accent-primary" /> Your Webhook Credentials
+                <Webhook size={14} className="text-accent-primary" /> Configuration
               </h3>
-              <KeyDisplay label="Webhook Secret (for signature verification)" value={webhookSecret} />
-              <KeyDisplay label="Configured Webhook URL" value={webhookUrl} masked={false} />
+              <p className="text-xs text-text-secondary">Webhook endpoints can be configured per service in the NRT dashboard. Use your service API key to verify incoming events.</p>
             </div>
 
             <div className="bg-[#0f172a] rounded-xl p-4 border border-glass-border/30 overflow-x-auto">
@@ -287,10 +362,10 @@ const crypto = require('crypto');
 app.post('/webhooks/nrt', express.raw({type: 'application/json'}), (req, res) => {
   const payload = req.body;
   const signature = req.headers['x-nrt-signature'];
-  const webhookSecret = '${displayWhSecret}';
+  const apiKey = '${displayApiKey}';
 
   const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
+    .createHmac('sha256', apiKey)
     .update(payload, 'utf8')
     .digest('hex');
 

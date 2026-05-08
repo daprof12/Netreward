@@ -16,12 +16,8 @@ interface FormDrafts {
     description: string;
     category: string;
     webUrl: string;
-    webDomain: string;
     androidUrl: string;
-    androidPackage: string;
     iosUrl: string;
-    iosBundle: string;
-    webhookUrl: string;
     logoPreview: string | null;
   };
 }
@@ -49,12 +45,8 @@ const initialDrafts: FormDrafts = {
     description: '',
     category: 'Streaming',
     webUrl: '',
-    webDomain: '',
     androidUrl: '',
-    androidPackage: '',
     iosUrl: '',
-    iosBundle: '',
-    webhookUrl: '',
     logoPreview: null,
   },
 };

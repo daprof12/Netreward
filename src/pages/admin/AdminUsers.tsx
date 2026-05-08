@@ -113,12 +113,20 @@ export default function AdminUsers() {
     setSpKeys(null);
     setIspKeys(null);
     if (user.is_sp) {
-      const { data } = await supabase.from('sp_api_keys').select('*').eq('sp_email', user.email).maybeSingle();
-      if (data) setSpKeys(data);
+      // Fetch SP profile to get sp_profiles.id, then fetch services
+      const { data: spProfile } = await supabase.from('sp_profiles').select('id').eq('user_id', user.id).maybeSingle();
+      if (spProfile) {
+        const { data: svcData } = await supabase.from('services').select('id, name, api_key, category, status, verified').eq('sp_id', spProfile.id).order('created_at', { ascending: false });
+        setSpKeys(svcData || []);
+      }
     }
     if (user.is_isp) {
-      const { data } = await supabase.from('isp_api_keys').select('*').eq('isp_email', user.email).maybeSingle();
-      if (data) setIspKeys(data);
+      // Fetch ISP profile to get isp_profiles.id, then fetch networks
+      const { data: ispProfile } = await supabase.from('isp_profiles').select('id').eq('user_id', user.id).maybeSingle();
+      if (ispProfile) {
+        const { data: netData } = await supabase.from('networks').select('id, name, api_key, category, verified').eq('isp_id', ispProfile.id).order('created_at', { ascending: false });
+        setIspKeys(netData || []);
+      }
     }
   };
 
@@ -349,20 +357,25 @@ export default function AdminUsers() {
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-text-secondary uppercase px-1">API Integration Suite</h4>
-                      <div className="grid gap-3">
-                        {[
-                          { label: 'SDK Key (x-sp-api-key)', value: spKeys?.sdk_key },
-                          { label: 'Payment Secret (x-sp-api-secret)', value: spKeys?.payment_key },
-                          { label: 'Webhook Secret', value: spKeys?.webhook_secret },
-                          { label: 'Endpoint URL', value: spKeys?.webhook_url || 'https://api.example.com/webhook' },
-                        ].map(k => (
-                          <div key={k.label} className="bg-bg-secondary p-4 rounded-xl border border-glass-border group relative">
-                            <p className="text-[9px] text-text-secondary uppercase font-black mb-1.5">{k.label}</p>
-                            <p className="text-xs font-mono text-text-primary break-all pr-8">{k.value || 'Not Configured'}</p>
-                          </div>
-                        ))}
-                      </div>
+                      <h4 className="text-[10px] font-black text-text-secondary uppercase px-1">Services & API Keys</h4>
+                      {!spKeys || spKeys.length === 0 ? (
+                        <div className="bg-bg-secondary p-4 rounded-xl border border-glass-border text-center">
+                          <p className="text-xs text-text-secondary">No services registered</p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-3">
+                          {spKeys.map((svc: any) => (
+                            <div key={svc.id} className="bg-bg-secondary p-4 rounded-xl border border-glass-border space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-text-primary">{svc.name}</span>
+                                <Badge label={svc.verified ? 'Verified' : svc.status} color={svc.verified ? '#10B981' : '#F59E0B'} />
+                              </div>
+                              <p className="text-[9px] text-text-secondary uppercase font-black">API Key</p>
+                              <p className="text-xs font-mono text-text-primary break-all">{svc.api_key || 'Not generated'}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -378,19 +391,25 @@ export default function AdminUsers() {
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-text-secondary uppercase px-1">Network Credentials</h4>
-                      <div className="grid gap-3">
-                        {[
-                          { label: 'ISP Primary Key', value: ispKeys?.sdk_key },
-                          { label: 'Transaction Secret', value: ispKeys?.payment_key },
-                          { label: 'Webhook Authority', value: ispKeys?.webhook_secret },
-                        ].map(k => (
-                          <div key={k.label} className="bg-bg-secondary p-4 rounded-xl border border-glass-border">
-                            <p className="text-[9px] text-text-secondary uppercase font-black mb-1.5">{k.label}</p>
-                            <p className="text-xs font-mono text-text-primary break-all">{k.value || 'N/A'}</p>
-                          </div>
-                        ))}
-                      </div>
+                      <h4 className="text-[10px] font-black text-text-secondary uppercase px-1">Networks & API Keys</h4>
+                      {!ispKeys || ispKeys.length === 0 ? (
+                        <div className="bg-bg-secondary p-4 rounded-xl border border-glass-border text-center">
+                          <p className="text-xs text-text-secondary">No networks registered</p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-3">
+                          {ispKeys.map((net: any) => (
+                            <div key={net.id} className="bg-bg-secondary p-4 rounded-xl border border-glass-border space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-text-primary">{net.name}</span>
+                                <Badge label={net.verified ? 'Verified' : 'Pending'} color={net.verified ? '#10B981' : '#F59E0B'} />
+                              </div>
+                              <p className="text-[9px] text-text-secondary uppercase font-black">API Key</p>
+                              <p className="text-xs font-mono text-text-primary break-all">{net.api_key || 'Not generated'}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

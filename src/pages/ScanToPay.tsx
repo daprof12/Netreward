@@ -195,17 +195,45 @@ export default function ScanToPay() {
         throw new Error('This payment request has expired. Ask the merchant to generate a new one.');
       }
 
-      // Fetch merchant name
-      const { data: profile } = await supabase
-        .from('users')
-        .select('display_name')
-        .eq('id', data.merchant_id)
+      // Fetch merchant branding — prioritize service name/logo, fallback to display_name
+      let merchantName = 'Merchant';
+
+      // Try to find the SP profile and their first service name
+      const { data: spProfile } = await supabase
+        .from('sp_profiles')
+        .select('id, company_name')
+        .eq('user_id', data.merchant_id)
         .single();
+
+      if (spProfile) {
+        // Check if there's a service with a name under this SP
+        const { data: services } = await supabase
+          .from('services')
+          .select('name')
+          .eq('sp_id', spProfile.id)
+          .limit(1);
+
+        if (services && services.length > 0 && services[0].name) {
+          merchantName = services[0].name;
+        } else if (spProfile.company_name) {
+          merchantName = spProfile.company_name;
+        }
+      }
+
+      // Final fallback to user display_name
+      if (merchantName === 'Merchant') {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('display_name')
+          .eq('id', data.merchant_id)
+          .single();
+        if (profile?.display_name) merchantName = profile.display_name;
+      }
 
       const session: CheckoutSession = {
         id: data.id,
         merchantId: data.merchant_id,
-        merchantName: profile?.display_name || 'Merchant',
+        merchantName,
         amountNrt: data.amount_nrt,
         description: data.description,
         status: data.status,

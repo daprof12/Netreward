@@ -136,7 +136,7 @@ export default function Campaigns() {
     filterRewardMin !== null || filterRewardMax !== null;
 
   const filtered = campaignsList
-    .filter(c => activeTab === 'all' || (activeTab === 'joined' && c.joined))
+    .filter(c => activeTab === 'joined' ? c.joined : !c.joined)
     .filter(c => {
       const q = (filterSearch || searchQuery).toLowerCase();
       if (q && !c.title.toLowerCase().includes(q) && !c.target_app.toLowerCase().includes(q)) return false;

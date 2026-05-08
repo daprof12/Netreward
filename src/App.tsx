@@ -55,6 +55,7 @@ import { useSystemStore } from '@/stores/useSystemStore';
 import { useSecurityStore } from '@/stores/useSecurityStore';
 import { useWalletAutomation } from '@/hooks/useWalletAutomation';
 import { useDeviceManager } from '@/hooks/useDeviceManager';
+import { supabase } from '@/lib/supabase';
 
 import CreateService from './pages/CreateService';
 import CreateCampaign from './pages/CreateCampaign';
@@ -174,7 +175,6 @@ function App() {
   useEffect(() => {
     const checkMaintenance = async () => {
       try {
-        const { supabase } = await import('@/lib/supabase');
         const { data } = await supabase.from('kv_settings').select('value').eq('key', 'maintenance_mode').single();
         setIsMaintenanceMode(data?.value === 'true');
       } catch { /* setting may not exist */ }

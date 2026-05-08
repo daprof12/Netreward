@@ -24,7 +24,7 @@ type TimeFilter = '24H' | '7D' | '3M' | 'All';
 export default function IspDashboard() {
   usePageTitle('ISP Dashboard');
   const { user, profile, refreshProfile, signOut, setHasOnboarded } = useAuthStore();
-  const { campaigns, profileLogo, ispName } = useIspStore();
+  const { campaigns, profileLogo, ispName, profileId: ispProfileId } = useIspStore();
   const { getCurrencyDetails } = useCurrencyStore();
   const { networkStats, fetchNetworkStats, isLoading: isStatsLoading } = useAnalyticsStore();
   const { ispTelemetry, ispHeatmap, isIspHeatmapLoading, isIspTelemetryLoading } = useTelemetry();
@@ -38,10 +38,10 @@ export default function IspDashboard() {
 
   useEffect(() => {
     refreshProfile();
-    if (user?.id) {
-      fetchNetworkStats(user.id, timeFilter === '24H' ? 1 : timeFilter === '7D' ? 7 : 90);
+    if (ispProfileId) {
+      fetchNetworkStats(ispProfileId, timeFilter === '24H' ? 1 : timeFilter === '7D' ? 7 : 90);
     }
-  }, [user?.id, timeFilter, refreshProfile, fetchNetworkStats]);
+  }, [ispProfileId, timeFilter, refreshProfile, fetchNetworkStats]);
 
   const runningCampaigns = campaigns.filter(c => c.status === 'active');
 
@@ -76,9 +76,9 @@ export default function IspDashboard() {
     >
       <div className="flex justify-between items-center">
         <div>
-          <p className="text-sm text-text-secondary">{ispName || 'Operator Portal'} 👋</p>
+          <p className="text-sm text-text-secondary">{profile?.display_name || ispName || 'Operator Portal'} 👋</p>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-text-primary capitalize">{user?.email?.split('@')[0] || 'Operator'}</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-text-primary capitalize">{profile?.display_name || user?.email?.split('@')[0] || 'Operator'}</h1>
             <span className="px-2 py-0.5 bg-purple-500/10 text-purple-500 text-[10px] font-black rounded-md border border-purple-500/20 tracking-tighter">ISP</span>
           </div>
         </div>
