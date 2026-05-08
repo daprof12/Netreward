@@ -156,6 +156,8 @@ serve(async (req) => {
 
     let serviceId: string | null = null;
     let networkId: string | null = null;
+    let secretKey: string | null = null;
+    let providerType: string | null = null;
 
     if (spApiKey) {
       // 1. Try centralized sp_api_keys table

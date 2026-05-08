@@ -2,11 +2,12 @@
   const currentScript = document.currentScript;
   if (!currentScript) return;
 
-  const apiKey = currentScript.getAttribute('data-api-key');
+  const spApiKey = currentScript.getAttribute('data-api-key');
+  const ispApiKey = currentScript.getAttribute('data-isp-api-key');
   const endpoint = currentScript.getAttribute('data-endpoint') || 'https://pmpeyfkbqipfnhokfksl.supabase.co/functions/v1/tracking';
 
-  if (!apiKey) {
-    console.warn('[NetReward Tracker] Missing data-api-key. Tracker disabled.');
+  if (!spApiKey && !ispApiKey) {
+    console.warn('[NetReward Tracker] Missing data-api-key or data-isp-api-key. Tracker disabled.');
     return;
   }
 
@@ -60,12 +61,15 @@
         navigator.sendBeacon(endpoint, blob);
       } else {
         try {
+          const headers = {
+            'Content-Type': 'application/json'
+          };
+          if (spApiKey) headers['x-sp-api-key'] = spApiKey;
+          if (ispApiKey) headers['x-isp-api-key'] = ispApiKey;
+
           await fetch(endpoint, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-sp-api-key': apiKey
-            },
+            headers: headers,
             body: payload,
             keepalive: isUnload
           });
@@ -84,9 +88,13 @@
   async function initSDK() {
     let category = 'other';
     try {
+      const headers = {};
+      if (spApiKey) headers['x-sp-api-key'] = spApiKey;
+      if (ispApiKey) headers['x-isp-api-key'] = ispApiKey;
+
       const res = await fetch(endpoint, {
         method: 'GET',
-        headers: { 'x-sp-api-key': apiKey }
+        headers: headers
       });
       if (res.ok) {
         const config = await res.json();

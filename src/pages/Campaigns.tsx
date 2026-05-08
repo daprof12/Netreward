@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Filter, Play, CheckCircle2, Loader2, X,
   Tv, Music, Globe, MapPin, TrendingUp, Info,
-  ChevronRight, Wifi, ArrowDownToLine, ArrowUpFromLine
+  ChevronRight, Wifi, ArrowDownToLine, ArrowUpFromLine, Clock
 } from 'lucide-react';
 import { useCampaigns } from '@/hooks/useCampaigns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +14,8 @@ import SpCampaignsView from './SpCampaignsView';
 import IspCampaignsView from './IspCampaignsView';
 import { useClaimRewards } from '@/hooks/useRewardEngine';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 
 // No static mock data needed here anymore
 
@@ -64,6 +66,48 @@ export default function Campaigns() {
   const { activeCampaigns, userEnrollments, isLoading, joinCampaign, isJoining } = useCampaigns();
   const { claimRewards, isClaiming } = useClaimRewards();
 
+  const { data: recentActivity } = useQuery({
+    queryKey: ['recent_activity_campaigns', useAuthStore.getState().user?.id],
+    queryFn: async () => {
+      const user = useAuthStore.getState().user;
+      if (!user) return [];
+      const { data } = await supabase
+        .from('device_data_sessions')
+        .select('campaign_id, session_end, duration_seconds')
+        .order('session_end', { ascending: false })
+        .limit(20);
+      return data || [];
+    },
+    refetchInterval: 10000,
+  });
+
+  // Aggregated duration per campaign for the user's devices
+  const { data: campaignDurations } = useQuery({
+    queryKey: ['campaign_durations', useAuthStore.getState().user?.id],
+    queryFn: async () => {
+      const user = useAuthStore.getState().user;
+      if (!user) return {};
+      // Get user's device IDs
+      const { data: devices } = await supabase
+        .from('devices')
+        .select('id')
+        .eq('user_id', user.id);
+      const deviceIds = devices?.map((d: any) => d.id) || [];
+      if (deviceIds.length === 0) return {};
+      // Sum duration_seconds per campaign across all user devices
+      const { data: sessions } = await supabase
+        .from('device_data_sessions')
+        .select('campaign_id, duration_seconds')
+        .in('device_id', deviceIds);
+      const map: Record<string, number> = {};
+      for (const s of (sessions || [])) {
+        map[s.campaign_id] = (map[s.campaign_id] || 0) + (s.duration_seconds || 0);
+      }
+      return map;
+    },
+    staleTime: 30000,
+  });
+
   // 2. CONDITIONAL RENDERING AFTER HOOKS
   if (role === 'sp') {
     return <SpCampaignsView />;
@@ -83,7 +127,7 @@ export default function Campaigns() {
   const rates = (activeCampaigns || []).map(c => c.reward_rate_per_gb || 0);
   const globalMin = rates.length > 0 ? Math.min(...rates) : 0;
   const globalMax = rates.length > 0 ? Math.max(...rates) : 10;
-  
+
   const currentMin = filterRewardMin !== null ? filterRewardMin : globalMin;
   const currentMax = filterRewardMax !== null ? filterRewardMax : globalMax;
 
@@ -231,7 +275,15 @@ export default function Campaigns() {
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h3 className="font-bold text-text-primary text-base truncate">{campaign.title}</h3>
+                            <h3 className="font-bold text-text-primary text-base truncate flex items-center gap-2">
+                              {campaign.title}
+                              {campaign.joined && recentActivity?.some((s: any) => s.campaign_id === campaign.id && (new Date().getTime() - new Date(s.session_end).getTime() < 5 * 60 * 1000)) && (
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                              )}
+                            </h3>
                             <p className="text-xs text-text-secondary font-medium truncate flex items-center gap-1">
                               {campaign.creator_name} • <span className="text-accent-primary/80">{campaign.category || 'General'}</span>
                             </p>
@@ -393,7 +445,7 @@ export default function Campaigns() {
                 <div className="relative h-2 mx-2">
                   {/* Track Background */}
                   <div className="absolute inset-0 bg-bg-secondary rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="absolute h-full bg-accent-primary transition-all duration-75"
                       style={{
                         left: `${((currentMin - globalMin) / (globalMax - globalMin || 1)) * 100}%`,
@@ -401,7 +453,7 @@ export default function Campaigns() {
                       }}
                     />
                   </div>
-                  
+
                   {/* Min Thumb */}
                   <input
                     type="range"
@@ -412,7 +464,7 @@ export default function Campaigns() {
                     onChange={e => setFilterRewardMin(Math.min(Number(e.target.value), currentMax - 0.01))}
                     className="absolute inset-0 w-full -top-1 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-accent-primary [&::-webkit-slider-thumb]:shadow-md z-20"
                   />
-                  
+
                   {/* Max Thumb */}
                   <input
                     type="range"
@@ -476,7 +528,15 @@ export default function Campaigns() {
         {earningCampaign && (() => {
           const enrollment = userEnrollments?.find((e: any) => e.campaign_id === earningCampaign.id);
           const totalData = enrollment?.data_consumed_gb || 0;
-          const nrtEarned = enrollment?.nrt_earned || 0;
+          const nrtEarned = (enrollment?.nrt_earned || 0) + (enrollment?.unclaimed_nrt || 0);
+
+          const durationSecs = campaignDurations?.[earningCampaign.id] || 0;
+          const durationFormatted = durationSecs >= 3600
+            ? `${(durationSecs / 3600).toFixed(1)} hrs`
+            : durationSecs >= 60
+              ? `${Math.floor(durationSecs / 60)} min ${durationSecs % 60}s`
+              : `${durationSecs}s`;
+
           const foregroundData = totalData * 0.8; // Approximate for UI
           const backgroundData = totalData * 0.2; // Approximate for UI
 
@@ -525,7 +585,13 @@ export default function Campaigns() {
                           {earningCampaign.category || 'General'}
                         </p>
                       </div>
-                      <span className="ml-auto text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-green-500/10 text-green-400">
+                      <span className="ml-auto text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-green-500/10 text-green-400 flex items-center gap-1.5">
+                        {recentActivity?.some((s: any) => s.campaign_id === earningCampaign.id && (new Date().getTime() - new Date(s.session_end).getTime() < 5 * 60 * 1000)) && (
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                          </span>
+                        )}
                         active
                       </span>
                     </div>
@@ -568,6 +634,10 @@ export default function Campaigns() {
                         <ArrowDownToLine size={12} className="text-accent-primary" />
                         <span>Total Data Tracked: <span className="text-text-primary font-semibold">{totalData.toFixed(2)} GB</span></span>
                       </div>
+                      <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                        <Clock size={12} className="text-accent-primary" />
+                        <span>Duration: <span className="text-text-primary font-semibold">{durationFormatted}</span></span>
+                      </div>
                     </div>
 
                     {/* Totals */}
@@ -597,9 +667,9 @@ export default function Campaigns() {
                   >
                     Close
                   </button>
-                  <button 
+                  <button
                     onClick={handleClaim}
-                    disabled={isClaiming || (enrollment?.nrt_earned || 0) <= 0}
+                    disabled={isClaiming || (enrollment?.unclaimed_nrt || 0) <= 0}
                     className="flex-1 py-3 rounded-xl bg-accent-primary text-primary-foreground font-semibold shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {isClaiming ? (

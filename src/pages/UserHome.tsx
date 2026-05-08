@@ -365,7 +365,15 @@ export default function UserHome() {
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-bold text-text-primary text-sm truncate">{camp?.title || 'Campaign'}</p>
+                            <p className="font-bold text-text-primary text-sm truncate flex items-center gap-2">
+                              {camp?.title || 'Campaign'}
+                              {recentActivity?.some((s: any) => s.campaign_id === camp.id && (new Date().getTime() - new Date(s.session_end).getTime() < 5 * 60 * 1000)) && (
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                              )}
+                            </p>
                             <p className="text-[10px] text-text-secondary mt-0.5 font-medium truncate">
                               {(camp as any)?.creator_name || 'NetReward Partner'} • {(camp as any)?.category || 'General'}
                             </p>

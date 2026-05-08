@@ -94,7 +94,15 @@ export default function DeviceDetail() {
           )}
           <div className="flex items-center gap-2 mt-0.5">
             <Wifi size={12} className={deviceStatus === 'active' ? 'text-accent-primary' : 'text-text-secondary'} />
-            <span className="text-xs text-text-secondary">{deviceStatus === 'active' ? 'Active' : 'Offline'} • {deviceIsp}</span>
+            <span className="text-xs text-text-secondary flex items-center gap-1.5">
+              {deviceStatus === 'active' && (
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                </span>
+              )}
+              {deviceStatus === 'active' ? 'Active' : 'Offline'} • {deviceIsp}
+            </span>
           </div>
         </div>
       </div>
@@ -339,13 +347,19 @@ export default function DeviceDetail() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md flex items-center gap-1.5 ${
                     app.status === 'active'
                       ? 'bg-green-500/10 text-green-400'
                       : app.status === 'idle'
                         ? 'bg-yellow-500/10 text-yellow-400'
                         : 'bg-bg-secondary text-text-secondary'
                   }`}>
+                    {app.status === 'active' && (
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                      </span>
+                    )}
                     {app.status}
                   </span>
                 </div>
