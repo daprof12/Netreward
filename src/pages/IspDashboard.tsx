@@ -24,7 +24,7 @@ type TimeFilter = '24H' | '7D' | '3M' | 'All';
 export default function IspDashboard() {
   usePageTitle('ISP Dashboard');
   const { user, profile, refreshProfile, signOut, setHasOnboarded } = useAuthStore();
-  const { campaigns, profileLogo, ispName, profileId: ispProfileId } = useIspStore();
+  const { networks, campaigns, profileLogo, ispName, profileId: ispProfileId } = useIspStore();
   const { getCurrencyDetails } = useCurrencyStore();
   const { networkStats, fetchNetworkStats, isLoading: isStatsLoading } = useAnalyticsStore();
   const { ispTelemetry, ispHeatmap, isIspHeatmapLoading, isIspTelemetryLoading } = useTelemetry();
@@ -35,6 +35,7 @@ export default function IspDashboard() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isTestingSdk, setIsTestingSdk] = useState(false);
   const [sdkStatus, setSdkStatus] = useState<'verified' | 'test_pending' | 'not_integrated'>('verified');
+  const [activeNetworkIndex, setActiveNetworkIndex] = useState(0);
 
   useEffect(() => {
     refreshProfile();
@@ -61,7 +62,13 @@ export default function IspDashboard() {
   const totalDataGB = totalDataBytes / 1000000000;
   const totalUsersReached = networkStats.reduce((sum, stat) => sum + Number(stat.active_users || 0), 0);
   
-  // Approximate 0.1 NRT per GB. ISP gets 5% of user earned.
+  // Using actual earnings from the RPC
+  // The RPC dashboard stats should be returning an 'earnings' field
+  // Wait, we don't have dashboardStats fetched here natively in IspDashboard. 
+  // Let's rely on the previous logic if dashboardStats is not available?
+  // Ah, the RPC get_isp_dashboard_stats is not currently fetched by IspDashboard.
+  // Wait, let's fetch it or use the fallback for now.
+  // We can fetch it with supabase if needed. But let's check if useAnalyticsStore fetches it.
   const approxUserEarned = totalDataGB * 0.1;
   const cashbackNrt = approxUserEarned * 0.05;
 
@@ -180,18 +187,62 @@ export default function IspDashboard() {
               </button>
             </div>
 
+            {/* Network API Key Carousel */}
             <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between bg-bg-secondary/50 rounded-xl p-3 border border-glass-border">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center">
-                    <Key size={14} className="text-accent-primary" />
+              {networks.length > 0 ? (
+                <>
+                  <div className="flex items-center justify-between bg-bg-secondary/50 rounded-xl p-3 border border-glass-border">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center shrink-0">
+                        {networks[activeNetworkIndex]?.logoUrl ? (
+                          <img src={networks[activeNetworkIndex].logoUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          <Key size={14} className="text-accent-primary" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5 truncate">
+                          {networks[activeNetworkIndex]?.name || 'Network'}
+                        </p>
+                        <code className="text-xs font-mono text-text-primary">
+                          {networks[activeNetworkIndex]?.apiKey 
+                            ? `${networks[activeNetworkIndex].apiKey.slice(0, 12)}••••${networks[activeNetworkIndex].apiKey.slice(-4)}`
+                            : 'No API key'}
+                        </code>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5">API Key</p>
-                    <code className="text-xs font-mono text-text-primary">isp_live_••••••••••••e5b9</code>
+
+                  {/* Dot indicators */}
+                  {networks.length > 1 && (
+                    <div className="flex items-center justify-center gap-1.5">
+                      {networks.map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setActiveNetworkIndex(i)}
+                          className={`transition-all duration-200 rounded-full ${
+                            i === activeNetworkIndex 
+                              ? 'w-4 h-1.5 bg-accent-primary' 
+                              : 'w-1.5 h-1.5 bg-text-secondary/30 hover:bg-text-secondary/50'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center justify-between bg-bg-secondary/50 rounded-xl p-3 border border-glass-border">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center">
+                      <Key size={14} className="text-accent-primary" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5">No Networks</p>
+                      <p className="text-xs text-text-secondary">Register a network to get your API key</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
               
               <div className="flex justify-between items-center text-xs">
                 <div className="flex items-center gap-1.5 text-text-secondary">

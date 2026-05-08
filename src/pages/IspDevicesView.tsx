@@ -23,12 +23,27 @@ export default function IspDevicesView() {
   usePageTitle('ISP Devices');
   const { devices, isLoading } = useIspDevices();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'network' | 'campaign'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'network' | 'campaign' | 'sp_campaign'>('all');
   const [filterValue, setFilterValue] = useState<string>('');
 
   const { networks, campaigns } = useIspStore();
   const availableNetworks = networks.map(n => n.name).filter(Boolean);
   const availableCampaigns = campaigns.map(c => c.name).filter(Boolean);
+
+  const availableSpCampaigns = useMemo(() => {
+    if (!devices) return [];
+    const spCamps = new Set<string>();
+    devices.forEach((d: any) => {
+      const sessions = Array.isArray(d.device_data_sessions) ? d.device_data_sessions : [d.device_data_sessions].filter(Boolean);
+      sessions.forEach((s: any) => {
+        const campTitle = Array.isArray(s.campaign) ? s.campaign[0]?.title : s.campaign?.title;
+        if (campTitle && !availableCampaigns.includes(campTitle)) {
+          spCamps.add(campTitle);
+        }
+      });
+    });
+    return Array.from(spCamps).sort();
+  }, [devices, availableCampaigns]);
 
   const filteredDevices = useMemo(() => {
     if (!devices) return [];
@@ -42,13 +57,41 @@ export default function IspDevicesView() {
       if (filterType === 'network' && filterValue) {
         if (device.isp_name !== filterValue) return false;
       } else if (filterType === 'campaign' && filterValue) {
-        const hasCampaign = device.device_data_sessions?.some((s: any) => s.campaign?.title === filterValue);
-        if (!hasCampaign) return false;
+        const hasCampaign = device.device_data_sessions?.some((s: any) => {
+          const t = Array.isArray(s.campaign) ? s.campaign[0]?.title : s.campaign?.title;
+          return t === filterValue;
+        });
+        if (!hasCampaign && (device as any)._enrolled_campaign_title !== filterValue) return false;
+      } else if (filterType === 'sp_campaign' && filterValue) {
+        const hasSpCampaign = device.device_data_sessions?.some((s: any) => {
+          const t = Array.isArray(s.campaign) ? s.campaign[0]?.title : s.campaign?.title;
+          return t === filterValue;
+        });
+        if (!hasSpCampaign) return false;
       }
 
       return true;
     });
   }, [devices, searchQuery, filterType, filterValue]);
+
+  const analyticsSummary = useMemo(() => {
+    let totalData = 0;
+    let totalNrt = 0;
+    filteredDevices.forEach((d: any) => {
+      const sessions = Array.isArray(d.device_data_sessions) ? d.device_data_sessions : [d.device_data_sessions].filter(Boolean);
+      sessions.forEach((s: any) => {
+        totalData += (s.bytes_up || 0) + (s.bytes_down || 0);
+        totalNrt += (s.nrt_awarded || 0);
+      });
+    });
+    const totalDataGB = totalData / 1e9;
+    return {
+      devices: filteredDevices.length,
+      dataGB: totalDataGB.toFixed(2),
+      nrt: totalNrt.toFixed(2),
+      cashback: (totalNrt * 0.05).toFixed(2) // 5% of user earnings roughly
+    };
+  }, [filteredDevices]);
 
   return (
     <motion.div 
@@ -77,7 +120,7 @@ export default function IspDevicesView() {
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">Filter By:</span>
           <div className="flex bg-bg-secondary p-1 rounded-lg">
-            {(['all', 'network', 'campaign'] as const).map(type => (
+            {(['all', 'network', 'campaign', 'sp_campaign'] as const).map(type => (
               <button
                 key={type}
                 onClick={() => {
@@ -90,7 +133,7 @@ export default function IspDevicesView() {
                     : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                {type}
+                {type.replace('_', ' ')}
               </button>
             ))}
           </div>
@@ -98,7 +141,7 @@ export default function IspDevicesView() {
 
         {filterType !== 'all' && (
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            {(filterType === 'network' ? availableNetworks : availableCampaigns).map(val => (
+            {(filterType === 'network' ? availableNetworks : filterType === 'campaign' ? availableCampaigns : availableSpCampaigns).map(val => (
               <button
                 key={val}
                 onClick={() => setFilterValue(val === filterValue ? '' : val)}
@@ -116,17 +159,50 @@ export default function IspDevicesView() {
         )}
       </div>
 
+      {/* Analytics Summary */}
+      {(searchQuery || (filterType !== 'all' && filterValue)) && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }} 
+          animate={{ opacity: 1, height: 'auto' }}
+          className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x"
+        >
+          <div className="glass p-4 rounded-xl border border-glass-border min-w-[140px] shrink-0 snap-start">
+            <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Matched Devices</p>
+            <p className="text-xl font-bold truncate">{analyticsSummary.devices}</p>
+          </div>
+          <div className="glass p-4 rounded-xl border border-glass-border min-w-[140px] shrink-0 snap-start">
+            <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Data Consumed (GB)</p>
+            <p className="text-xl font-bold truncate">{analyticsSummary.dataGB}</p>
+          </div>
+          <div className="glass p-4 rounded-xl border border-glass-border min-w-[140px] shrink-0 snap-start">
+            <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">NRT Earned (Users)</p>
+            <p className="text-xl font-bold text-accent-primary truncate">{analyticsSummary.nrt}</p>
+          </div>
+          <div className="glass p-4 rounded-xl border border-glass-border relative overflow-hidden min-w-[140px] shrink-0 snap-start">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-[#10B981]/10 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none" />
+            <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">ISP Cashback (5%)</p>
+            <p className="text-xl font-bold text-[#10B981] truncate">{analyticsSummary.cashback}</p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Device List */}
       <div className="space-y-4">
         {isLoading ? (
           <div className="flex justify-center p-4"><span className="animate-pulse">Loading tracking data...</span></div>
         ) : filteredDevices.map(device => {
           
-          // Defensively handle Supabase potentially returning relationships as arrays
-          const sessionObj = Array.isArray(device.device_data_sessions) 
-            ? device.device_data_sessions[0] 
-            : device.device_data_sessions;
-            
+          // Calculate device totals
+          let devDataBytes = 0;
+          let devNrt = 0;
+          const sessions = Array.isArray(device.device_data_sessions) ? device.device_data_sessions : [device.device_data_sessions].filter(Boolean);
+          sessions.forEach((s: any) => {
+            devDataBytes += (s.bytes_up || 0) + (s.bytes_down || 0);
+            devNrt += (s.nrt_awarded || 0);
+          });
+          const devDataGB = (devDataBytes / 1e9).toFixed(2);
+
+          const sessionObj = sessions[0];
           const campaignObjFromSession = sessionObj ? (Array.isArray(sessionObj.campaign) ? sessionObj.campaign[0] : sessionObj.campaign) : null;
           
           // Fall back to enrolled campaign title if no session-level campaign exists
@@ -184,11 +260,11 @@ export default function IspDevicesView() {
               <div className="flex gap-4">
                 <div className="flex flex-col">
                   <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-1">Data Used</span>
-                  <span className="text-sm font-bold">0.00 GB</span>
+                  <span className="text-sm font-bold">{devDataGB} GB</span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-1">NRT Earned</span>
-                  <span className="text-sm font-bold text-accent-primary">0.00</span>
+                  <span className="text-sm font-bold text-accent-primary">{devNrt.toFixed(2)}</span>
                 </div>
               </div>
 

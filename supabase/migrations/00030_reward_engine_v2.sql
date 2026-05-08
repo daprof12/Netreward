@@ -94,7 +94,7 @@ BEGIN
     SELECT ip.user_id INTO v_isp_user_id
     FROM public.networks n
     JOIN public.isp_profiles ip ON n.isp_id = ip.id
-    WHERE LOWER(n.name) = LOWER(v_device_isp_name)
+    WHERE LOWER(n.name) = LOWER(v_device_isp_name) AND n.verified = true
     LIMIT 1;
   END IF;
 
@@ -423,7 +423,9 @@ BEGIN
   INTO v_nrt_distributed, v_total_data_gb
   FROM public.device_data_sessions s
   JOIN public.campaigns c ON s.campaign_id = c.id
-  WHERE c.isp_id = p_isp_profile_id;
+  JOIN public.devices d ON s.device_id = d.id
+  WHERE c.isp_id = p_isp_profile_id
+     OR d.isp_name IN (SELECT n.name FROM public.networks n WHERE n.isp_id = p_isp_profile_id AND n.verified = true);
 
   -- Active campaigns
   SELECT COUNT(*) INTO v_active_campaigns
@@ -435,7 +437,8 @@ BEGIN
   FROM public.device_data_sessions s
   JOIN public.devices d ON s.device_id = d.id
   JOIN public.campaigns c ON s.campaign_id = c.id
-  WHERE c.isp_id = p_isp_profile_id;
+  WHERE c.isp_id = p_isp_profile_id
+     OR d.isp_name IN (SELECT n.name FROM public.networks n WHERE n.isp_id = p_isp_profile_id AND n.verified = true);
 
   -- Earnings (5% ISP share)
   v_earnings := v_nrt_distributed * 0.05;

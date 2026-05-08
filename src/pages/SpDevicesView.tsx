@@ -55,6 +55,22 @@ export default function SpDevicesView() {
     });
   }, [sessions, searchQuery, filterType, filterValue]);
 
+  const analyticsSummary = useMemo(() => {
+    let totalData = 0;
+    let totalNrt = 0;
+    filteredDevices.forEach(session => {
+      totalData += (session.bytes_up || 0) + (session.bytes_down || 0);
+      totalNrt += (session.nrt_awarded || 0);
+    });
+    const totalDataGB = totalData / 1e9;
+    return {
+      devices: filteredDevices.length,
+      dataGB: totalDataGB.toFixed(2),
+      nrt: totalNrt.toFixed(2),
+      cashback: (totalNrt * 0.10).toFixed(2) // 10% of user earnings for SP
+    };
+  }, [filteredDevices]);
+
   return (
     <motion.div 
       className="space-y-6 pb-24 p-4 pt-8"
@@ -120,6 +136,33 @@ export default function SpDevicesView() {
           </div>
         )}
       </div>
+
+      {/* Analytics Summary */}
+      {(searchQuery || (filterType !== 'all' && filterValue)) && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }} 
+          animate={{ opacity: 1, height: 'auto' }}
+          className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x"
+        >
+          <div className="glass p-4 rounded-xl border border-glass-border min-w-[140px] shrink-0 snap-start">
+            <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Matched Devices</p>
+            <p className="text-xl font-bold truncate">{analyticsSummary.devices}</p>
+          </div>
+          <div className="glass p-4 rounded-xl border border-glass-border min-w-[140px] shrink-0 snap-start">
+            <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Data Consumed (GB)</p>
+            <p className="text-xl font-bold truncate">{analyticsSummary.dataGB}</p>
+          </div>
+          <div className="glass p-4 rounded-xl border border-glass-border min-w-[140px] shrink-0 snap-start">
+            <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">NRT Distributed</p>
+            <p className="text-xl font-bold text-accent-primary truncate">{analyticsSummary.nrt}</p>
+          </div>
+          <div className="glass p-4 rounded-xl border border-glass-border relative overflow-hidden min-w-[140px] shrink-0 snap-start">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-[#3B82F6]/10 rounded-full blur-xl -mr-4 -mt-4 pointer-events-none" />
+            <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">SP Cashback (10%)</p>
+            <p className="text-xl font-bold text-[#3B82F6] truncate">{analyticsSummary.cashback}</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Device List */}
       <div className="space-y-4">

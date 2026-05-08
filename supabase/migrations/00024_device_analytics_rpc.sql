@@ -71,10 +71,13 @@ $$;
 
 
 -- 2. Breakdown of Data Usage by Campaign/App for a specific Device (DeviceDetail.tsx)
+DROP FUNCTION IF EXISTS get_device_app_usage(UUID);
+
 CREATE OR REPLACE FUNCTION get_device_app_usage(p_device_id UUID)
 RETURNS TABLE (
   campaign_id UUID,
   app_name TEXT,
+  service_category TEXT,
   duration_seconds BIGINT,
   total_data_gb NUMERIC,
   nrt_earned NUMERIC,
@@ -88,14 +91,16 @@ BEGIN
   SELECT 
     c.id as campaign_id,
     c.title as app_name,
+    COALESCE(svc.category, 'Network') as service_category,
     COALESCE(SUM(s.duration_seconds), 0)::BIGINT as duration_seconds,
     COALESCE(SUM(s.bytes_up + s.bytes_down)::NUMERIC / 1e9, 0) as total_data_gb,
     COALESCE(SUM(s.nrt_awarded), 0) as nrt_earned,
     c.status::TEXT as status
   FROM public.device_data_sessions s
   JOIN public.campaigns c ON s.campaign_id = c.id
+  LEFT JOIN public.services svc ON c.service_id = svc.id
   WHERE s.device_id = p_device_id
-  GROUP BY c.id, c.title, c.status
+  GROUP BY c.id, c.title, svc.category, c.status
   ORDER BY nrt_earned DESC;
 END;
 $$;

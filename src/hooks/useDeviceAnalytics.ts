@@ -13,6 +13,7 @@ export interface UserDeviceStat {
 export interface DeviceAppUsage {
   campaign_id: string;
   app_name: string;
+  service_category: string;
   duration_seconds: number;
   total_data_gb: number;
   nrt_earned: number;

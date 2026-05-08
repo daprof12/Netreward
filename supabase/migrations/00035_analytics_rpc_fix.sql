@@ -71,7 +71,7 @@ BEGIN
         c.isp_id = p_isp_id
         OR
         -- Path 2: Any device accessing ANY campaign through this ISP's network
-        d.isp_name IN (SELECT n.name FROM public.networks n WHERE n.isp_id = p_isp_id)
+        d.isp_name IN (SELECT n.name FROM public.networks n WHERE n.isp_id = p_isp_id AND n.verified = true)
     )
       AND s.session_end >= p_start_date::TIMESTAMPTZ
     GROUP BY DATE(s.session_end)
@@ -171,7 +171,7 @@ BEGIN
         c.isp_id = p_isp_id
         OR
         -- Path 2: Any device accessing ANY campaign through this ISP's network
-        d.isp_name IN (SELECT nn.name FROM public.networks nn WHERE nn.isp_id = p_isp_id)
+        d.isp_name IN (SELECT nn.name FROM public.networks nn WHERE nn.isp_id = p_isp_id AND nn.verified = true)
     )
       AND s.session_end >= (CURRENT_DATE - p_days)
     GROUP BY DATE(s.session_end), COALESCE(n.name, c.title)
@@ -204,7 +204,7 @@ BEGIN
         JOIN public.devices d ON s.device_id = d.id
         WHERE (
             c.isp_id = p_isp_id
-            OR d.isp_name IN (SELECT n.name FROM public.networks n WHERE n.isp_id = p_isp_id)
+            OR d.isp_name IN (SELECT n.name FROM public.networks n WHERE n.isp_id = p_isp_id AND n.verified = true)
         )
         AND session_end >= CURRENT_DATE - INTERVAL '112 days'
         GROUP BY session_end::DATE
@@ -225,7 +225,7 @@ BEGIN
         JOIN public.devices d ON s.device_id = d.id
         WHERE (
             c.isp_id = p_isp_id
-            OR d.isp_name IN (SELECT n.name FROM public.networks n WHERE n.isp_id = p_isp_id)
+            OR d.isp_name IN (SELECT n.name FROM public.networks n WHERE n.isp_id = p_isp_id AND n.verified = true)
         )
         AND session_end >= CURRENT_DATE - INTERVAL '112 days'
         GROUP BY session_end::DATE

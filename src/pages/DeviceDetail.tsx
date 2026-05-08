@@ -350,8 +350,12 @@ export default function DeviceDetail() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold text-text-primary text-sm">{app.app_name}</h4>
-                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border bg-blue-500/10 text-blue-500 border-blue-500/20`}>
-                        Service
+                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border ${
+                        app.service_category === 'Network' 
+                          ? 'bg-purple-500/10 text-purple-500 border-purple-500/20'
+                          : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                      }`}>
+                        {app.service_category}
                       </span>
                     </div>
                     <p className="text-xs text-text-secondary">{Math.floor(app.duration_seconds / 60)}m</p>
