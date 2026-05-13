@@ -14,6 +14,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { useDeviceManager } from '@/hooks/useDeviceManager';
 import { Trash2, AlertTriangle } from 'lucide-react';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 // Exposed so Devices.tsx can patch the cache after linking
 declare module '@/hooks/useDeviceManager' {
@@ -36,7 +37,7 @@ function UserDevicesView() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24H');
   const { data: stats } = useUserDeviceStats(timeFilter);
   const currentData = stats?.chartData || [];
-  const summary = stats?.summary || { totalData: '0.00 GB', totalNrt: '0.00 NRT' };
+  const summary = stats?.summary || { totalData: 0, totalNrt: 0 };
 
   // Add device sheet state
   const [showAddDevice, setShowAddDevice] = useState(false);
@@ -103,11 +104,11 @@ function UserDevicesView() {
         <div className="flex justify-between items-start mb-2">
           <div>
             <p className="text-sm text-text-secondary font-medium">Data Consumed</p>
-            <h2 className="text-2xl font-bold text-text-primary">{summary.totalData}</h2>
+            <h2 className="text-2xl font-bold text-text-primary">{Number(summary.totalData).toFixed(2)} GB</h2>
           </div>
           <div className="text-right">
             <p className="text-sm text-text-secondary font-medium">NRT Earned</p>
-            <h2 className="text-2xl font-bold text-accent-primary">{summary.totalNrt}</h2>
+            <h2 className="text-2xl font-bold text-accent-primary"><NrtAmount value={summary.totalNrt} /></h2>
           </div>
         </div>
 

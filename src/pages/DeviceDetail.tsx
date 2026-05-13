@@ -41,7 +41,7 @@ export default function DeviceDetail() {
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const { data: stats } = useUserDeviceStats(timeFilter);
   const currentData = stats?.chartData || [];
-  const summary = stats?.summary || { totalData: '0.00 GB', totalNrt: '0.00 NRT' };
+  const summary = stats?.summary || { totalData: 0, totalNrt: 0 };
 
   const { data: appUsage = [] } = useDeviceAppUsage(deviceId || '');
   const { data: deviceInfo, isLoading: isDeviceLoading } = useDeviceById(deviceId || '');

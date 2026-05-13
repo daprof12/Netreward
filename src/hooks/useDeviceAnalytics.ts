@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
-import NrtAmount from '@/components/ui/NrtAmount';
 
 export type TimeFilter = '24H' | '7D' | '1M' | 'ALL';
 
@@ -27,7 +26,7 @@ export function useUserDeviceStats(timeFilter: TimeFilter) {
   return useQuery({
     queryKey: ['user_device_stats', user?.id, timeFilter],
     queryFn: async () => {
-      if (!user) return { chartData: [], summary: { totalData: '0 GB', totalNrt: '0.00 NRT' } };
+      if (!user) return { chartData: [], summary: { totalData: 0, totalNrt: 0 } };
 
       const { data, error } = await supabase.rpc('get_user_device_stats', {
         p_user_id: user.id,
@@ -59,8 +58,8 @@ export function useUserDeviceStats(timeFilter: TimeFilter) {
       return {
         chartData,
         summary: {
-          totalData: `${totalData.toFixed(2)} GB`,
-          totalNrt: `$<NrtAmount value={totalNrt} />`
+          totalData,
+          totalNrt
         }
       };
     },
