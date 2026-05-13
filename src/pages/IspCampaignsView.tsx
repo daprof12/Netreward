@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import NrtAmount from '@/components/ui/NrtAmount';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Play, Pause, Square, Trash2, X, ChevronRight, Edit, 
@@ -9,7 +10,7 @@ import { useIspStore, type IspCampaign } from '@/stores/useIspStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { useCampaignAnalytics } from '@/hooks/useCampaignAnalytics';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { 
+import {
   AreaChart, 
   Area, 
   XAxis, 
