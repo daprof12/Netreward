@@ -11,6 +11,7 @@ import { useToastStore } from '@/stores/useToastStore';
 import MapSelectionModal from '@/components/MapSelectionModal';
 import { useFormStore } from '@/stores/useFormStore';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useSystemStore } from '@/stores/useSystemStore';
 
 export default function CreateIspCampaign() {
   usePageTitle('Create ISP Campaign');
@@ -20,6 +21,7 @@ export default function CreateIspCampaign() {
   const { balanceNRT, fetchBalance } = useWalletStore();
   const { selectedCurrency, convertNrt } = useCurrencyStore();
   const { showToast } = useToastStore();
+  const { settings } = useSystemStore();
   
   // Persistence logic (reusing campaign draft structure)
   const { drafts, updateCampaignDraft, clearCampaignDraft } = useFormStore();
@@ -87,7 +89,7 @@ export default function CreateIspCampaign() {
         name,
         targetLocation: targetLocations,
         budgetNrt: Number(budgetNrt),
-        rewardRate: 0.1, // 0.1 NRT per GB default
+        rewardRate: 1 / settings.gbPerNrt, // Dynamic GB per NRT
         startDate,
         endDate,
         isRecurring,
@@ -260,7 +262,7 @@ export default function CreateIspCampaign() {
               <p className="text-[10px] text-destructive mt-1 font-bold">Insufficient NRT balance</p>
             )}
             <p className="text-[10px] text-text-secondary mt-2 flex items-center gap-1">
-              <Calculator size={12} /> Rate: ~1 NRT per 10GB Data 
+              <Calculator size={12} /> Rate: ~1 NRT per {settings.gbPerNrt}GB Data 
               {budgetNrt && typeof budgetNrt === 'number' && (
                 <span className="text-green-500 font-bold ml-1">
                   (≈ {convertNrt(budgetNrt).symbol}{convertNrt(budgetNrt).amount} {selectedCurrency.split(' ')[0]})

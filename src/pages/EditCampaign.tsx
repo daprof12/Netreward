@@ -9,6 +9,7 @@ import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { useToastStore } from '@/stores/useToastStore';
 import MapSelectionModal from '@/components/MapSelectionModal';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useSystemStore } from '@/stores/useSystemStore';
 
 export default function EditCampaign() {
   usePageTitle('Edit Campaign');
@@ -19,6 +20,7 @@ export default function EditCampaign() {
   const { balanceNRT } = useWalletStore();
   const { selectedCurrency, convertNrt } = useCurrencyStore();
   const { showToast } = useToastStore();
+  const { settings } = useSystemStore();
   
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -225,10 +227,10 @@ export default function EditCampaign() {
               <p className="text-[10px] text-destructive mt-1 font-bold">Insufficient NRT balance for increase</p>
             )}
             <p className="text-[10px] text-text-secondary mt-2 flex items-center gap-1">
-              <Calculator size={12} /> Rate: ~1 NRT per 10GB Data 
+              <Calculator size={12} /> Rate: ~1 NRT per {settings.gbPerNrt}GB Data 
               {budgetNrt && typeof budgetNrt === 'number' && (
                 <span className="text-green-500 font-bold ml-1">
-                  (≈ {convertNrt(budgetNrt).symbol}{convertNrt(budgetNrt).amount.toFixed(2)} {selectedCurrency.split(' ')[0]})
+                  (≈ {convertNrt(budgetNrt).symbol}{convertNrt(budgetNrt).amount} {selectedCurrency.split(' ')[0]})
                 </span>
               )}
             </p>

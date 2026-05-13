@@ -11,6 +11,7 @@ import MapSelectionModal from '@/components/MapSelectionModal';
 
 import { useFormStore } from '@/stores/useFormStore';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useSystemStore } from '@/stores/useSystemStore';
 
 export default function CreateCampaign() {
   usePageTitle('Create Campaign');
@@ -20,6 +21,7 @@ export default function CreateCampaign() {
   const { balanceNRT, fetchBalance } = useWalletStore();
   const { selectedCurrency, convertNrt } = useCurrencyStore();
   const { showToast } = useToastStore();
+  const { settings } = useSystemStore();
   
   // Persistence logic
   const { drafts, updateCampaignDraft, clearCampaignDraft } = useFormStore();
@@ -65,7 +67,7 @@ export default function CreateCampaign() {
   const selectedService = services.find(s => s.id === serviceId);
 
   // Budget Calculator Logic
-  // Assuming 1 NRT = 10GB of data. Avg user earning varies by category, but let's mock it to ~0.5 NRT per session.
+  // Assuming 1 NRT = {settings.gbPerNrt}GB of data. Avg user earning varies by category, but let's mock it to ~0.5 NRT per session.
   const estimatedReach = useMemo(() => {
     if (!budgetNrt || typeof budgetNrt !== 'number') return 0;
     return Math.floor(budgetNrt / 0.5);
@@ -88,7 +90,7 @@ export default function CreateCampaign() {
         name,
         targetLocation: targetLocations,
         budgetNrt: Number(budgetNrt),
-        rewardRate: 0.1, // 0.1 NRT per GB default
+        rewardRate: 1 / settings.gbPerNrt, // Dynamic GB per NRT
         startDate,
         endDate,
         isRecurring,
@@ -248,7 +250,7 @@ export default function CreateCampaign() {
               <p className="text-[10px] text-destructive mt-1 font-bold">Insufficient NRT balance</p>
             )}
             <p className="text-[10px] text-text-secondary mt-2 flex items-center gap-1">
-              <Calculator size={12} /> Rate: ~1 NRT per 10GB Data 
+              <Calculator size={12} /> Rate: ~1 NRT per {settings.gbPerNrt}GB Data 
               {budgetNrt && typeof budgetNrt === 'number' && (
                 <span className="text-green-500 font-bold ml-1">
                   (≈ {convertNrt(budgetNrt).symbol}{convertNrt(budgetNrt).amount} {selectedCurrency.split(' ')[0]})

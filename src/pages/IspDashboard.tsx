@@ -69,7 +69,7 @@ export default function IspDashboard() {
   // Ah, the RPC get_isp_dashboard_stats is not currently fetched by IspDashboard.
   // Wait, let's fetch it or use the fallback for now.
   // We can fetch it with supabase if needed. But let's check if useAnalyticsStore fetches it.
-  const approxUserEarned = totalDataGB * 0.1;
+  const approxUserEarned = totalDataGB * (1 / settings.gbPerNrt);
   const cashbackNrt = approxUserEarned * 0.05;
 
   const { settings } = useSystemStore();
