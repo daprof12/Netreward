@@ -67,11 +67,12 @@ export default function CreateCampaign() {
   const selectedService = services.find(s => s.id === serviceId);
 
   // Budget Calculator Logic
-  // Assuming 1 NRT = {settings.gbPerNrt}GB of data. Avg user earning varies by category, but let's mock it to ~0.5 NRT per session.
+  // Assuming a target incentive of $0.10 USD per unique user reached (equivalent to ~500MB of browsing data value).
   const estimatedReach = useMemo(() => {
     if (!budgetNrt || typeof budgetNrt !== 'number') return 0;
-    return Math.floor(budgetNrt / 0.5);
-  }, [budgetNrt]);
+    // (Budget in NRT * Price of NRT) / Target Cost per User Reach
+    return Math.floor((budgetNrt * settings.nrtUsdValue) / settings.targetReachCostUsd);
+  }, [budgetNrt, settings.nrtUsdValue, settings.targetReachCostUsd]);
 
   const removeLocation = (id: string) => {
     setTargetLocations(targetLocations.filter(l => l.id !== id));

@@ -188,7 +188,7 @@ function ReferralTab() {
 
 function RewardTab() {
   const { showToast } = useToastStore();
-  const [form, setForm] = useState({ gbPerNrt: 1, nrtUsdValue: 0.042, spCashbackPct: 5, ispCashbackPct: 3 });
+  const [form, setForm] = useState({ gbPerNrt: 1, nrtUsdValue: 0.042, spCashbackPct: 5, ispCashbackPct: 3, targetReachCostUsd: 0.10 });
 
   useEffect(() => {
     (async () => {
@@ -196,7 +196,7 @@ function RewardTab() {
         const { data: rewards } = await supabase.from('kv_settings').select('value').eq('key', 'reward_config').single();
         const { data: token } = await supabase.from('kv_settings').select('value').eq('key', 'token_config').single();
         
-        let initialForm = { gbPerNrt: 1, nrtUsdValue: 0.042, spCashbackPct: 5, ispCashbackPct: 3, instantPurchasePrice: 0.005 };
+        let initialForm = { gbPerNrt: 1, nrtUsdValue: 0.042, spCashbackPct: 5, ispCashbackPct: 3, targetReachCostUsd: 0.10, instantPurchasePrice: 0.005 };
         
         if (rewards?.value) { 
           try { initialForm = { ...initialForm, ...JSON.parse(rewards.value) }; } catch {} 
@@ -351,6 +351,31 @@ function RewardTab() {
                 NRT Earned = (Data GB / Rate) × <span className="text-blue-400 font-bold">{ (form as any).nhsMultiplier || 1.0 }</span>
                 <br/>
                 <span className="opacity-50">Higher multipliers encourage usage during periods of high demand.</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-bg-card border border-glass-border rounded-xl p-5 space-y-4">
+          <h3 className="font-bold border-b border-glass-border pb-3">Campaign Reach Strategy</h3>
+          
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Target User Incentive (USD)</label>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-text-secondary">$</span>
+              <input type="number" step="0.01" value={form.targetReachCostUsd} onChange={e => setForm({ ...form, targetReachCostUsd: Number(e.target.value) })}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
+            </div>
+            <p className="text-xs text-text-secondary mt-1">Average reward value given to a user to count as 1 "reach".</p>
+          </div>
+
+          <div className="pt-2">
+            <div className="bg-emerald-500/5 rounded-lg p-3 border border-emerald-500/10">
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">Reach Calculation Logic</p>
+              <p className="text-[11px] text-text-secondary leading-relaxed">
+                Estimated Reach = (Budget NRT × NRT Price) / <span className="text-emerald-400 font-bold">${form.targetReachCostUsd}</span>
+                <br/>
+                <span className="opacity-50">This helps SPs estimate how many users they can incentivize with their budget.</span>
               </p>
             </div>
           </div>

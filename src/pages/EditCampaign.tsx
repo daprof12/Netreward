@@ -57,8 +57,8 @@ export default function EditCampaign() {
 
   const estimatedReach = useMemo(() => {
     if (!budgetNrt || typeof budgetNrt !== 'number') return 0;
-    return Math.floor(budgetNrt / 0.5);
-  }, [budgetNrt]);
+    return Math.floor((budgetNrt * settings.nrtUsdValue) / settings.targetReachCostUsd);
+  }, [budgetNrt, settings.nrtUsdValue, settings.targetReachCostUsd]);
 
   const removeLocation = (id: string) => {
     setTargetLocations(targetLocations.filter(l => l.id !== id));

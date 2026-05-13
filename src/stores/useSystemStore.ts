@@ -5,6 +5,8 @@ interface SystemSettings {
   spCashbackPercentage: number;
   ispCashbackPercentage: number;
   gbPerNrt: number;
+  nrtUsdValue: number;
+  targetReachCostUsd: number;
   notificationsEnabled: boolean;
   soundEnabled: boolean;
   vibrationEnabled: boolean;
@@ -22,6 +24,8 @@ export const useSystemStore = create<SystemStore>((set) => ({
     spCashbackPercentage: 10,
     ispCashbackPercentage: 5,
     gbPerNrt: 2250, // Default fallback
+    nrtUsdValue: 450, // Default fallback
+    targetReachCostUsd: 0.10, // Default fallback
     notificationsEnabled: true,
     soundEnabled: true,
     vibrationEnabled: true,
@@ -49,6 +53,8 @@ export const useSystemStore = create<SystemStore>((set) => ({
             spCashbackPercentage: Number(config.spCashbackPercentage || 10),
             ispCashbackPercentage: Number(config.ispCashbackPercentage || 5),
             gbPerNrt: Number(rewardConfig.gbPerNrt || 2250),
+            nrtUsdValue: Number(rewardConfig.nrtUsdValue || 450),
+            targetReachCostUsd: Number(rewardConfig.targetReachCostUsd || 0.10),
             notificationsEnabled: config.notificationsEnabled ?? true,
             soundEnabled: config.soundEnabled ?? true,
             vibrationEnabled: config.vibrationEnabled ?? true,
