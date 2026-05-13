@@ -38,7 +38,7 @@ export default function NrtTokenInfo() {
         <div className="w-16 h-16 rounded-full bg-accent-primary/20 flex items-center justify-center mb-2">
           <Zap size={32} className="text-accent-primary" />
         </div>
-        <h2 className="text-3xl font-black">${tokenStats.price.toFixed(4)}</h2>
+        <h2 className="text-3xl font-black">${tokenStats.price.toLocaleString(undefined, { maximumFractionDigits: 10 })}</h2>
         <div className="flex items-center gap-2 text-sm font-bold text-green-500 bg-green-500/10 px-3 py-1 rounded-full">
           <Activity size={14} /> +{tokenStats.change24h}%
         </div>

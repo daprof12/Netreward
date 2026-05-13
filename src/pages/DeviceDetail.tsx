@@ -13,6 +13,7 @@ type TimeFilter = '24H' | '7D' | '1M' | 'ALL';
 import EmptyState from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 function SignalBars({ strength }: { strength: number }) {
   return (

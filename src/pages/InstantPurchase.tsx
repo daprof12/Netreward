@@ -12,6 +12,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { usePaymentGateways, type LiveGateway } from '@/hooks/usePaymentGateways';
+import NrtAmount, { NrtAmountInline } from '@/components/ui/NrtAmount';
 
 type Step = 'enter' | 'confirm' | 'processing' | 'success';
 
@@ -280,7 +281,7 @@ export default function InstantPurchase() {
             {/* Rate note */}
             <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 text-xs text-amber-400">
               <Zap size={14} />
-              Platform rate: 1 NRT = {symbol}{NRT_RATE.toFixed(4)} (instant settlement)
+              Platform rate: 1 NRT = {symbol}{NRT_RATE.toLocaleString(undefined, { maximumFractionDigits: 10 })} (instant settlement)
             </div>
 
             {/* Amount */}
@@ -421,7 +422,7 @@ export default function InstantPurchase() {
               {[
                 ['You pay', `${symbol}${amount}`],
                 ['You receive', <NrtAmountInline value={nrt} />],
-                ['Rate', `1 NRT = ${symbol}${NRT_RATE.toFixed(4)}`],
+                ['Rate', `1 NRT = ${symbol}${NRT_RATE.toLocaleString(undefined, { maximumFractionDigits: 10 })}`],
                 ['Destination', sendOnChain && solanaAddress ? `${solanaAddress.slice(0,6)}...${solanaAddress.slice(-4)} (Solana)` : 'Platform Wallet'],
                 ['Method', selectedGateway?.name || 'Unknown'],
                 ['Fee', selectedGateway?.fees || 'Unknown'],

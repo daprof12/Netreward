@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 export type TimeFilter = '24H' | '7D' | '1M' | 'ALL';
 

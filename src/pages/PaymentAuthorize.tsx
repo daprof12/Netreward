@@ -15,6 +15,7 @@ import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import PinEntryModal from '@/components/ui/PinEntryModal';
 import BiometricPromptModal from '@/components/ui/BiometricPromptModal';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

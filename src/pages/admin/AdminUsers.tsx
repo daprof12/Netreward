@@ -5,6 +5,7 @@ import LocationSearch from '@/components/LocationSearch';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 interface AdminUser {
   id: string;
@@ -298,7 +299,7 @@ export default function AdminUsers() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[
                         { icon: Activity, label: 'Status', value: viewUser.status, color: statusColor[viewUser.status] },
-                        { icon: Wallet, label: 'Balance', value: `${viewUser.nrt_balance.toFixed(1)}`, color: '#6366f1' },
+                        { icon: Wallet, label: 'Balance', value: `${viewUser.nrt_balance.toLocaleString(undefined, { maximumFractionDigits: 10 })}`, color: '#6366f1' },
                         { icon: Gift, label: 'Referrals', value: viewUser.referral_count.toString(), color: '#10B981' },
                         { icon: Smartphone, label: 'Devices', value: viewUser.device_count.toString(), color: '#f59e0b' },
                       ].map(stat => (

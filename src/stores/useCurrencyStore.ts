@@ -44,7 +44,7 @@ export const useCurrencyStore = create<CurrencyStore>()(
         return {
           amount: converted.toLocaleString(undefined, { 
             minimumFractionDigits: 2, 
-            maximumFractionDigits: 2 
+            maximumFractionDigits: 10 
           }),
           symbol
         };

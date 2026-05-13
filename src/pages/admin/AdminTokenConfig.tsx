@@ -195,7 +195,7 @@ export default function AdminTokenConfig() {
             <span className="text-[10px] font-bold text-green-500">+2.4%</span>
           </div>
           <p className="text-xs text-text-secondary font-medium">Calculated NRT Value</p>
-          <h3 className="text-xl font-bold text-text-primary mt-0.5">${form.currentValue.toFixed(6)}</h3>
+          <h3 className="text-xl font-bold text-text-primary mt-0.5">${form.currentValue.toLocaleString(undefined, { maximumFractionDigits: 10 })}</h3>
         </div>
 
         <div className="glass p-4 rounded-2xl border border-glass-border">
@@ -293,7 +293,7 @@ export default function AdminTokenConfig() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-text-primary">{source.source}</span>
                       <span className="text-[10px] text-text-secondary font-mono">
-                        Contrib: ${((source.weight * source.currentPrice) / 100).toFixed(6)}
+                        Contrib: ${((source.weight * source.currentPrice) / 100).toLocaleString(undefined, { maximumFractionDigits: 10 })}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">

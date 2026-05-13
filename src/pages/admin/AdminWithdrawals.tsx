@@ -280,7 +280,7 @@ export default function AdminWithdrawals() {
             <div className="w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center"><Wallet size={16} className="text-accent-primary" /></div>
             <p className="text-xs font-bold text-accent-primary uppercase tracking-wider">Platform Treasury</p>
           </div>
-          <h3 className="text-2xl font-black text-text-primary mt-1">{treasuryBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} NRT</h3>
+          <h3 className="text-2xl font-black text-text-primary mt-1">{treasuryBalance.toLocaleString(undefined, { maximumFractionDigits: 10 })} NRT</h3>
           <p className="text-[10px] text-text-secondary mt-1">Total accumulated wealth</p>
         </div>
         
@@ -369,7 +369,7 @@ export default function AdminWithdrawals() {
                         <div className="font-bold text-text-primary">
                           {req.withdrawal_type === 'crypto' ? 'Crypto Transfer' : `${req.amount_fiat.toLocaleString()} ${req.currency}`}
                         </div>
-                        <div className="text-xs text-text-secondary">{req.amount_nrt.toLocaleString()} NRT deducted</div>
+                        <div className="text-xs text-text-secondary">{req.amount_nrt.toLocaleString(undefined, { maximumFractionDigits: 10 })} NRT deducted</div>
                       </td>
                       <td className="px-4 py-3">
                         {req.withdrawal_type === 'crypto' ? (
@@ -432,7 +432,7 @@ export default function AdminWithdrawals() {
                               {dep.country}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-accent-primary font-bold">{dep.amount.toLocaleString()} NRT</td>
+                          <td className="px-4 py-3 text-accent-primary font-bold">{dep.amount.toLocaleString(undefined, { maximumFractionDigits: 10 })} NRT</td>
                           <td className="px-4 py-3 text-text-secondary text-xs">{dep.description}</td>
                           <td className="px-4 py-3">
                             {getStatusBadge(dep.status)}
@@ -475,7 +475,7 @@ export default function AdminWithdrawals() {
                       {selectedReq.withdrawal_type === 'crypto' ? 'Crypto Withdrawal' : 'Net Fiat Payout'}
                     </p>
                     <p className="text-2xl font-black text-text-primary">
-                      {selectedReq.withdrawal_type === 'crypto' ? `${selectedReq.amount_nrt.toLocaleString()} NRT` : `${selectedReq.amount_fiat.toLocaleString()} ${selectedReq.currency}`}
+                      {selectedReq.withdrawal_type === 'crypto' ? `${selectedReq.amount_nrt.toLocaleString(undefined, { maximumFractionDigits: 10 })} NRT` : `${selectedReq.amount_fiat.toLocaleString()} ${selectedReq.currency}`}
                     </p>
                     {selectedReq.withdrawal_type === 'fiat' && selectedReq.fee_fiat > 0 && (
                       <p className="text-xs text-green-500 font-medium">+ {selectedReq.fee_fiat.toLocaleString()} {selectedReq.currency} (1.5% Fee Kept)</p>

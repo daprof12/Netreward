@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import PinEntryModal from '@/components/ui/PinEntryModal';
 import BiometricPromptModal from '@/components/ui/BiometricPromptModal';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 type ScanStep = 'requesting' | 'scanning' | 'decoding' | 'detected' | 'authenticating' | 'success' | 'failed' | 'camera_error';
 
@@ -300,7 +301,7 @@ export default function ScanToPay() {
   };
 
   const amountUsd = detectedSession
-    ? (detectedSession.amountNrt * fiatValue).toFixed(2)
+    ? (detectedSession.amountNrt * fiatValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 10 })
     : '0.00';
 
   // ── Render ─────────────────────────────────────────────────────

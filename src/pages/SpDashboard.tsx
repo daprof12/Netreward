@@ -14,6 +14,7 @@ import AnalyticsChart from '@/components/ui/AnalyticsChart';
 import { useTelemetry } from '@/hooks/useTelemetry';
 import EmptyState from '@/components/ui/EmptyState';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 type TimeFilter = '24H' | '7D' | '3M' | 'All';
 

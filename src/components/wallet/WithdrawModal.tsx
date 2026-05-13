@@ -6,6 +6,7 @@ import { useWithdrawals } from '@/hooks/useWithdrawals';
 import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { useWalletStore } from '@/stores/useWalletStore';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 interface WithdrawModalProps {
   isOpen: boolean;

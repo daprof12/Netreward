@@ -49,7 +49,7 @@ export default function AdminTreasury() {
   const processedW = withdrawals.filter(w => w.status === 'processed').length;
 
   const stats = [
-    { label: 'NRT Reserve', value: Number(nrtBal).toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' NRT', icon: Wallet, color: 'bg-emerald-500/10 text-emerald-400' },
+    { label: 'NRT Reserve', value: Number(nrtBal).toLocaleString(undefined, { maximumFractionDigits: 10 }) + ' NRT', icon: Wallet, color: 'bg-emerald-500/10 text-emerald-400' },
     { label: 'Fiat Liquidity', value: '$' + Number(totalFiat).toLocaleString(undefined, { maximumFractionDigits: 2 }), icon: Banknote, color: 'bg-blue-500/10 text-blue-400' },
     { label: 'Pending Payouts', value: String(pendingW), icon: Clock, color: 'bg-amber-500/10 text-amber-400' },
     { label: 'Processed', value: String(processedW), icon: CheckCircle2, color: 'bg-purple-500/10 text-purple-400' },
@@ -65,7 +65,7 @@ export default function AdminTreasury() {
     return m[s] || 'bg-zinc-500/10 text-zinc-400';
   };
 
-  const fmt = (n: number, d = 2) => Number(n).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+  const fmt = (n: number, d = 2) => Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 10 });
   const fmtDate = (d: string) => d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
   return (

@@ -16,6 +16,7 @@ import { useClaimRewards } from '@/hooks/useRewardEngine';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 // No static mock data needed here anymore
 
