@@ -39,49 +39,44 @@ export function formatNrt(
   const abs  = Math.abs(num);
   const sign = num < 0 ? '-' : showSign && num > 0 ? '+' : '';
 
-  // ── Normal range ───────────────────────────────────────────────────────────
-  if (abs >= 1000) {
+  // ── Compact subscript range (< 0.0001) ─────────────────────────────────────
+  if (abs > 0 && abs < 0.0001) {
+    // Use toFixed(20) to avoid scientific notation, then analyse digit positions
+    const raw         = abs.toFixed(20).replace(/0+$/, ''); // Strip trailing zeros
+    const afterDot    = raw.split('.')[1] ?? '';
+
+    // Count leading zeros before first non-zero digit
+    let leadingZeros  = 0;
+    for (const ch of afterDot) {
+      if (ch === '0') leadingZeros++;
+      else break;
+    }
+
+    // Extract all significant digits (no truncation)
+    const sigStart = leadingZeros;
+    const sig      = afterDot.slice(sigStart) || '0';
+
+    // "0.0" already shows one zero; subscript shows how many MORE zeros follow
+    const subscriptZeros = leadingZeros - 1;
+
     return {
-      type: 'plain',
-      text: sign + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      type:   'subscript',
+      prefix: sign + '0.0',
+      zeros:  subscriptZeros,
+      suffix: sig,
     };
   }
-  if (abs >= 1) {
-    return { type: 'plain', text: sign + abs.toFixed(2) };
-  }
-  if (abs >= 0.001) {
-    return { type: 'plain', text: sign + abs.toFixed(4) };
-  }
-  if (abs >= 0.0001) {
-    return { type: 'plain', text: sign + abs.toFixed(6) };
-  }
 
-  // ── Compact subscript range (< 0.0001) ─────────────────────────────────────
-  // Use toFixed(20) to avoid scientific notation, then analyse digit positions
-  const raw         = abs.toFixed(20);           // e.g. "0.00000000089000..."
-  const afterDot    = raw.split('.')[1] ?? '';    // e.g. "00000000089000..."
-
-  // Count leading zeros before first non-zero digit
-  let leadingZeros  = 0;
-  for (const ch of afterDot) {
-    if (ch === '0') leadingZeros++;
-    else break;
-  }
-
-  // Extract significant digits (up to 3 non-zero leading digits, strip trailing zeros)
-  const sigStart = leadingZeros;
-  const sigRaw   = afterDot.slice(sigStart).replace(/0+$/, '');
-  const sig      = sigRaw.slice(0, 3) || '0'; // max 3 significant digits shown
-
-  // "0.0" already shows one zero; subscript shows how many MORE zeros follow
-  // e.g. 0.00000000089 → leadingZeros=9 → prefix="0.0", zeros=8, suffix="89"
-  const subscriptZeros = leadingZeros - 1;
+  // ── Normal range (≥ 0.0001) ───────────────────────────────────────────────
+  // Show full digits without artificial rounding (up to 20 decimal places)
+  const text = abs.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 20,
+  });
 
   return {
-    type:   'subscript',
-    prefix: sign + '0.0',
-    zeros:  subscriptZeros,
-    suffix: sig,
+    type: 'plain',
+    text: sign + text,
   };
 }
 
