@@ -19,6 +19,8 @@ import EmptyState from '@/components/ui/EmptyState';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import NrtAmount from '@/components/ui/NrtAmount';
+import { formatNrtText } from '@/lib/formatNrt';
 
 const quickActions = [
   { icon: ArrowRightLeft, label: 'P2P', to: '/wallet/deposit/p2p', color: '#3b82f6', bg: 'bg-blue-500/10' },
@@ -80,7 +82,7 @@ export default function UserHome() {
             setRecentActivity(data.slice(0, 4).map(d => ({
               id: d.id,
               icon: Zap,
-              text: `Earned ${Number(d.nrt_awarded).toFixed(2)} NRT from ${d.campaigns?.title || 'Unknown'}`,
+              text: `Earned ${formatNrtText(Number(d.nrt_awarded))} NRT from ${d.campaigns?.title || 'Unknown'}`,
               time: new Date(d.session_end).toLocaleDateString(),
               color: '#10b981'
             })));
@@ -169,7 +171,11 @@ export default function UserHome() {
         <div className="relative z-10">
           <p className="text-white/70 text-sm font-medium">Total Balance</p>
           <h2 className="text-3xl font-bold text-white mt-1 tracking-tight">
-            {displayBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <NrtAmount
+              value={displayBalance}
+              hideUnit
+              className="text-3xl font-bold text-white tracking-tight"
+            />
             <span className="text-lg ml-1.5 text-white/80">NRT</span>
           </h2>
           <p className="text-white/60 text-sm mt-1">
@@ -195,7 +201,7 @@ export default function UserHome() {
                   : 'bg-white/10 text-white/40 cursor-not-allowed'
               }`}
             >
-              {isClaiming ? <Loader2 size={16} className="animate-spin" /> : totalUnclaimed > 0 ? `Claim ${totalUnclaimed.toFixed(2)}` : 'Claim Rewards'}
+              {isClaiming ? <Loader2 size={16} className="animate-spin" /> : totalUnclaimed > 0 ? <>Claim <NrtAmount value={totalUnclaimed} hideUnit className="font-semibold" /></> : 'Claim Rewards'}
             </motion.button>
           </div>
           {totalUnclaimed > 0 && (
@@ -214,7 +220,9 @@ export default function UserHome() {
         </div>
         <div className="glass rounded-xl p-3 border border-glass-border text-center">
           <p className="text-xs text-text-secondary">Earned</p>
-          <p className="text-xl font-bold text-accent-primary mt-0.5">{totalEarned.toFixed(1)}</p>
+          <p className="text-xl font-bold text-accent-primary mt-0.5">
+            <NrtAmount value={totalEarned} hideUnit className="text-xl font-bold text-accent-primary" />
+          </p>
         </div>
         <div className="glass rounded-xl p-3 border border-glass-border text-center">
           <p className="text-xs text-text-secondary">Devices</p>
@@ -406,7 +414,9 @@ export default function UserHome() {
                               style={{ width: `${(camp?.budget_spent / camp?.total_budget) * 100 || 0}%` }} 
                             />
                           </div>
-                          <span className="text-[10px] font-black text-accent-primary">+{en.nrt_earned.toFixed(2)} NRT</span>
+                          <span className="text-[10px] font-black text-accent-primary">
+                            +<NrtAmount value={en.nrt_earned} hideUnit className="text-[10px] font-black text-accent-primary" /> NRT
+                          </span>
                         </div>
                       </div>
                     </div>

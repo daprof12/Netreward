@@ -3,19 +3,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Copy, Check, Share2, Users,
-  Gift, TrendingUp, Inbox, X, MessageCircle, Send,
+  Gift, TrendingUp, Inbox, X, MessageCircle, Send, Zap, ShieldCheck,
 } from 'lucide-react';
 import { useReferrals } from '@/hooks/useReferrals';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 // ── Social share targets ────────────────────────────────────────────────────
 
-function buildShareTargets(link: string, code: string) {
+function buildShareTargets(link: string, code: string, bonusNrt: number) {
   const msg = encodeURIComponent(
     `Join NetReward and earn NRT rewards for every MB of data you use! 🎉\nUse my referral code: ${code}\n${link}`,
   );
-  const msgShort = encodeURIComponent(`Join NetReward — earn NRT rewards! Use my code: ${code}`);
+  const msgShort = encodeURIComponent(`Join NetReward — earn ${bonusNrt} NRT per referral! Use my code: ${code}`);
   return [
     {
       id: 'whatsapp',
@@ -78,12 +79,12 @@ function buildShareTargets(link: string, code: string) {
 export default function Referral() {
   usePageTitle('Referrals');
   const navigate = useNavigate();
-  const { referrals, referralCode, isLoading, totalReferred, totalEarned, pendingRewards } = useReferrals();
+  const { referrals, referralCode, isLoading, totalReferred, totalEarned, pendingRewards, bonusNrt, condition } = useReferrals();
   const [copied, setCopied] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
 
   const referralLink = `https://netreward.online/join?ref=${referralCode}`;
-  const shareTargets = buildShareTargets(referralLink, referralCode);
+  const shareTargets = buildShareTargets(referralLink, referralCode, bonusNrt);
 
   const handleCopy = async () => {
     try {
@@ -166,21 +167,27 @@ export default function Referral() {
             <Gift size={160} strokeWidth={1} />
           </div>
           <Gift size={40} className="text-white mx-auto relative z-10" />
-          <h2 className="text-2xl font-bold text-white relative z-10">Earn 5 NRT</h2>
+          <h2 className="text-2xl font-bold text-white relative z-10">Earn {bonusNrt} NRT</h2>
           <p className="text-white/80 text-sm relative z-10">for every friend who joins and earns their first reward</p>
+          {/* Condition badge */}
+          <div className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-full px-3 py-1 relative z-10">
+            {condition === 'first_reward'
+              ? <><ShieldCheck size={12} className="text-white" /><span className="text-white text-[10px] font-bold uppercase tracking-wider">First Reward Condition</span></>
+              : <><Zap size={12} className="text-white" /><span className="text-white text-[10px] font-bold uppercase tracking-wider">Instant on Signup</span></>}
+          </div>
         </motion.div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { icon: Users, label: 'Referred', value: String(totalReferred), color: '#3b82f6' },
-            { icon: TrendingUp, label: 'Total Earned', value: `${totalEarned.toFixed(1)} NRT`, color: 'var(--accent-primary)' },
-            { icon: Gift, label: 'Pending', value: `${pendingRewards.toFixed(1)} NRT`, color: '#f59e0b' },
+            { icon: Users,     label: 'Referred',      value: <span className="font-bold text-text-primary text-sm mt-0.5">{String(totalReferred)}</span>,                                        color: '#3b82f6' },
+            { icon: TrendingUp, label: 'Total Earned',  value: <NrtAmount value={totalEarned} hideUnit={false} className="font-bold text-sm mt-0.5" />, color: 'var(--accent-primary)' },
+            { icon: Gift,       label: 'Pending',       value: <NrtAmount value={pendingRewards} hideUnit={false} className="font-bold text-sm mt-0.5" />, color: '#f59e0b' },
           ].map(({ icon: Icon, label, value, color }) => (
             <div key={label} className="glass rounded-xl p-3 border border-glass-border text-center">
               <Icon size={18} style={{ color }} className="mx-auto mb-1" />
               <p className="text-xs text-text-secondary">{label}</p>
-              <p className="font-bold text-text-primary text-sm mt-0.5">{value}</p>
+              {value}
             </div>
           ))}
         </div>
@@ -268,8 +275,10 @@ export default function Referral() {
           <div className="space-y-2">
             {[
               { step: '1', text: 'Share your unique referral code or link with friends' },
-              { step: '2', text: 'Friend signs up and earns their first NRT reward' },
-              { step: '3', text: 'You receive 5 NRT instantly in your wallet' },
+              { step: '2', text: condition === 'first_reward'
+                ? 'Friend signs up and earns their first NRT reward'
+                : 'Friend signs up using your referral link or code' },
+              { step: '3', text: `You receive ${bonusNrt} NRT instantly in your wallet` },
             ].map(({ step, text }) => (
               <div key={step} className="flex items-start gap-3 glass rounded-xl p-3 border border-glass-border">
                 <div className="w-7 h-7 rounded-full bg-accent-primary flex items-center justify-center text-primary-foreground font-bold text-xs shrink-0">
@@ -312,7 +321,9 @@ export default function Referral() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-accent-primary">+{Number(ref.reward_nrt).toFixed(2)} NRT</p>
+                      <p className="text-sm font-bold text-accent-primary">
+                        +<NrtAmount value={ref.reward_nrt} hideUnit className="text-sm font-bold text-accent-primary" /> NRT
+                      </p>
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                         ref.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
                       }`}>
@@ -356,7 +367,7 @@ export default function Referral() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-bold">Share Your Link</h3>
-                  <p className="text-xs text-text-secondary">Invite friends to earn 5 NRT per referral</p>
+                  <p className="text-xs text-text-secondary">Invite friends to earn {bonusNrt} NRT per referral</p>
                 </div>
                 <button
                   onClick={() => setShowShareSheet(false)}

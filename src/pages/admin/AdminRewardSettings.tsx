@@ -1,9 +1,190 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, Settings, DollarSign, Loader2 } from 'lucide-react';
+import { Save, Settings, DollarSign, Gift, Users, Clock, Info } from 'lucide-react';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
+
+const CONDITION_LABELS: Record<string, string> = {
+  first_reward: 'First Reward Earned',
+  signup_only:  'Signup Only',
+};
+
+function ReferralTab() {
+  const { showToast } = useToastStore();
+  const [saving, setSaving] = useState(false);
+  const [referralForm, setReferralForm] = useState({
+    bonusNrt: 5,
+    condition: 'first_reward' as 'first_reward' | 'signup_only',
+    maxReferralsPerUser: 0,
+    cooldownDays: 0,
+  });
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('kv_settings')
+        .select('value')
+        .eq('key', 'referral_config')
+        .single();
+      if (data?.value) {
+        try {
+          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          setReferralForm(f => ({ ...f, ...parsed }));
+        } catch {}
+      }
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await supabase.from('kv_settings').upsert(
+        {
+          key: 'referral_config',
+          value: JSON.stringify(referralForm),
+          category: 'rewards',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'key' }
+      );
+      showToast('Referral reward settings saved.', 'success');
+    } catch (e: any) {
+      showToast(e.message || 'Save failed', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const previewEarnings = referralForm.maxReferralsPerUser > 0
+    ? `Up to ${(referralForm.bonusNrt * referralForm.maxReferralsPerUser).toLocaleString()} NRT max per user`
+    : 'Unlimited earning potential';
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">Referral Program</h2>
+          <p className="text-sm text-text-secondary">Configure the user referral bonus and payout rules</p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-accent-primary/20 hover:opacity-90 transition-opacity disabled:opacity-60"
+        >
+          {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={16} />}
+          Save Changes
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {/* Bonus Amount */}
+        <div className="bg-bg-card border border-glass-border rounded-xl p-5 space-y-4">
+          <div className="flex items-center gap-2 border-b border-glass-border pb-3">
+            <Gift size={16} className="text-amber-400" />
+            <h3 className="font-bold">Bonus Per Referral</h3>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">NRT Amount</label>
+            <div className="flex items-center gap-3">
+              <input
+                id="referral-bonus-nrt"
+                type="number"
+                min="0"
+                step="0.5"
+                value={referralForm.bonusNrt}
+                onChange={e => setReferralForm(f => ({ ...f, bonusNrt: Number(e.target.value) }))}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary"
+              />
+              <span className="text-sm font-bold text-text-secondary">NRT</span>
+            </div>
+            <p className="text-xs text-text-secondary mt-1">Instant wallet credit paid to the referrer when condition is met.</p>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Payout Condition</label>
+            <select
+              id="referral-condition"
+              value={referralForm.condition}
+              onChange={e => setReferralForm(f => ({ ...f, condition: e.target.value as any }))}
+              className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-accent-primary"
+            >
+              <option value="first_reward">First Reward Earned (Industry Standard)</option>
+              <option value="signup_only">Signup Only</option>
+            </select>
+            <p className="text-xs text-text-secondary mt-1">
+              {referralForm.condition === 'first_reward'
+                ? 'Bonus is paid after the referred user earns their first NRT reward — prevents fraud.'
+                : 'Bonus is paid immediately upon signup. Higher fraud risk.'}
+            </p>
+          </div>
+
+          {/* Live Preview */}
+          <div className="bg-amber-500/5 rounded-lg p-3 border border-amber-500/10">
+            <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">Live Preview</p>
+            <p className="text-sm text-text-primary font-bold">You receive <span className="text-amber-400">{referralForm.bonusNrt} NRT</span> instantly in your wallet</p>
+            <p className="text-xs text-text-secondary mt-0.5">{previewEarnings}</p>
+          </div>
+        </div>
+
+        {/* Limits & Controls */}
+        <div className="bg-bg-card border border-glass-border rounded-xl p-5 space-y-4">
+          <div className="flex items-center gap-2 border-b border-glass-border pb-3">
+            <Users size={16} className="text-blue-400" />
+            <h3 className="font-bold">Limits & Controls</h3>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Max Referrals Per User</label>
+            <div className="flex items-center gap-3">
+              <input
+                id="referral-max-per-user"
+                type="number"
+                min="0"
+                step="1"
+                value={referralForm.maxReferralsPerUser}
+                onChange={e => setReferralForm(f => ({ ...f, maxReferralsPerUser: Number(e.target.value) }))}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary"
+              />
+              <span className="text-sm font-bold text-text-secondary">{referralForm.maxReferralsPerUser === 0 ? 'Unlimited' : 'max'}</span>
+            </div>
+            <p className="text-xs text-text-secondary mt-1">Set to 0 for unlimited referrals. Caps the total rewards a single user can earn.</p>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Cooldown Between Payouts (Days)</label>
+            <div className="flex items-center gap-3">
+              <input
+                id="referral-cooldown-days"
+                type="number"
+                min="0"
+                step="1"
+                value={referralForm.cooldownDays}
+                onChange={e => setReferralForm(f => ({ ...f, cooldownDays: Number(e.target.value) }))}
+                className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary"
+              />
+              <span className="text-sm font-bold text-text-secondary">{referralForm.cooldownDays === 0 ? 'Off' : 'days'}</span>
+            </div>
+            <p className="text-xs text-text-secondary mt-1">0 = no cooldown. Prevents a single user spamming referrals rapidly.</p>
+          </div>
+
+          <div className="bg-blue-500/5 rounded-lg p-3 border border-blue-500/10 flex gap-2">
+            <Info size={14} className="text-blue-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">Industry Standard</p>
+              <p className="text-[11px] text-text-secondary leading-relaxed">
+                Most referral programs use <strong className="text-text-primary">"First Reward Earned"</strong> as the condition
+                with no hard cap to maximise organic growth. Cooldowns are optional fraud mitigations.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function RewardTab() {
   const { showToast } = useToastStore();
@@ -253,27 +434,35 @@ function FeesTab() {
 
 export default function AdminRewardSettings() {
   usePageTitle('Admin — Rewards');
-  const [activeTab, setActiveTab] = useState<'rewards' | 'fees'>('rewards');
+  const [activeTab, setActiveTab] = useState<'rewards' | 'referral' | 'fees'>('rewards');
 
   return (
     <motion.div className="space-y-5" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <div>
         <h1 className="text-2xl font-black">Rewards & Fees</h1>
-        <p className="text-sm text-text-secondary">Manage global reward settings and processing fees</p>
+        <p className="text-sm text-text-secondary">Manage global reward settings, referral bonuses, and processing fees</p>
       </div>
 
-      <div className="flex bg-bg-secondary p-1 rounded-xl w-full max-w-sm">
+      <div className="flex bg-bg-secondary p-1 rounded-xl w-fit gap-1">
         <button
           onClick={() => setActiveTab('rewards')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-lg transition-all ${
+          className={`flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
             activeTab === 'rewards' ? 'bg-bg-primary shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
           }`}
         >
           <Settings size={16} /> Rewards
         </button>
         <button
+          onClick={() => setActiveTab('referral')}
+          className={`flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+            activeTab === 'referral' ? 'bg-bg-primary shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          <Gift size={16} /> Referral
+        </button>
+        <button
           onClick={() => setActiveTab('fees')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-lg transition-all ${
+          className={`flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
             activeTab === 'fees' ? 'bg-bg-primary shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -283,8 +472,9 @@ export default function AdminRewardSettings() {
 
       <AnimatePresence mode="wait">
         <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-          {activeTab === 'rewards' && <RewardTab />}
-          {activeTab === 'fees' && <FeesTab />}
+          {activeTab === 'rewards'  && <RewardTab />}
+          {activeTab === 'referral' && <ReferralTab />}
+          {activeTab === 'fees'     && <FeesTab />}
         </motion.div>
       </AnimatePresence>
     </motion.div>

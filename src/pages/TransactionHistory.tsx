@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useTransactions, type Transaction } from '@/hooks/useTransactions';
 import EmptyState from '@/components/ui/EmptyState';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 const TYPE_OPTIONS = [
   { value: 'reward',         label: 'Rewards',     icon: TrendingUp,     color: 'text-emerald-400',     bg: 'bg-emerald-500/10'     },
@@ -219,7 +220,12 @@ export default function TransactionHistory() {
                   <div className="flex justify-between items-start mb-1">
                     <p className="text-sm font-bold text-text-primary truncate pr-2">{tx.description}</p>
                     <p className={`font-black text-sm shrink-0 ${tx.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {tx.amount > 0 ? '+' : ''}{tx.amount.toFixed(3)} <span className="text-[10px] font-medium text-text-secondary">NRT</span>
+                      <NrtAmount
+                        value={tx.amount}
+                        showSign
+                        className={`font-black text-sm ${tx.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                        unitClassName="text-[10px] font-medium text-text-secondary ml-0.5"
+                      />
                     </p>
                   </div>
                   <div className="flex justify-between items-center">
@@ -254,7 +260,11 @@ export default function TransactionHistory() {
                   <div className="flex justify-between items-start mb-1">
                     <p className="text-sm font-bold text-text-primary truncate pr-2">{chk.description}</p>
                     <p className="font-black text-sm text-text-primary shrink-0">
-                      {Math.abs(chk.amount).toFixed(2)} <span className="text-[10px] text-text-secondary font-medium">NRT</span>
+                      <NrtAmount
+                        value={Math.abs(chk.amount)}
+                        className="font-black text-sm text-text-primary"
+                        unitClassName="text-[10px] text-text-secondary font-medium ml-0.5"
+                      />
                     </p>
                   </div>
                   <div className="flex justify-between items-center">
@@ -430,8 +440,12 @@ export default function TransactionHistory() {
                     <Icon size={32} className={m.color} />
                   </div>
                   <h3 className="text-3xl font-black text-text-primary">
-                    {receipt.amount > 0 ? '+' : ''}{receipt.amount.toFixed(3)}
-                    <span className="text-sm ml-1 text-text-secondary font-bold">NRT</span>
+                    <NrtAmount
+                      value={receipt.amount}
+                      showSign
+                      className="text-3xl font-black text-text-primary"
+                      unitClassName="text-sm ml-1 text-text-secondary font-bold"
+                    />
                   </h3>
                   <p className="text-sm text-text-secondary font-medium mt-1">{receipt.description}</p>
                   <div className="mt-3 flex items-center gap-2">

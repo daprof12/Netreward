@@ -17,6 +17,7 @@ import { useTransactions } from '@/hooks/useTransactions';
 import WithdrawModal from '@/components/wallet/WithdrawModal';
 import { useWalletAutomation } from '@/hooks/useWalletAutomation';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 function WalletSkeleton() {
   return (
@@ -86,7 +87,11 @@ export default function WalletPage() {
         <div className="relative z-10">
           <p className="text-white/70 text-sm font-medium">Total Balance</p>
           <h2 className="text-4xl font-bold text-white mt-1 tracking-tight">
-            {displayBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <NrtAmount
+              value={displayBalance}
+              hideUnit
+              className="text-4xl font-bold text-white tracking-tight"
+            />
             <span className="text-xl ml-2 text-white/70">NRT</span>
           </h2>
           <p className="text-white/60 text-sm mt-1">
@@ -97,11 +102,13 @@ export default function WalletPage() {
           <div className="flex gap-6 mt-5">
             <div>
               <p className="text-white/50 text-xs">Total Earned</p>
-              <p className="text-white font-bold text-sm">+{totalEarned.toFixed(2)} NRT</p>
+              <p className="text-white font-bold text-sm">
+                <NrtAmount value={totalEarned} showSign className="text-white font-bold text-sm" />
+              </p>
             </div>
             <div>
               <p className="text-white/50 text-xs">Withdrawn</p>
-              <p className="text-white font-bold text-sm">-{totalWithdrawn.toFixed(2)} NRT</p>
+              <p className="text-white font-bold text-sm">-<NrtAmount value={totalWithdrawn} hideUnit className="text-white font-bold text-sm" /><span className="ml-1 text-white/70 text-xs font-bold">NRT</span></p>
             </div>
           </div>
         </div>
@@ -246,7 +253,7 @@ export default function WalletPage() {
                 </p>
               </div>
               <p className={`font-bold text-sm shrink-0 ${Number(tx.amount) > 0 ? 'text-emerald-400' : 'text-text-primary'}`}>
-                {Number(tx.amount) > 0 ? '+' : ''}{Number(tx.amount).toFixed(3)} NRT
+                <NrtAmount value={tx.amount} showSign className={`font-bold text-sm ${Number(tx.amount) > 0 ? 'text-emerald-400' : 'text-text-primary'}`} />
               </p>
             </motion.div>
           ))}
@@ -270,8 +277,12 @@ export default function WalletPage() {
                    <ArrowDownToLine size={32} className="text-accent-primary" />}
                 </div>
                 <h3 className="text-3xl font-black text-text-primary">
-                  {receipt.amount > 0 ? '+' : ''}{receipt.amount.toFixed(3)}
-                  <span className="text-sm ml-1 text-text-secondary font-bold">NRT</span>
+                  <NrtAmount
+                    value={receipt.amount}
+                    showSign
+                    className="text-3xl font-black text-text-primary"
+                    unitClassName="text-sm ml-1 text-text-secondary font-bold"
+                  />
                 </h3>
                 <p className="text-xs text-text-secondary font-medium mt-1">
                   ≈ {convertNrt(Math.abs(receipt.amount)).symbol}{convertNrt(Math.abs(receipt.amount)).amount} {selectedCurrency.split(' ')[0]}

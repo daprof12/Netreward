@@ -1,0 +1,99 @@
+/**
+ * formatNrt.ts
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Smart NRT amount formatter that prevents micro-values (e.g. 0.00000000089)
+ * from distorting UI layouts.
+ *
+ * STRATEGY
+ * ─────────
+ * • value ≥ 1 000     → "1,234.56"          (comma-separated, 2 dp)
+ * • value ≥ 1         → "5.00"              (2 dp)
+ * • value ≥ 0.001     → "0.0042"            (4 dp, short enough for UI)
+ * • value ≥ 0.0001    → "0.000089"          (6 dp, still reasonable)
+ * • value < 0.0001    → COMPACT subscript   { prefix:"0.0", zeros:8, sig:"89" }
+ *   rendered as: 0.0₈89  (subscript zero-count, plain suffix)
+ *
+ * The actual stored value is NEVER rounded — only the display is affected.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+export type NrtFormatResult =
+  | { type: 'plain'; text: string }
+  | { type: 'subscript'; prefix: string; zeros: number; suffix: string };
+
+/**
+ * Format a raw NRT amount into a display-safe result.
+ *
+ * @param value   The raw numeric NRT value (or string representation)
+ * @param sign    Whether to prepend '+' for positive values (default: false)
+ */
+export function formatNrt(
+  value: number | string | null | undefined,
+  { showSign = false }: { showSign?: boolean } = {},
+): NrtFormatResult {
+  const num = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
+
+  if (isNaN(num)) return { type: 'plain', text: '0' };
+  if (num === 0)  return { type: 'plain', text: '0' };
+
+  const abs  = Math.abs(num);
+  const sign = num < 0 ? '-' : showSign && num > 0 ? '+' : '';
+
+  // ── Normal range ───────────────────────────────────────────────────────────
+  if (abs >= 1000) {
+    return {
+      type: 'plain',
+      text: sign + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    };
+  }
+  if (abs >= 1) {
+    return { type: 'plain', text: sign + abs.toFixed(2) };
+  }
+  if (abs >= 0.001) {
+    return { type: 'plain', text: sign + abs.toFixed(4) };
+  }
+  if (abs >= 0.0001) {
+    return { type: 'plain', text: sign + abs.toFixed(6) };
+  }
+
+  // ── Compact subscript range (< 0.0001) ─────────────────────────────────────
+  // Use toFixed(20) to avoid scientific notation, then analyse digit positions
+  const raw         = abs.toFixed(20);           // e.g. "0.00000000089000..."
+  const afterDot    = raw.split('.')[1] ?? '';    // e.g. "00000000089000..."
+
+  // Count leading zeros before first non-zero digit
+  let leadingZeros  = 0;
+  for (const ch of afterDot) {
+    if (ch === '0') leadingZeros++;
+    else break;
+  }
+
+  // Extract significant digits (up to 3 non-zero leading digits, strip trailing zeros)
+  const sigStart = leadingZeros;
+  const sigRaw   = afterDot.slice(sigStart).replace(/0+$/, '');
+  const sig      = sigRaw.slice(0, 3) || '0'; // max 3 significant digits shown
+
+  // "0.0" already shows one zero; subscript shows how many MORE zeros follow
+  // e.g. 0.00000000089 → leadingZeros=9 → prefix="0.0", zeros=8, suffix="89"
+  const subscriptZeros = leadingZeros - 1;
+
+  return {
+    type:   'subscript',
+    prefix: sign + '0.0',
+    zeros:  subscriptZeros,
+    suffix: sig,
+  };
+}
+
+/**
+ * Plain-text version — useful for toasts, console logs, input placeholders.
+ * Renders compact form as  "0.0[8]89"  (bracket notation, no real subscript).
+ */
+export function formatNrtText(
+  value: number | string | null | undefined,
+  opts: { showSign?: boolean } = {},
+): string {
+  const r = formatNrt(value, opts);
+  if (r.type === 'plain') return r.text;
+  return `${r.prefix}[${r.zeros}]${r.suffix}`;
+}

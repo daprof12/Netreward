@@ -15,6 +15,22 @@ export interface Referral {
   };
 }
 
+export interface ReferralConfig {
+  bonusNrt: number;
+  condition: 'first_reward' | 'signup_only';
+  minRewardsToUnlock: number;
+  cooldownDays: number;
+  maxReferralsPerUser: number;
+}
+
+const DEFAULT_REFERRAL_CONFIG: ReferralConfig = {
+  bonusNrt: 5,
+  condition: 'first_reward',
+  minRewardsToUnlock: 1,
+  cooldownDays: 0,
+  maxReferralsPerUser: 0,
+};
+
 export function useReferrals() {
   const { user } = useAuthStore();
 
@@ -51,6 +67,27 @@ export function useReferrals() {
     enabled: !!user,
   });
 
+  const { data: referralConfig } = useQuery({
+    queryKey: ['referral_config'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('kv_settings')
+        .select('value')
+        .eq('key', 'referral_config')
+        .single();
+      if (error) return DEFAULT_REFERRAL_CONFIG;
+      try {
+        const parsed = typeof data.value === 'string'
+          ? JSON.parse(data.value)
+          : data.value;
+        return { ...DEFAULT_REFERRAL_CONFIG, ...parsed } as ReferralConfig;
+      } catch {
+        return DEFAULT_REFERRAL_CONFIG;
+      }
+    },
+    staleTime: 1000 * 60 * 5, // cache for 5 min
+  });
+
   const totalReferred = referrals?.length || 0;
   const totalEarned = referrals
     ?.filter(r => r.status === 'active')
@@ -59,6 +96,8 @@ export function useReferrals() {
     ?.filter(r => r.status === 'pending')
     .reduce((sum, r) => sum + Number(r.reward_nrt), 0) || 0;
 
+  const config = referralConfig ?? DEFAULT_REFERRAL_CONFIG;
+
   return {
     referrals: referrals || [],
     referralCode: referralCode || '',
@@ -66,5 +105,9 @@ export function useReferrals() {
     totalReferred,
     totalEarned,
     pendingRewards,
+    bonusNrt: config.bonusNrt,
+    condition: config.condition,
+    maxReferralsPerUser: config.maxReferralsPerUser,
+    cooldownDays: config.cooldownDays,
   };
 }
