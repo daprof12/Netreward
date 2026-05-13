@@ -60,7 +60,6 @@ export default function AdminWithdrawals() {
 
   // Disbursement mode: 'auto' or 'manual'
   const [disbursementMode, setDisbursementMode] = useState('manual');
-  const [opayDeposits, setOpayDeposits] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -146,14 +145,6 @@ export default function AdminWithdrawals() {
         user_email: d.wallets?.users?.email || 'Unknown',
         country: d.wallets?.users?.country || 'Unknown'
       })));
-
-      // Also fetch OPay payments
-      const { data: opayData } = await supabase
-        .from('opay_payments')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(200);
-      setOpayDeposits(opayData || []);
     } catch (e) {
       console.error('Fetch deposits:', e);
     }
@@ -422,18 +413,15 @@ export default function AdminWithdrawals() {
                     <th className="text-left px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-wider">NRT Received</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-wider">Method</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-wider">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-wider">OPay</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-glass-border">
                   {loading ? (
-                    <tr><td colSpan={7} className="text-center py-12 text-text-secondary">Loading purchases...</td></tr>
+                    <tr><td colSpan={6} className="text-center py-12 text-text-secondary">Loading purchases...</td></tr>
                   ) : filteredDeposits.length === 0 ? (
-                    <tr><td colSpan={7} className="text-center py-12 text-text-secondary">No instant purchases found.</td></tr>
+                    <tr><td colSpan={6} className="text-center py-12 text-text-secondary">No instant purchases found.</td></tr>
                   ) : (
                     filteredDeposits.map(dep => {
-                      // Find matching OPay payment if any
-                      const opayMatch = opayDeposits.find(op => dep.description?.includes('OPay') && op.amount_nrt && Math.abs(op.amount_nrt - dep.amount) < 0.01);
                       return (
                         <tr key={dep.id} className="hover:bg-bg-secondary/50 transition-colors">
                           <td className="px-4 py-3 text-text-secondary">{new Date(dep.created_at).toLocaleString()}</td>
@@ -449,13 +437,6 @@ export default function AdminWithdrawals() {
                           <td className="px-4 py-3">
                             {getStatusBadge(dep.status)}
                           </td>
-                          <td className="px-4 py-3">
-                            {opayMatch ? (
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${opayMatch.status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' : opayMatch.status === 'PENDING' || opayMatch.status === 'INITIAL' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>{opayMatch.status}</span>
-                            ) : (
-                              <span className="text-text-secondary/40 text-xs">—</span>
-                            )}
-                          </td>
                         </tr>
                       );
                     })
@@ -463,69 +444,7 @@ export default function AdminWithdrawals() {
                 </tbody>
               </table>
               
-              {/* OPay Payments Table */}
-              {opayDeposits.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-sm font-bold text-text-secondary mb-3 flex items-center gap-2">
-                    <div className="w-5 h-5 rounded bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-[10px] font-black">OP</div>
-                    OPay Payment Records ({opayDeposits.length})
-                  </h3>
-                  <div className="overflow-x-auto rounded-xl border border-glass-border">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-glass-border bg-bg-secondary">
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-text-secondary uppercase">Date</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-text-secondary uppercase">Reference</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-text-secondary uppercase">Fiat</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-text-secondary uppercase">NRT</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-text-secondary uppercase">Status</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-text-secondary uppercase">OPay TxID</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-text-secondary uppercase">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-glass-border">
-                        {opayDeposits.map(op => (
-                          <tr key={op.id} className="hover:bg-bg-secondary/50">
-                            <td className="px-3 py-2 text-xs text-text-secondary">{new Date(op.created_at).toLocaleString()}</td>
-                            <td className="px-3 py-2 text-xs font-mono text-text-primary">{op.reference}</td>
-                            <td className="px-3 py-2 text-xs font-bold">{op.currency} {op.amount_fiat?.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-xs font-bold text-accent-primary">{op.amount_nrt?.toFixed(2)}</td>
-                            <td className="px-3 py-2">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                op.status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' :
-                                op.status === 'FAIL' || op.status === 'CLOSE' ? 'bg-red-500/20 text-red-400' :
-                                'bg-amber-500/20 text-amber-400'
-                              }`}>{op.status}</span>
-                            </td>
-                            <td className="px-3 py-2 text-[10px] font-mono text-text-secondary">{op.opay_transaction_id || '—'}</td>
-                            <td className="px-3 py-2">
-                              {(op.status === 'INITIAL' || op.status === 'PENDING') && (
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      const { data, error } = await supabase.functions.invoke('opay-query-status', {
-                                        body: { reference: op.reference, order_no: op.order_no }
-                                      });
-                                      if (error) throw error;
-                                      showToast(`OPay status: ${data?.opay_response?.data?.status || 'Unknown'}`, 'info');
-                                      fetchDeposits(); // Refresh
-                                    } catch (e: any) {
-                                      showToast(e.message || 'Query failed', 'danger');
-                                    }
-                                  }}
-                                  className="px-2 py-1 bg-accent-primary/10 text-accent-primary text-[10px] font-bold rounded-lg hover:bg-accent-primary/20 transition-colors"
-                                >
-                                  Verify
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+              {/* Removed Duplicate Gateway Tables */}
             </>
           )}
         </div>
