@@ -118,7 +118,7 @@ export default function P2PMarketplace() {
         <div className="flex items-center gap-2 p-3 bg-accent-primary/5 rounded-xl border border-accent-primary/10">
           <TrendingUp size={16} className="text-accent-primary" />
           <p className="text-xs font-medium text-text-primary">
-            NRT Live Price: <span className="font-bold">{symbol}{(NRT_LIVE_PRICE * rate).toLocaleString(undefined, { maximumFractionDigits: 10 })}</span>
+            NRT Live Price: <span className="font-bold">{symbol}{(NRT_LIVE_PRICE * rate).toLocaleString(undefined, { maximumFractionDigits: 7 })}</span>
           </p>
         </div>
       </div>
@@ -168,7 +168,7 @@ export default function P2PMarketplace() {
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-text-secondary font-medium">Price</p>
-                  <p className="text-lg font-black text-text-primary">{symbol}{(offer.price * rate).toLocaleString(undefined, { maximumFractionDigits: 10 })}</p>
+                  <p className="text-lg font-black text-text-primary">{symbol}{(offer.price * rate).toLocaleString(undefined, { maximumFractionDigits: 7 })}</p>
                 </div>
               </div>
 

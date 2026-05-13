@@ -158,11 +158,11 @@ export default function CreateP2POffer() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-text-secondary">Market Price</p>
-                  <p className="text-lg font-bold text-text-primary">${NRT_LIVE_PRICE.toLocaleString(undefined, { maximumFractionDigits: 10 })}</p>
+                  <p className="text-lg font-bold text-text-primary">${NRT_LIVE_PRICE.toLocaleString(undefined, { maximumFractionDigits: 7 })}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-text-secondary">Your Price</p>
-                  <p className="text-lg font-bold text-accent-primary">${calculatedPrice.toLocaleString(undefined, { maximumFractionDigits: 10 })}</p>
+                  <p className="text-lg font-bold text-accent-primary">${calculatedPrice.toLocaleString(undefined, { maximumFractionDigits: 7 })}</p>
                 </div>
               </div>
               <div className="space-y-2">

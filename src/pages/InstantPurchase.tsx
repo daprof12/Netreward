@@ -281,7 +281,7 @@ export default function InstantPurchase() {
             {/* Rate note */}
             <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 text-xs text-amber-400">
               <Zap size={14} />
-              Platform rate: 1 NRT = {symbol}{NRT_RATE.toLocaleString(undefined, { maximumFractionDigits: 10 })} (instant settlement)
+              Platform rate: 1 NRT = {symbol}{NRT_RATE.toLocaleString(undefined, { maximumFractionDigits: 7 })} (instant settlement)
             </div>
 
             {/* Amount */}
@@ -422,7 +422,7 @@ export default function InstantPurchase() {
               {[
                 ['You pay', `${symbol}${amount}`],
                 ['You receive', <NrtAmountInline value={nrt} />],
-                ['Rate', `1 NRT = ${symbol}${NRT_RATE.toLocaleString(undefined, { maximumFractionDigits: 10 })}`],
+                ['Rate', `1 NRT = ${symbol}${NRT_RATE.toLocaleString(undefined, { maximumFractionDigits: 7 })}`],
                 ['Destination', sendOnChain && solanaAddress ? `${solanaAddress.slice(0,6)}...${solanaAddress.slice(-4)} (Solana)` : 'Platform Wallet'],
                 ['Method', selectedGateway?.name || 'Unknown'],
                 ['Fee', selectedGateway?.fees || 'Unknown'],

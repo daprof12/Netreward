@@ -41,8 +41,10 @@ export function formatNrt(
 
   // ── Compact subscript range (< 0.0001) ─────────────────────────────────────
   if (abs > 0 && abs < 0.0001) {
-    // Use toFixed(20) to avoid scientific notation, then analyse digit positions
-    const raw         = abs.toFixed(20).replace(/0+$/, ''); // Strip trailing zeros
+    // Use toFixed(7) to adhere to platform-wide max 7 decimal place rule
+    const raw         = abs.toFixed(7).replace(/0+$/, ''); 
+    if (raw === '0' || raw === '0.') return { type: 'plain', text: sign + '0' };
+
     const afterDot    = raw.split('.')[1] ?? '';
 
     // Count leading zeros before first non-zero digit
@@ -52,7 +54,7 @@ export function formatNrt(
       else break;
     }
 
-    // Extract all significant digits (no truncation)
+    // Extract significant digits (capped by the .toFixed(7) above)
     const sigStart = leadingZeros;
     const sig      = afterDot.slice(sigStart) || '0';
 
@@ -68,10 +70,10 @@ export function formatNrt(
   }
 
   // ── Normal range (≥ 0.0001) ───────────────────────────────────────────────
-  // Show full digits without artificial rounding (up to 20 decimal places)
+  // Show digits capped at 7 decimal places per user request
   const text = abs.toLocaleString(undefined, {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 20,
+    maximumFractionDigits: 7,
   });
 
   return {

@@ -301,7 +301,7 @@ export default function ScanToPay() {
   };
 
   const amountUsd = detectedSession
-    ? (detectedSession.amountNrt * fiatValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 10 })
+    ? (detectedSession.amountNrt * fiatValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 7 })
     : '0.00';
 
   // ── Render ─────────────────────────────────────────────────────

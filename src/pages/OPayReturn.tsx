@@ -77,7 +77,7 @@ export default function OPayReturn() {
     SUCCESS: {
       icon: <CheckCircle2 size={48} className="text-emerald-400" />,
       title: 'Payment Successful!',
-      subtitle: `${paymentData?.amount_nrt?.toLocaleString(undefined, { maximumFractionDigits: 10 }) || '0'} NRT has been credited to your wallet.`,
+      subtitle: `${paymentData?.amount_nrt?.toLocaleString(undefined, { maximumFractionDigits: 7 }) || '0'} NRT has been credited to your wallet.`,
       color: 'from-emerald-500/20 to-green-500/20',
     },
     PENDING: {
@@ -140,7 +140,7 @@ export default function OPayReturn() {
               {[
                 { label: 'Reference', value: paymentData.reference },
                 { label: 'Amount', value: `${paymentData.currency} ${paymentData.amount_fiat?.toLocaleString()}` },
-                { label: 'NRT Amount', value: `${paymentData.amount_nrt?.toLocaleString(undefined, { maximumFractionDigits: 10 })} NRT` },
+                { label: 'NRT Amount', value: `${paymentData.amount_nrt?.toLocaleString(undefined, { maximumFractionDigits: 7 })} NRT` },
                 ...(paymentData.opay_transaction_id ? [{ label: 'OPay ID', value: paymentData.opay_transaction_id }] : []),
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between text-sm">

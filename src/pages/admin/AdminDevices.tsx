@@ -121,8 +121,8 @@ export default function AdminDevices() {
         {[
           { icon: Smartphone, label: 'Total Devices', value: devices.length.toString(), color: '#3B82F6', bg: 'bg-blue-500/10' },
           { icon: Activity, label: 'Active Devices', value: devices.filter(d => d.status === 'active').length.toString(), color: '#10B981', bg: 'bg-emerald-500/10' },
-          { icon: Coins, label: 'Total NRT Earned', value: devices.reduce((s, d) => s + d.nrtEarned, 0).toLocaleString(undefined, { maximumFractionDigits: 10 }), color: '#8b5cf6', bg: 'bg-purple-500/10' },
-          { icon: Zap, label: 'Unclaimed NRT', value: devices.reduce((s, d) => s + d.unclaimedNrt, 0).toLocaleString(undefined, { maximumFractionDigits: 10 }), color: '#F59E0B', bg: 'bg-amber-500/10' },
+          { icon: Coins, label: 'Total NRT Earned', value: devices.reduce((s, d) => s + d.nrtEarned, 0).toLocaleString(undefined, { maximumFractionDigits: 7 }), color: '#8b5cf6', bg: 'bg-purple-500/10' },
+          { icon: Zap, label: 'Unclaimed NRT', value: devices.reduce((s, d) => s + d.unclaimedNrt, 0).toLocaleString(undefined, { maximumFractionDigits: 7 }), color: '#F59E0B', bg: 'bg-amber-500/10' },
         ].map(({ icon: Icon, label, value, color, bg }) => (
           <div key={label} className="glass p-4 rounded-2xl border border-glass-border">
             <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center mb-2`}>
@@ -191,9 +191,9 @@ export default function AdminDevices() {
                   </td>
                   <td className="px-6 py-4 text-text-secondary font-medium">{d.duration}</td>
                   <td className="px-6 py-4 text-center font-bold text-text-primary">{d.dataUsedGb.toFixed(2)}</td>
-                  <td className="px-6 py-4 text-center font-black text-accent-primary">{d.nrtEarned.toLocaleString(undefined, { maximumFractionDigits: 10 })}</td>
-                  <td className="px-6 py-4 text-center font-bold text-green-500">{d.claimedNrt.toLocaleString(undefined, { maximumFractionDigits: 10 })}</td>
-                  <td className="px-6 py-4 text-center font-bold text-amber-500">{d.unclaimedNrt.toLocaleString(undefined, { maximumFractionDigits: 10 })}</td>
+                  <td className="px-6 py-4 text-center font-black text-accent-primary">{d.nrtEarned.toLocaleString(undefined, { maximumFractionDigits: 7 })}</td>
+                  <td className="px-6 py-4 text-center font-bold text-green-500">{d.claimedNrt.toLocaleString(undefined, { maximumFractionDigits: 7 })}</td>
+                  <td className="px-6 py-4 text-center font-bold text-amber-500">{d.unclaimedNrt.toLocaleString(undefined, { maximumFractionDigits: 7 })}</td>
                   <td className="px-6 py-4 text-center">
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${d.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                       {d.status}

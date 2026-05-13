@@ -325,7 +325,7 @@ export default function P2PFlow() {
                   <p className="text-xs text-text-secondary">NetReward Token</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-text-primary">${currentPrice.toLocaleString(undefined, { maximumFractionDigits: 10 })}</p>
+                  <p className="font-bold text-text-primary">${currentPrice.toLocaleString(undefined, { maximumFractionDigits: 7 })}</p>
                   <p className="text-xs text-emerald-400">+2.4% 24h</p>
                 </div>
               </motion.div>
@@ -382,7 +382,7 @@ export default function P2PFlow() {
                     {isSelling ? `$${usdAmountDisplay}` : `${nrtAmountDisplay}`} 
                     <span className="text-sm text-text-secondary font-normal ml-1">{isSelling ? LOCAL_CURRENCY : 'NRT'}</span>
                   </p>
-                  <p className="text-xs text-text-secondary mt-0.5">Rate: 1 NRT = ${currentPrice.toLocaleString(undefined, { maximumFractionDigits: 10 })} · <span className="text-emerald-400 font-semibold">0 Fee</span></p>
+                  <p className="text-xs text-text-secondary mt-0.5">Rate: 1 NRT = ${currentPrice.toLocaleString(undefined, { maximumFractionDigits: 7 })} · <span className="text-emerald-400 font-semibold">0 Fee</span></p>
                 </div>
               </div>
 
