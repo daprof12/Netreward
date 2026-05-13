@@ -126,7 +126,7 @@ export default function DeviceDetail() {
         </div>
         <div className="glass rounded-xl p-3 border border-glass-border text-center">
           <p className="text-xs text-text-secondary">NRT Earned</p>
-          <p className="text-lg font-bold text-accent-primary">{totalNrt.toFixed(2)} NRT</p>
+          <p className="text-lg font-bold text-accent-primary"><NrtAmount value={totalNrt} /></p>
         </div>
       </div>
 
@@ -407,7 +407,7 @@ export default function DeviceDetail() {
                   </div>
                   <div>
                     <p className="text-[10px] text-text-secondary uppercase tracking-wider">Earned</p>
-                    <p className="text-sm font-bold text-accent-primary">{Number(app.nrt_earned).toFixed(3)} NRT</p>
+                    <p className="text-sm font-bold text-accent-primary"><NrtAmount value={app.nrt_earned} /></p>
                   </div>
                 </div>
                 <motion.button

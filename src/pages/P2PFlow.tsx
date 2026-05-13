@@ -79,8 +79,8 @@ export default function P2PFlow() {
   // If selling, 'amount' is NRT. If buying, 'amount' is USD.
   const nrtValue = isSelling ? parseFloat(amount || '0') : parseFloat(amount || '0') / currentPrice;
   const usdValue = isSelling ? parseFloat(amount || '0') * currentPrice : parseFloat(amount || '0');
-  const nrtAmountDisplay = nrtValue.toFixed(2);
-  const usdAmountDisplay = usdValue.toFixed(2);
+  const nrtAmountDisplay = nrtValue;
+  const usdAmountDisplay = usdValue;
 
   const { mins, secs, remaining } = useCountdown(15 * 60, step === 'pay-seller');
   const { mins: releaseMins, secs: releaseSecs, remaining: releaseRemaining } = useCountdown(15 * 60, step === 'awaiting-release');

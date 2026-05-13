@@ -120,7 +120,7 @@ export default function InstantPurchase() {
     }
   }, [publicKey]);
 
-  const nrt = amount ? (parseFloat(amount) / NRT_RATE).toFixed(2) : '0.00';
+  const nrt = amount ? (parseFloat(amount) / NRT_RATE) : 0;
   const selectedGateway = availableGateways.find(g => g.id === method) || availableGateways[0];
 
   const handleConfirm = async () => {
@@ -300,7 +300,7 @@ export default function InstantPurchase() {
               </div>
               <div className="border-t border-glass-border/50 pt-3">
                 <label className="text-xs text-text-secondary font-medium">You receive (NRT)</label>
-                <p className="text-2xl font-bold text-accent-primary mt-1">{nrt} <span className="text-sm text-text-secondary font-normal">NRT</span></p>
+                <p className="text-2xl font-bold text-accent-primary mt-1"><NrtAmount value={nrt} /></p>
               </div>
             </div>
 
@@ -420,7 +420,7 @@ export default function InstantPurchase() {
             <div className="glass rounded-xl border border-glass-border p-4 space-y-3 text-sm">
               {[
                 ['You pay', `${symbol}${amount}`],
-                ['You receive', `${nrt} NRT`],
+                ['You receive', <NrtAmountInline value={nrt} />],
                 ['Rate', `1 NRT = ${symbol}${NRT_RATE.toFixed(4)}`],
                 ['Destination', sendOnChain && solanaAddress ? `${solanaAddress.slice(0,6)}...${solanaAddress.slice(-4)} (Solana)` : 'Platform Wallet'],
                 ['Method', selectedGateway?.name || 'Unknown'],
@@ -502,7 +502,7 @@ export default function InstantPurchase() {
             </motion.div>
             <div className="space-y-2">
               <h2 className="text-2xl font-bold">Purchase Complete!</h2>
-              <p className="text-4xl font-black text-accent-primary">{nrt} <span className="text-lg">NRT</span></p>
+              <NrtAmount value={nrt} className="text-4xl font-black text-accent-primary" unitClassName="text-lg ml-1 font-normal" />
               {txSignature ? (
                 <>
                   <p className="text-sm text-text-secondary">Tokens sent to your Solana wallet</p>

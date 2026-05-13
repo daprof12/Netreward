@@ -102,7 +102,7 @@ export default function UserHome() {
     try {
       const result: any = await claimRewards();
       if (result?.success) {
-        showToast(`Successfully claimed ${result.net_amount.toFixed(2)} NRT (Tax: ${result.tax_amount.toFixed(2)} ${result.tax_label})`, 'success');
+        showToast(`Successfully claimed $<NrtAmount value={result.net_amount} /> (Tax: ${result.tax_amount.toFixed(2)} ${result.tax_label})`, 'success');
       } else {
         showToast(result?.message || 'Failed to claim rewards', 'danger');
       }

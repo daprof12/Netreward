@@ -246,9 +246,9 @@ export default function AdminDevices() {
                 {/* NRT Stats */}
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { label: 'Total Earned', value: `${selectedDevice.nrtEarned.toFixed(2)} NRT`, color: 'text-accent-primary' },
-                    { label: 'Claimed', value: `${selectedDevice.claimedNrt.toFixed(2)} NRT`, color: 'text-green-500' },
-                    { label: 'Unclaimed', value: `${selectedDevice.unclaimedNrt.toFixed(2)} NRT`, color: 'text-amber-500' },
+                    { label: 'Total Earned', value: `$<NrtAmount value={selectedDevice.nrtEarned} />`, color: 'text-accent-primary' },
+                    { label: 'Claimed', value: `$<NrtAmount value={selectedDevice.claimedNrt} />`, color: 'text-green-500' },
+                    { label: 'Unclaimed', value: `$<NrtAmount value={selectedDevice.unclaimedNrt} />`, color: 'text-amber-500' },
                   ].map(({ label, value, color }) => (
                     <div key={label} className="glass rounded-xl p-3 border border-glass-border text-center">
                       <p className="text-[10px] text-text-secondary uppercase tracking-wider">{label}</p>
@@ -265,7 +265,7 @@ export default function AdminDevices() {
                       <div key={idx} className="glass rounded-xl border border-glass-border p-4 space-y-2">
                         <div className="flex justify-between items-center text-sm mb-2">
                           <span className="font-bold text-text-primary text-base">{ae.campaignName}</span>
-                          <span className="font-bold text-accent-primary bg-accent-primary/10 px-2 py-1 rounded-lg">+{ae.nrtEarned.toFixed(2)} NRT</span>
+                          <span className="font-bold text-accent-primary bg-accent-primary/10 px-2 py-1 rounded-lg">+<NrtAmount value={ae.nrtEarned} /></span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-text-secondary">Service</span>
@@ -297,7 +297,7 @@ export default function AdminDevices() {
                             <p className="text-xs text-text-secondary">{pe.serviceName} · {pe.period}</p>
                           </div>
                         </div>
-                        <span className="font-black text-green-500">+{pe.nrt.toFixed(2)} NRT</span>
+                        <span className="font-black text-green-500">+<NrtAmount value={pe.nrt} /></span>
                       </div>
                     )) : (
                       <p className="text-sm text-text-secondary">No past earnings recorded.</p>

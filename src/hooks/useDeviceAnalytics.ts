@@ -59,7 +59,7 @@ export function useUserDeviceStats(timeFilter: TimeFilter) {
         chartData,
         summary: {
           totalData: `${totalData.toFixed(2)} GB`,
-          totalNrt: `${totalNrt.toFixed(2)} NRT`
+          totalNrt: `$<NrtAmount value={totalNrt} />`
         }
       };
     },

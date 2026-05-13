@@ -335,7 +335,7 @@ export default function AdminUsers() {
                         { label: 'Primary Email', value: viewUser.email },
                         { label: 'Region/Country', value: viewUser.country },
                         { label: 'KYC Status', value: viewUser.kyc_status.toUpperCase() },
-                        { label: 'Total Referral Bonus', value: `${viewUser.referral_bonus.toFixed(2)} NRT` },
+                        { label: 'Total Referral Bonus', value: `$<NrtAmount value={viewUser.referral_bonus} />` },
                       ].map((item, i) => (
                         <div key={item.label} className={`flex items-center justify-between p-3.5 ${i !== 6 ? 'border-b border-glass-border' : ''}`}>
                           <span className="text-[10px] font-black text-text-secondary uppercase">{item.label}</span>

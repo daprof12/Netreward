@@ -471,7 +471,7 @@ function CampaignAnalyticsModal({ campaign, onClose }: { campaign: SpCampaign; o
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-accent-primary text-sm">+{u.nrt_earned.toFixed(2)} NRT</p>
+                    <p className="font-semibold text-accent-primary text-sm">+<NrtAmount value={u.nrt_earned} /></p>
                     <p className="text-[10px] text-green-500 uppercase font-bold tracking-wider">{u.status}</p>
                   </div>
                 </div>

@@ -298,7 +298,7 @@ export default function PaymentAuthorize() {
                     <span className="text-sm text-text-secondary">Amount Due</span>
                     <div className="text-right">
                       <p className="text-2xl font-black text-text-primary">
-                        {session.amountNrt.toFixed(4)} NRT
+                        <NrtAmount value={session.amountNrt} />
                       </p>
                       {fiat && (
                         <p className="text-xs text-text-secondary">≈ {fiat.symbol}{fiat.amount}</p>
@@ -309,7 +309,7 @@ export default function PaymentAuthorize() {
                   <div className="border-t border-glass-border pt-3 flex justify-between items-center">
                     <span className="text-xs text-text-secondary">Your Balance</span>
                     <span className={`text-sm font-bold ${insufficientBalance ? 'text-red-400' : 'text-emerald-400'}`}>
-                      {balanceNRT.toFixed(4)} NRT
+                      <NrtAmount value={balanceNRT} />
                     </span>
                   </div>
                 </div>
@@ -421,7 +421,7 @@ export default function PaymentAuthorize() {
               <div className="space-y-1">
                 <h2 className="text-2xl font-bold">Payment Sent!</h2>
                 <p className="text-text-secondary text-sm">
-                  You paid <span className="font-bold text-text-primary">{session.amountNrt.toFixed(4)} NRT</span>{' '}
+                  You paid <span className="font-bold text-text-primary"><NrtAmount value={session.amountNrt} /></span>{' '}
                   to {session.merchantName}
                 </p>
               </div>

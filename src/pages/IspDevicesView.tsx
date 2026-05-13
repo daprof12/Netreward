@@ -88,8 +88,8 @@ export default function IspDevicesView() {
     return {
       devices: filteredDevices.length,
       dataGB: totalDataGB.toFixed(2),
-      nrt: totalNrt.toFixed(2),
-      cashback: (totalNrt * 0.05).toFixed(2) // 5% of user earnings roughly
+      nrt: totalNrt,
+      cashback: totalNrt * 0.05 // 5% of user earnings roughly
     };
   }, [filteredDevices]);
 

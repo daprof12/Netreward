@@ -514,14 +514,14 @@ export default function ScanToPay() {
                 <div className="flex justify-between items-end">
                   <span className="text-sm text-text-secondary">Amount Due</span>
                   <div className="text-right">
-                    <span className="text-2xl font-black text-text-primary">{detectedSession.amountNrt.toFixed(2)} NRT</span>
+                    <span className="text-2xl font-black text-text-primary"><NrtAmount value={detectedSession.amountNrt} /></span>
                     <p className="text-xs text-text-secondary">≈ ${amountUsd} USD</p>
                   </div>
                 </div>
                 <div className="flex justify-between items-center pt-1 border-t border-glass-border mt-2">
                   <span className="text-xs text-text-secondary">Your Balance</span>
                   <span className={`text-sm font-bold ${balanceNRT < detectedSession.amountNrt ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {balanceNRT.toFixed(2)} NRT
+                    <NrtAmount value={balanceNRT} />
                   </span>
                 </div>
               </div>
@@ -611,7 +611,7 @@ export default function ScanToPay() {
             <div className="space-y-2">
               <h2 className="text-2xl font-bold">Payment Successful!</h2>
               <p className="text-sm text-text-secondary">
-                You paid <span className="font-bold text-text-primary">{detectedSession.amountNrt.toFixed(2)} NRT</span> to {detectedSession.merchantName}.
+                You paid <span className="font-bold text-text-primary"><NrtAmount value={detectedSession.amountNrt} /></span> to {detectedSession.merchantName}.
               </p>
             </div>
             <div className="w-full pt-4 space-y-3">

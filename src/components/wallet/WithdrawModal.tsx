@@ -114,7 +114,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                 <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                   <div className="text-center">
                     <p className="text-sm text-text-secondary mb-1">Available Balance</p>
-                    <p className="text-3xl font-black text-text-primary">{availableBalance.toFixed(2)} NRT</p>
+                    <p className="text-3xl font-black text-text-primary"><NrtAmount value={availableBalance} /></p>
                   </div>
                   
                   <div>

@@ -66,7 +66,7 @@ export default function SpDevicesView() {
     return {
       devices: filteredDevices.length,
       dataGB: totalDataGB.toFixed(2),
-      nrt: totalNrt.toFixed(2),
+      nrt: totalNrt,
       cashback: (totalNrt * 0.10).toFixed(2) // 10% of user earnings for SP
     };
   }, [filteredDevices]);

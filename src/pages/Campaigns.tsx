@@ -170,7 +170,7 @@ export default function Campaigns() {
     try {
       const res = await claimRewards();
       if (res?.success) {
-        showToast(`Successfully claimed ${res.net_amount.toFixed(3)} NRT!`, 'success');
+        showToast(`Successfully claimed $<NrtAmount value={res.net_amount} />!`, 'success');
         setEarningCampaign(null);
       } else {
         showToast(res?.message || 'Failed to claim rewards', 'warning');
@@ -439,7 +439,7 @@ export default function Campaigns() {
                 <div className="flex justify-between items-center mb-6">
                   <p className="text-sm font-medium text-text-secondary">Reward Range</p>
                   <span className="text-xs text-accent-primary font-bold">
-                    {currentMin.toFixed(2)} – {currentMax.toFixed(2)} NRT/GB
+                    {currentMin.toFixed(2)} – <NrtAmount value={currentMax} />/GB
                   </span>
                 </div>
                 <div className="relative h-2 mx-2">
@@ -648,7 +648,7 @@ export default function Campaigns() {
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-text-secondary uppercase tracking-wider">NRT Earned</p>
-                        <p className="font-bold text-accent-primary">{nrtEarned.toFixed(3)} NRT</p>
+                        <p className="font-bold text-accent-primary"><NrtAmount value={nrtEarned} /></p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-text-secondary uppercase tracking-wider">Rate</p>

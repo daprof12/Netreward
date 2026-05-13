@@ -505,7 +505,7 @@ export default function SpDashboard() {
               type={chartType}
               color={chartView === 'campaigns' ? '#3B82F6' : chartView === 'checkout' ? '#10B981' : '#8B5CF6'}
               yAxisFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val.toString()}
-              tooltipFormatter={(val) => chartView === 'campaigns' ? `${val} Users` : `${val.toFixed(2)} NRT`}
+              tooltipFormatter={(val) => chartView === 'campaigns' ? `${val} Users` : `$<NrtAmount value={val} />`}
             />
           )}
         </div>
