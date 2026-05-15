@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Play, Pause, Square, Trash2, X, ChevronRight, Edit, 
-  Users, Smartphone, Laptop, Network, Loader2, TrendingUp 
+  Users, Smartphone, Laptop, Network, Loader2, TrendingUp, Search, Filter 
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useIspStore, type IspCampaign } from '@/stores/useIspStore';
@@ -35,6 +35,21 @@ export default function IspCampaignsView() {
   // Management state
   const [managingCampaign, setManagingCampaign] = useState<IspCampaign | null>(null);
   const [viewingCampaignDetails, setViewingCampaignDetails] = useState<IspCampaign | null>(null);
+
+  // Search & filter state for campaigns tab
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all');
+
+  const filteredCampaigns = campaigns.filter(campaign => {
+    const network = networks.find(n => n.id === campaign.networkId);
+    const q = campaignSearch.toLowerCase();
+    const matchesSearch = !q || 
+      campaign.name.toLowerCase().includes(q) ||
+      (network?.name || '').toLowerCase().includes(q) ||
+      (campaign.country || '').toLowerCase().includes(q);
+    const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const handleDeleteNetwork = (id: string) => {
     if (confirm('Are you sure you want to delete this network? All associated campaigns will be stopped.')) {
@@ -159,12 +174,54 @@ export default function IspCampaignsView() {
       {/* Campaigns List */}
       {activeTab === 'campaigns' && (
         <div className="space-y-4">
+          {/* Search & Filter Bar */}
+          {campaigns.length > 0 && (
+            <div className="space-y-3">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+                <input
+                  type="text"
+                  placeholder="Search by name, network, or country..."
+                  value={campaignSearch}
+                  onChange={e => setCampaignSearch(e.target.value)}
+                  className="w-full bg-bg-secondary border border-glass-border rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary transition-colors"
+                />
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {(['all', 'active', 'paused', 'completed'] as const).map(s => {
+                  const count = s === 'all' ? campaigns.length : campaigns.filter(c => c.status === s).length;
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => setStatusFilter(s)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-all ${
+                        statusFilter === s
+                          ? 'bg-accent-primary text-primary-foreground shadow-sm'
+                          : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      {s === 'active' && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
+                      {s === 'paused' && <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />}
+                      {s === 'completed' && <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />}
+                      {s} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {campaigns.length === 0 ? (
             <div className="text-center py-10 text-text-secondary text-sm">
               No campaigns found. Click the + icon to create one.
             </div>
+          ) : filteredCampaigns.length === 0 ? (
+            <div className="text-center py-10 text-text-secondary text-sm">
+              <Filter size={20} className="mx-auto mb-2 opacity-50" />
+              No campaigns match your search or filter.
+            </div>
           ) : (
-            campaigns.map(campaign => {
+            filteredCampaigns.map(campaign => {
               const network = networks.find(n => n.id === campaign.networkId);
               const budgetPct = Math.min((campaign.spentNrt / campaign.budgetNrt) * 100, 100);
 
