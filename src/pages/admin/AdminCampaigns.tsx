@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Play, Pause, Trash2, Target, Activity, Coins, RefreshCw, Loader2 } from 'lucide-react';
+import { Search, Play, Pause, Square, Trash2, Target, Activity, Coins, RefreshCw, Loader2 } from 'lucide-react';
 import { useToastStore } from '@/stores/useToastStore';
 import { adminCampaignApi } from '@/lib/adminApi';
 import MapSelectionModal from '@/components/MapSelectionModal';
@@ -57,12 +57,31 @@ export default function AdminCampaigns() {
     }
   };
 
+  const handleStop = async (id: string) => {
+    const campaign = campaigns.find(c => c.id === id);
+    const unspent = campaign ? (campaign.total_budget || 0) - (campaign.budget_spent || 0) : 0;
+    if (!confirm(`Stop this campaign? ${unspent > 0 ? `${unspent.toLocaleString()} NRT will be refunded to the owner.` : 'No unspent NRT to refund.'}`)) return;
+    try {
+      const data = await adminCampaignApi.stopCampaign(id);
+      setCampaigns(prev => prev.map(c => c.id === id ? { ...c, status: 'completed' } : c));
+      showToast(`Campaign stopped. ${data?.refunded_amount || 0} NRT refunded to owner.`, 'success');
+    } catch (e: any) { 
+      showToast(e.message || 'Stop failed', 'error'); 
+    }
+  };
+
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this campaign?')) return;
+    const campaign = campaigns.find(c => c.id === id);
+    const isActive = campaign && campaign.status !== 'completed' && campaign.status !== 'canceled';
+    const unspent = campaign ? (campaign.total_budget || 0) - (campaign.budget_spent || 0) : 0;
+    const msg = isActive && unspent > 0
+      ? `Delete this campaign? ${unspent.toLocaleString()} NRT unspent budget will be refunded to the owner.`
+      : 'Are you sure you want to delete this campaign?';
+    if (!confirm(msg)) return;
     try {
       await adminCampaignApi.deleteCampaign(id);
       setCampaigns(prev => prev.filter(c => c.id !== id));
-      showToast('Campaign deleted.', 'success');
+      showToast('Campaign deleted. Unspent NRT refunded.', 'success');
     } catch (e: any) { 
       showToast(e.message || 'Delete failed', 'error'); 
     }
@@ -173,11 +192,14 @@ export default function AdminCampaigns() {
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
                       {c.status === 'active' ? (
-                        <button onClick={() => updateStatus(c.id, 'paused')} className="p-1.5 text-text-secondary hover:text-amber-500 bg-bg-secondary rounded-lg"><Pause size={14} /></button>
-                      ) : (
-                        <button onClick={() => updateStatus(c.id, 'active')} className="p-1.5 text-text-secondary hover:text-green-500 bg-bg-secondary rounded-lg"><Play size={14} /></button>
+                        <button onClick={() => updateStatus(c.id, 'paused')} className="p-1.5 text-text-secondary hover:text-amber-500 bg-bg-secondary rounded-lg" title="Pause"><Pause size={14} /></button>
+                      ) : c.status !== 'completed' && c.status !== 'canceled' ? (
+                        <button onClick={() => updateStatus(c.id, 'active')} className="p-1.5 text-text-secondary hover:text-green-500 bg-bg-secondary rounded-lg" title="Resume"><Play size={14} /></button>
+                      ) : null}
+                      {c.status !== 'completed' && c.status !== 'canceled' && (
+                        <button onClick={() => handleStop(c.id)} className="p-1.5 text-text-secondary hover:text-red-500 bg-bg-secondary rounded-lg" title="Stop & Refund"><Square size={14} /></button>
                       )}
-                      <button onClick={() => handleDelete(c.id)} className="p-1.5 text-text-secondary hover:text-destructive bg-bg-secondary rounded-lg"><Trash2 size={14} /></button>
+                      <button onClick={() => handleDelete(c.id)} className="p-1.5 text-text-secondary hover:text-destructive bg-bg-secondary rounded-lg" title="Delete"><Trash2 size={14} /></button>
                     </div>
                   </td>
                 </tr>

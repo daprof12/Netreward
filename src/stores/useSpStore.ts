@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/lib/supabase';
+import { useWalletStore } from './useWalletStore';
 
 export interface TargetLocation {
   id?: string;
@@ -74,6 +75,7 @@ interface SpStore {
   // Campaign actions
   addCampaign: (campaign: Omit<SpCampaign, 'id' | 'createdAt' | 'status' | 'spentNrt'>) => Promise<SpCampaign>;
   updateCampaign: (id: string, updates: Partial<SpCampaign>) => Promise<void>;
+  stopCampaign: (id: string) => Promise<{ refundedAmount: number }>;
   deleteCampaign: (id: string) => Promise<void>;
  
   // Checkout
@@ -268,11 +270,30 @@ export const useSpStore = create<SpStore>()(
       updateCampaign: async (id, updates) => {
         set({ isLoading: true, error: null });
         try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('Not authenticated');
+
+          // If budget is changing, use the atomic RPC
+          if (updates.budgetNrt !== undefined) {
+            const currentCampaign = get().campaigns.find(c => c.id === id);
+            if (currentCampaign && updates.budgetNrt !== currentCampaign.budgetNrt) {
+              const { data, error: rpcError } = await supabase.rpc('adjust_campaign_budget', {
+                p_campaign_id: id,
+                p_user_id: user.id,
+                p_new_budget: updates.budgetNrt
+              });
+              if (rpcError) throw rpcError;
+              if (data?.status === 'error') throw new Error(data.message);
+              // Refresh wallet balance after budget adjustment
+              await useWalletStore.getState().fetchBalance(user.id);
+            }
+          }
+
+          // Update non-budget fields via direct update
           const dbUpdates: any = {};
           if (updates.name !== undefined) dbUpdates.title = updates.name;
           if (updates.status !== undefined) dbUpdates.status = updates.status;
           if (updates.spentNrt !== undefined) dbUpdates.budget_spent = updates.spentNrt;
-          if (updates.budgetNrt !== undefined) dbUpdates.total_budget = updates.budgetNrt;
           if (updates.rewardRate !== undefined) dbUpdates.reward_rate_per_gb = updates.rewardRate;
           if (updates.startDate !== undefined) dbUpdates.start_date = updates.startDate;
           if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate;
@@ -280,8 +301,11 @@ export const useSpStore = create<SpStore>()(
           if (updates.country !== undefined) dbUpdates.country = updates.country;
           if (updates.targetLocation !== undefined) dbUpdates.target_locations = updates.targetLocation;
           
-          const { error } = await supabase.from('campaigns').update(dbUpdates).eq('id', id);
-          if (error) throw error;
+          // Only run direct update if there are non-budget fields to update
+          if (Object.keys(dbUpdates).length > 0) {
+            const { error } = await supabase.from('campaigns').update(dbUpdates).eq('id', id);
+            if (error) throw error;
+          }
           
           set((state) => ({
             campaigns: state.campaigns.map(c => c.id === id ? { ...c, ...updates } : c),
@@ -292,12 +316,58 @@ export const useSpStore = create<SpStore>()(
           throw err;
         }
       },
+
+      stopCampaign: async (id) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('Not authenticated');
+
+          const { data, error } = await supabase.rpc('stop_campaign_with_refund', {
+            p_campaign_id: id,
+            p_user_id: user.id
+          });
+          if (error) throw error;
+          if (data?.status === 'error') throw new Error(data.message);
+
+          // Refresh wallet balance after refund
+          await useWalletStore.getState().fetchBalance(user.id);
+
+          set((state) => ({
+            campaigns: state.campaigns.map(c => c.id === id ? { ...c, status: 'completed' as const } : c),
+            isLoading: false
+          }));
+
+          return { refundedAmount: data?.refunded_amount || 0 };
+        } catch (err: any) {
+          set({ error: err.message, isLoading: false });
+          throw err;
+        }
+      },
       
       deleteCampaign: async (id) => {
         set({ isLoading: true, error: null });
         try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('Not authenticated');
+
+          // Refund remaining balance before deleting
+          const campaign = get().campaigns.find(c => c.id === id);
+          if (campaign && campaign.status !== 'completed' && campaign.status !== 'canceled') {
+            const { data, error: rpcError } = await supabase.rpc('cancel_campaign_with_refund', {
+              p_campaign_id: id,
+              p_user_id: user.id
+            });
+            if (rpcError) throw rpcError;
+            if (data?.status === 'error') throw new Error(data.message);
+          }
+
           const { error } = await supabase.from('campaigns').delete().eq('id', id);
           if (error) throw error;
+
+          // Refresh wallet balance after refund
+          await useWalletStore.getState().fetchBalance(user.id);
+
           set((state) => ({ campaigns: state.campaigns.filter(c => c.id !== id), isLoading: false }));
         } catch (err: any) {
           set({ error: err.message, isLoading: false });

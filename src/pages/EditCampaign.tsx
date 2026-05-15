@@ -35,6 +35,7 @@ export default function EditCampaign() {
   const [endDate, setEndDate] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
   const [initialBudget, setInitialBudget] = useState(0);
+  const [spentNrt, setSpentNrt] = useState(0);
 
   useEffect(() => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -44,6 +45,7 @@ export default function EditCampaign() {
       setTargetLocations(campaign.targetLocation || []);
       setBudgetNrt(campaign.budgetNrt);
       setInitialBudget(campaign.budgetNrt);
+      setSpentNrt(campaign.spentNrt || 0);
       setStartDate(campaign.startDate ? campaign.startDate.split('T')[0] : '');
       setEndDate(campaign.endDate ? campaign.endDate.split('T')[0] : '');
       setIsRecurring(campaign.isRecurring);
@@ -66,7 +68,8 @@ export default function EditCampaign() {
 
   // For editing, we check if the ADDITIONAL budget is within balance
   const additionalBudgetNeeded = (typeof budgetNrt === 'number' ? budgetNrt : 0) - initialBudget;
-  const isBudgetValid = budgetNrt && typeof budgetNrt === 'number' && (additionalBudgetNeeded <= 0 || additionalBudgetNeeded <= balanceNRT) && budgetNrt > 0;
+  const isBelowSpent = typeof budgetNrt === 'number' && budgetNrt < spentNrt;
+  const isBudgetValid = budgetNrt && typeof budgetNrt === 'number' && !isBelowSpent && (additionalBudgetNeeded <= 0 || additionalBudgetNeeded <= balanceNRT) && budgetNrt > 0;
   const canSave = serviceId && name.trim() && targetLocations.length > 0 && isBudgetValid && startDate && endDate;
 
   const handleSave = async () => {
@@ -225,6 +228,17 @@ export default function EditCampaign() {
             </div>
             {additionalBudgetNeeded > balanceNRT && (
               <p className="text-[10px] text-destructive mt-1 font-bold">Insufficient NRT balance for increase</p>
+            )}
+            {isBelowSpent && (
+              <p className="text-[10px] text-destructive mt-1 font-bold">Cannot set budget below already spent amount ({spentNrt.toLocaleString()} NRT)</p>
+            )}
+            {typeof budgetNrt === 'number' && budgetNrt !== initialBudget && !isBelowSpent && (
+              <p className={`text-[10px] mt-1 font-bold ${additionalBudgetNeeded > 0 ? 'text-amber-500' : 'text-green-500'}`}>
+                {additionalBudgetNeeded > 0 
+                  ? `⬆ ${additionalBudgetNeeded.toLocaleString()} NRT will be additionally escrowed from your wallet`
+                  : `⬇ ${Math.abs(additionalBudgetNeeded).toLocaleString()} NRT will be refunded to your wallet`
+                }
+              </p>
             )}
             <p className="text-[10px] text-text-secondary mt-2 flex items-center gap-1">
               <Calculator size={12} /> Rate: ~1 NRT per {settings.gbPerNrt}GB Data 

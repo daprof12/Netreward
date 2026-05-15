@@ -22,7 +22,7 @@ import {
 
 export default function SpCampaignsView() {
   usePageTitle('SP Campaigns');
-  const { services, campaigns, updateCampaign, deleteCampaign, deleteService } = useSpStore();
+  const { services, campaigns, updateCampaign, stopCampaign, deleteCampaign, deleteService } = useSpStore();
   const { showToast } = useToastStore();
 
   const location = useLocation();
@@ -43,11 +43,18 @@ export default function SpCampaignsView() {
     }
   };
 
-  const handleCampaignAction = (id: string, action: 'pause' | 'resume' | 'stop') => {
+  const handleCampaignAction = async (id: string, action: 'pause' | 'resume' | 'stop') => {
     if (action === 'stop') {
-      if (confirm('Are you sure you want to stop this campaign? All active users will automatically claim their earned rewards.')) {
-        updateCampaign(id, { status: 'completed' });
-        showToast('Campaign stopped. All active users automatically claimed rewards.', 'success');
+      if (confirm('Are you sure you want to stop this campaign? Unspent NRT will be refunded and earned rewards auto-claimed.')) {
+        try {
+          const result = await stopCampaign(id);
+          const refundMsg = result.refundedAmount > 0
+            ? ` ${result.refundedAmount.toLocaleString()} NRT refunded to your wallet.`
+            : '';
+          showToast(`Campaign stopped.${refundMsg} Earned rewards auto-claimed.`, 'success');
+        } catch (e: any) {
+          showToast(e.message || 'Error stopping campaign', 'danger');
+        }
         setManagingCampaign(null);
       }
     } else if (action === 'pause') {
@@ -59,10 +66,19 @@ export default function SpCampaignsView() {
     }
   };
 
-  const handleDeleteCampaign = (id: string) => {
-    if (confirm('Are you sure you want to delete this campaign?')) {
-      deleteCampaign(id);
-      showToast('Campaign deleted.', 'success');
+  const handleDeleteCampaign = async (id: string) => {
+    const campaign = campaigns.find(c => c.id === id);
+    const hasUnspent = campaign && campaign.budgetNrt > campaign.spentNrt && campaign.status !== 'completed';
+    const msg = hasUnspent
+      ? `Delete this campaign? ${(campaign.budgetNrt - campaign.spentNrt).toLocaleString()} NRT unspent budget will be refunded.`
+      : 'Are you sure you want to delete this campaign?';
+    if (confirm(msg)) {
+      try {
+        await deleteCampaign(id);
+        showToast('Campaign deleted. Unspent NRT refunded.', 'success');
+      } catch (e: any) {
+        showToast(e.message || 'Error deleting campaign', 'danger');
+      }
       setManagingCampaign(null);
     }
   };

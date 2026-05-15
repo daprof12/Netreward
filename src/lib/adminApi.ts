@@ -186,7 +186,50 @@ export const adminCampaignApi = {
     if (error) throw error;
   },
 
+  async stopCampaign(id: string) {
+    // Fetch campaign to find the owner
+    const { data: campaign, error: fetchError } = await supabase
+      .from('campaigns')
+      .select('sp_id, isp_id, sp_profiles!sp_id(user_id), isp_profiles!isp_id(user_id)')
+      .eq('id', id)
+      .single();
+    if (fetchError) throw fetchError;
+
+    const ownerId = (campaign.sp_profiles as any)?.user_id || (campaign.isp_profiles as any)?.user_id;
+    if (!ownerId) throw new Error('Could not determine campaign owner');
+
+    const { data, error } = await supabase.rpc('stop_campaign_with_refund', {
+      p_campaign_id: id,
+      p_user_id: ownerId
+    });
+    if (error) throw error;
+    if (data?.status === 'error') throw new Error(data.message);
+    return data;
+  },
+
   async deleteCampaign(id: string) {
+    // Fetch campaign to find the owner and check if refund needed
+    const { data: campaign, error: fetchError } = await supabase
+      .from('campaigns')
+      .select('status, sp_id, isp_id, sp_profiles!sp_id(user_id), isp_profiles!isp_id(user_id)')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Refund remaining balance to the campaign owner before deleting
+    if (campaign && campaign.status !== 'completed' && campaign.status !== 'canceled') {
+      const ownerId = (campaign.sp_profiles as any)?.user_id || (campaign.isp_profiles as any)?.user_id;
+      if (ownerId) {
+        const { data, error: rpcError } = await supabase.rpc('cancel_campaign_with_refund', {
+          p_campaign_id: id,
+          p_user_id: ownerId
+        });
+        if (rpcError) throw rpcError;
+        if (data?.status === 'error') throw new Error(data.message);
+      }
+    }
+
     const { error } = await supabase.from('campaigns').delete().eq('id', id);
     if (error) throw error;
   },
