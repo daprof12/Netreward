@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'; 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { ChevronLeft, X, CheckCircle2, AlertTriangle, MessageCircle,
   Upload, Camera, Flag, Clock, Loader2, Check,
   ArrowRight, ShieldAlert, CreditCard, Plus, ShieldAlert as DisputeIcon
@@ -11,6 +11,7 @@ import { useToastStore } from '@/stores/useToastStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useP2PStore } from '@/stores/useP2PStore';
 import { useSystemStore } from '@/stores/useSystemStore';
+import { useWalletStore } from '@/stores/useWalletStore';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
@@ -18,9 +19,11 @@ type P2PStep =
   | 'onboarding'
   | 'choose-asset'
   | 'enter-amount'
-  | 'searching'
+  | 'waiting-acceptance'
+  | 'declined'
   | 'pay-seller'
   | 'upload-proof'
+  | 'waiting-payment'
   | 'awaiting-release'
   | 'success'
   | 'cancelled';
@@ -29,13 +32,28 @@ type P2PStep =
 const LOCAL_CURRENCY = 'USD';
 const PAYMENT_METHODS = ['Bank Transfer', 'Mobile Money', 'USDC'];
 
-function useCountdown(seconds: number, active: boolean) {
+function useCountdown(seconds: number, active: boolean, startTime?: string | null) {
   const [remaining, setRemaining] = useState(seconds);
   useEffect(() => {
     if (!active) { setRemaining(seconds); return; }
-    const t = setInterval(() => setRemaining(r => Math.max(0, r - 1)), 1000);
+    
+    // Set initial remaining based on elapsed time if startTime is provided
+    if (startTime) {
+      const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
+      setRemaining(Math.max(0, seconds - elapsed));
+    }
+
+    const t = setInterval(() => {
+      setRemaining(r => {
+        if (startTime) {
+          const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
+          return Math.max(0, seconds - elapsed);
+        }
+        return Math.max(0, r - 1);
+      });
+    }, 1000);
     return () => clearInterval(t);
-  }, [active, seconds]);
+  }, [active, seconds, startTime]);
   const mins = String(Math.floor(remaining / 60)).padStart(2, '0');
   const secs = String(remaining % 60).padStart(2, '0');
   return { mins, secs, remaining };
@@ -47,18 +65,73 @@ export default function P2PFlow() {
   const location = useLocation();
   const { user, profile } = useAuthStore();
   const { fetchBalance } = useWalletStore();
-  const selectedOffer = location.state?.offer;
 
   const { showToast } = useToastStore();
   const { paymentAccounts } = useP2PStore();
   const { settings: systemSettings } = useSystemStore();
 
+  const { orderId: urlOrderId } = useParams<{ orderId: string }>();
+  const [loadedOffer, setLoadedOffer] = useState<any>(null);
+  const [isLoadingOrder, setIsLoadingOrder] = useState(!!urlOrderId);
+  const [orderUpdatedAt, setOrderUpdatedAt] = useState<string | null>(null);
+  const [loadedFiat, setLoadedFiat] = useState<number | null>(null);
+  const [loadedNrt, setLoadedNrt] = useState<number | null>(null);
+  const [loadedPaymentMethod, setLoadedPaymentMethod] = useState<string | null>(null);
+
+  const selectedOffer = location.state?.offer || loadedOffer;
   const isSelling = selectedOffer?.type === 'buy'; 
 
   const [step, setStep] = useState<P2PStep>(selectedOffer ? 'enter-amount' : 'onboarding');
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
   const [paymentMethodId, setPaymentMethodId] = useState(paymentAccounts[0]?.id || '');
+
+  // Load existing order if accessed from notification link
+  useEffect(() => {
+    if (urlOrderId && user) {
+      const loadOrder = async () => {
+        const { data: order } = await supabase
+          .from('p2p_orders')
+          .select('*, p2p_offers(*, users(display_name))')
+          .eq('id', urlOrderId)
+          .single();
+          
+        if (order) {
+           setCurrentOrderId(order.id);
+           setLoadedNrt(order.nrt_amount);
+           setLoadedFiat(order.fiat_amount);
+           setLoadedPaymentMethod(order.payment_method);
+           setOrderUpdatedAt(order.updated_at);
+           
+           const amISelling = user.id === order.seller_id;
+           setAmount(amISelling ? order.nrt_amount.toString() : order.fiat_amount.toString());
+           
+           setLoadedOffer({
+              ...order.p2p_offers,
+              type: amISelling ? 'buy' : 'sell', 
+              userName: order.p2p_offers?.users?.display_name || 'Trader',
+              userId: amISelling ? order.buyer_id : order.seller_id,
+              price: order.fiat_amount / order.nrt_amount
+           });
+           
+           if (order.status === 'completed') setStep('success');
+           else if (order.status === 'disputed') setStep('awaiting-release');
+           else if (order.status === 'cancelled') setStep('cancelled');
+           else if (amISelling && order.status === 'pending') setStep('pay-seller'); // Seller sees accept/decline
+           else if (amISelling && (order.status === 'accepted' || order.status === 'paid')) setStep('waiting-payment');
+           else if (!amISelling && (order.status === 'pending')) setStep('waiting-acceptance');
+           else if (!amISelling && (order.status === 'accepted')) setStep('pay-seller');
+           else if (!amISelling && (order.status === 'paid')) setStep('awaiting-release');
+           else setStep('pay-seller');
+        } else {
+           showToast('Order not found', 'error');
+           navigate('/wallet');
+        }
+        setIsLoadingOrder(false);
+      };
+      loadOrder();
+    }
+  }, [urlOrderId, user, navigate, showToast]);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [chatReply, setChatReply] = useState('');
@@ -72,18 +145,38 @@ export default function P2PFlow() {
   const [rating, setRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
-  const tradeId = 'TRD-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  // Derive trade ID from the real DB order ID so both parties see the same one
+  const tradeId = currentOrderId ? currentOrderId.slice(0, 8).toUpperCase() : '---';
 
-  const currentPrice = selectedOffer?.price || useTokenPrice();
+  // Fetch seller's payment account if buying
+  const [sellerAccount, setSellerAccount] = useState<any>(null);
+  useEffect(() => {
+    if (!isSelling && selectedOffer?.userId) {
+      supabase.from('p2p_payment_methods')
+        .select('*')
+        .eq('user_id', selectedOffer.userId)
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setSellerAccount(data);
+        });
+    }
+  }, [isSelling, selectedOffer]);
+
+  const fetchedPrice = useTokenPrice();
+  const currentPrice = selectedOffer?.price || fetchedPrice;
 
   // If selling, 'amount' is NRT. If buying, 'amount' is USD.
   const nrtValue = isSelling ? parseFloat(amount || '0') : parseFloat(amount || '0') / currentPrice;
   const usdValue = isSelling ? parseFloat(amount || '0') * currentPrice : parseFloat(amount || '0');
-  const nrtAmountDisplay = nrtValue;
-  const usdAmountDisplay = usdValue;
+  const nrtAmountDisplay = loadedNrt || nrtValue;
+  const usdAmountDisplay = loadedFiat || usdValue;
 
-  const { mins, secs, remaining } = useCountdown(15 * 60, step === 'pay-seller');
-  const { mins: releaseMins, secs: releaseSecs, remaining: releaseRemaining } = useCountdown(15 * 60, step === 'awaiting-release');
+  const { mins, secs, remaining } = useCountdown(15 * 60, step === 'pay-seller', orderUpdatedAt);
+  const { mins: releaseMins, secs: releaseSecs, remaining: releaseRemaining } = useCountdown(15 * 60, step === 'awaiting-release' || step === 'waiting-payment', orderUpdatedAt);
+  const { mins: acceptMins, secs: acceptSecs, remaining: acceptRemaining } = useCountdown(10 * 60, step === 'waiting-acceptance', orderUpdatedAt);
+
+  const { acceptOrder, declineOrder, markOrderPaid } = useP2PStore();
 
   const playNotification = () => {
     if (systemSettings.soundEnabled) {
@@ -95,14 +188,70 @@ export default function P2PFlow() {
     }
   };
 
+  // Handle status changes from either realtime or polling
+  const handleOrderStatusChange = (newStatus: string, updatedAt?: string) => {
+    if (updatedAt) setOrderUpdatedAt(updatedAt);
+
+    if (newStatus === 'accepted' && !isSelling && step === 'waiting-acceptance') {
+      playNotification();
+      setStep('pay-seller');
+    } else if (newStatus === 'cancelled' && step !== 'cancelled') {
+      setStep('cancelled');
+    } else if (newStatus === 'paid' && isSelling && step !== 'waiting-payment') {
+      playNotification();
+      setStep('waiting-payment');
+    } else if (newStatus === 'completed' && step !== 'success') {
+      playNotification();
+      setStep('success');
+    } else if (newStatus === 'disputed' && step !== 'cancelled') {
+      showToast('This trade has been escalated to the resolution center.', 'warning');
+      setTimeout(() => navigate('/wallet/deposit/p2p/disputes'), 1500);
+    }
+  };
+
+  // Real-time subscription to order status changes
+  useEffect(() => {
+    if (!currentOrderId) return;
+    const channel = supabase
+      .channel(`order:${currentOrderId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'p2p_orders',
+        filter: `id=eq.${currentOrderId}`,
+      }, (payload) => {
+        handleOrderStatusChange(payload.new.status, payload.new.updated_at);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentOrderId, isSelling, step, navigate, showToast]);
+
+  // Polling fallback — checks every 5s in case realtime is delayed
+  useEffect(() => {
+    if (!currentOrderId) return;
+    const waitingSteps: P2PStep[] = ['waiting-acceptance', 'pay-seller', 'waiting-payment', 'awaiting-release'];
+    if (!waitingSteps.includes(step)) return;
+
+    const poll = setInterval(async () => {
+      const { data } = await supabase
+        .from('p2p_orders')
+        .select('status, updated_at')
+        .eq('id', currentOrderId)
+        .single();
+      if (data) handleOrderStatusChange(data.status, data.updated_at);
+    }, 5000);
+
+    return () => clearInterval(poll);
+  }, [currentOrderId, step, isSelling]);
+
   const handleStartTrade = async () => {
     if (!selectedOffer || !user) return;
-    setStep('searching');
+    setStep('waiting-acceptance');
     
     try {
       const { data: orderId, error } = await supabase.rpc('create_p2p_order', {
         p_offer_id: selectedOffer.id,
-        p_buyer_id: isSelling ? selectedOffer.userId : user.id, // If I'm selling, the offer owner is the buyer
+        p_buyer_id: isSelling ? selectedOffer.userId : user.id,
         p_nrt_amount: nrtValue,
         p_fiat_amount: usdValue,
         p_payment_method: paymentAccounts.find(a => a.id === paymentMethodId)?.provider || 'Bank Transfer'
@@ -111,14 +260,44 @@ export default function P2PFlow() {
       if (error) throw error;
       
       setCurrentOrderId(orderId);
-      setTimeout(() => {
-        setStep('pay-seller');
-        playNotification();
-      }, 2000);
+      // Immediately fetch the created order to get its created_at/updated_at timestamp for the timer
+      const { data: newOrder } = await supabase.from('p2p_orders').select('updated_at').eq('id', orderId).single();
+      if (newOrder) setOrderUpdatedAt(newOrder.updated_at);
+      
     } catch (err: any) {
       console.error('Trade start error:', err);
       showToast(err.message || 'Failed to start trade', 'error');
       setStep('enter-amount');
+    }
+  };
+
+  const handleAcceptOrder = async () => {
+    if (!currentOrderId) return;
+    try {
+      await acceptOrder(currentOrderId);
+      setStep('waiting-payment');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to accept order', 'error');
+    }
+  };
+
+  const handleDeclineOrder = async () => {
+    if (!currentOrderId) return;
+    try {
+      await declineOrder(currentOrderId);
+      setStep('cancelled');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to decline order', 'error');
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!currentOrderId) return;
+    try {
+      await supabase.rpc('cancel_p2p_order', { p_order_id: currentOrderId });
+      setStep('cancelled');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to cancel order', 'error');
     }
   };
 
@@ -139,23 +318,34 @@ export default function P2PFlow() {
     }
   };
 
-  // Auto-advance logic (modified)
+  // Auto-cancel (before payment) / auto-dispute (after payment) on timeout
   useEffect(() => {
     if (step === 'success') {
       playNotification();
       const t = setTimeout(() => setShowReviewModal(true), 1500);
       return () => clearTimeout(t);
     }
-    if (step === 'awaiting-release' && releaseRemaining === 0) {
-      handleReportTrade('Automatic dispute: Release timer expired');
+    // Before payment: auto-cancel
+    if (step === 'waiting-acceptance' && acceptRemaining === 0 && currentOrderId) {
+      handleCancelOrder();
     }
-  }, [step, releaseRemaining]);
+    if (step === 'pay-seller' && remaining === 0 && currentOrderId) {
+      handleCancelOrder();
+    }
+    // After payment: auto-dispute
+    if ((step === 'awaiting-release' || step === 'waiting-payment') && releaseRemaining === 0 && currentOrderId) {
+      supabase.rpc('auto_dispute_p2p_order', { p_order_id: currentOrderId }).then(() => {
+        showToast('Trade auto-escalated to resolution center.', 'warning');
+        setTimeout(() => navigate('/wallet/deposit/p2p/disputes'), 1500);
+      });
+    }
+  }, [step, remaining, releaseRemaining, acceptRemaining]);
 
-  const steps: P2PStep[] = ['onboarding', 'choose-asset', 'enter-amount', 'searching', 'pay-seller', 'upload-proof', 'awaiting-release', 'success'];
+  const steps: P2PStep[] = ['onboarding', 'choose-asset', 'enter-amount', 'waiting-acceptance', 'pay-seller', 'upload-proof', 'awaiting-release', 'success'];
   const stepIdx = steps.indexOf(step);
   const progressPct = step === 'success' ? 100 : Math.max(0, (stepIdx / (steps.length - 1)) * 100);
 
-  const canCancel = ['searching', 'pay-seller', 'upload-proof', 'awaiting-release'].includes(step);
+  const canCancel = ['waiting-acceptance', 'pay-seller', 'upload-proof'].includes(step);
 
   const handleBack = () => {
     if (step === 'onboarding') { navigate(-1); return; }
@@ -217,17 +407,17 @@ export default function P2PFlow() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
+      {isLoadingOrder && (
+        <div className="absolute inset-0 z-50 bg-bg-primary/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+          <Loader2 size={40} className="text-accent-primary animate-spin" />
+          <p className="text-sm font-bold text-text-secondary">Loading Order Details...</p>
+        </div>
+      )}
       {/* Top bar */}
       <div className="flex items-center justify-between p-4 pt-8">
-        {canCancel ? (
-          <button onClick={() => setShowCancelConfirm(true)} className="p-2 bg-bg-secondary rounded-full">
-            <X size={18} className="text-text-primary" />
-          </button>
-        ) : (
-          <button onClick={handleBack} className="p-2 bg-bg-secondary rounded-full">
-            <ChevronLeft size={18} className="text-text-primary" />
-          </button>
-        )}
+        <button onClick={handleBack} className="p-2 bg-bg-secondary rounded-full hover:bg-glass-border transition-colors">
+          <ChevronLeft size={18} className="text-text-primary" />
+        </button>
         <div className="text-center">
           <p className="text-xs text-text-secondary font-medium">P2P Trading</p>
           <p className="text-[10px] text-text-secondary">Trade ID: {tradeId}</p>
@@ -482,46 +672,142 @@ export default function P2PFlow() {
             </div>
           )}
 
-          {/* ── SEARCHING ──────────────────────────────────────── */}
-          {step === 'searching' && (
-            <div className="flex flex-col items-center justify-center gap-6 pt-20">
+          {/* ── WAITING FOR SELLER ACCEPTANCE (Buyer view) ──── */}
+          {step === 'waiting-acceptance' && (
+            <div className="flex flex-col items-center justify-center gap-6 pt-16">
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                 className="w-20 h-20 rounded-full border-4 border-accent-primary border-t-transparent"
               />
-              <div className="text-center">
-                <h2 className="text-xl font-bold">Finding a Seller</h2>
-                <p className="text-sm text-text-secondary mt-2">Matching you with the best available seller for <span className="text-accent-primary font-semibold">{nrtAmountDisplay} NRT</span>…</p>
+              <div className="text-center space-y-2">
+                <h2 className="text-xl font-bold">Waiting for Seller</h2>
+                <p className="text-sm text-text-secondary">
+                  Your order for <span className="text-accent-primary font-semibold">{nrtAmountDisplay} NRT</span> has been sent to {selectedOffer?.userName || 'the seller'}.
+                </p>
+                <p className="text-xs text-text-secondary">Waiting for them to accept your trade…</p>
               </div>
-              <div className="flex gap-2">
-                {[0, 0.3, 0.6].map(d => (
-                  <motion.div
-                    key={d}
-                    className="w-2 h-2 rounded-full bg-accent-primary"
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1, delay: d, repeat: Infinity }}
-                  />
-                ))}
+              <div className={`flex items-center justify-center gap-2 py-3 px-6 rounded-xl border font-mono text-xl font-bold ${
+                acceptRemaining < 120 ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-accent-primary/10 border-accent-primary/30 text-accent-primary'
+              }`}>
+                <Clock size={18} />
+                {acceptMins}:{acceptSecs}
               </div>
+              <p className="text-[10px] text-text-secondary text-center">
+                The order will be automatically cancelled if the seller does not respond within 10 minutes.
+              </p>
             </div>
           )}
 
-          {/* ── PAY SELLER ─────────────────────────────────────── */}
-          {step === 'pay-seller' && (
+          {/* ── DECLINED (Seller rejected) ─────────────────── */}
+          {step === 'declined' && (
+            <div className="flex flex-col items-center justify-center gap-6 pt-16 text-center">
+              <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center">
+                <X size={40} className="text-red-400" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold">Order Declined</h2>
+                <p className="text-sm text-text-secondary">The seller has declined your trade request. No funds were charged.</p>
+              </div>
+              <button
+                onClick={() => navigate('/wallet/deposit/p2p')}
+                className="w-full py-4 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20"
+              >
+                Return to P2P Market
+              </button>
+            </div>
+          )}
+
+          {/* ── WAITING FOR PAYMENT (Seller view) ──────────── */}
+          {step === 'waiting-payment' && (
             <div className="space-y-4 pt-2">
               <div>
-                <h2 className="text-xl font-bold">{isSelling ? 'Awaiting Payment' : 'Pay the Seller'}</h2>
-                <p className="text-sm text-text-secondary mt-0.5">{isSelling ? 'Wait for the buyer to confirm payment' : 'Complete payment before the timer expires'}</p>
+                <h2 className="text-xl font-bold">Waiting for Payment</h2>
+                <p className="text-sm text-text-secondary mt-0.5">The buyer is processing payment. You will be notified when proof is uploaded.</p>
               </div>
 
               {/* Countdown */}
               <div className={`flex items-center justify-center gap-2 py-3 rounded-xl border font-mono text-2xl font-bold ${
-                remaining < 120 ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-accent-primary/10 border-accent-primary/30 text-accent-primary'
+                releaseRemaining < 120 ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
               }`}>
                 <Clock size={20} />
-                {mins}:{secs}
+                {releaseMins}:{releaseSecs}
               </div>
+
+              {/* Trade details */}
+              <div className="glass rounded-xl border border-glass-border p-4 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-secondary">Amount</span>
+                  <span className="font-bold text-accent-primary">{nrtAmountDisplay} NRT</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-secondary">You receive</span>
+                  <span className="font-bold text-text-primary">${usdAmountDisplay} {LOCAL_CURRENCY}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-secondary">Buyer</span>
+                  <span className="font-bold text-text-primary">{selectedOffer?.userName || 'Buyer'}</span>
+                </div>
+              </div>
+
+              {/* Scam Tips */}
+              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-amber-500">
+                  <ShieldAlert size={18} />
+                  <p className="text-sm font-bold">Scam Protection Tips</p>
+                </div>
+                <ul className="text-xs text-text-secondary space-y-1 list-disc list-inside leading-relaxed">
+                  <li>Only confirm when you see the <span className="font-bold text-text-primary">actual funds</span> in your bank account</li>
+                  <li>Do <span className="font-bold text-red-400">NOT</span> rely on SMS or email notifications — they can be faked</li>
+                  <li>Never release NRT based on a screenshot from the buyer</li>
+                  <li>Check your bank app directly to verify the payment</li>
+                </ul>
+              </div>
+
+              {/* Check bank message */}
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-2">
+                <CreditCard size={16} className="text-blue-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  <span className="font-bold text-blue-400">Check your bank account</span> to confirm the buyer's payment has arrived before releasing NRT.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowChat(true)}
+                  className="flex-1 py-3 rounded-xl bg-bg-secondary border border-glass-border text-text-secondary font-semibold flex items-center justify-center gap-2 text-sm"
+                >
+                  <MessageCircle size={16} /> Chat Buyer
+                </button>
+                <button
+                  onClick={handleReleaseEscrow}
+                  className="flex-2 flex-grow py-3 rounded-xl bg-accent-primary text-primary-foreground font-bold shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 text-sm"
+                >
+                  <Check size={16} /> Confirm & Release NRT
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── PAY SELLER / SELLER ACCEPT ────────────────────── */}
+          {step === 'pay-seller' && (
+            <div className="space-y-4 pt-2">
+              <div>
+                <h2 className="text-xl font-bold">{isSelling ? 'New Order Received' : 'Pay the Seller'}</h2>
+                <p className="text-sm text-text-secondary mt-0.5">
+                  {isSelling ? 'A buyer wants to purchase NRT from you. Review and accept or decline.' : 'Complete payment before the timer expires'}
+                </p>
+              </div>
+
+              {/* Countdown (buyer only) */}
+              {!isSelling && (
+                <div className={`flex items-center justify-center gap-2 py-3 rounded-xl border font-mono text-2xl font-bold ${
+                  remaining < 120 ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-accent-primary/10 border-accent-primary/30 text-accent-primary'
+                }`}>
+                  <Clock size={20} />
+                  {mins}:{secs}
+                </div>
+              )}
 
               {/* Trade details */}
               <div className="glass rounded-xl border border-glass-border p-4 space-y-3">
@@ -535,34 +821,65 @@ export default function P2PFlow() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Payment method</span>
-                  <span className="font-bold text-text-primary">{paymentAccounts.find(a => a.id === paymentMethodId)?.provider || 'Bank Transfer'}</span>
+                  <span className="font-bold text-text-primary">{loadedPaymentMethod || paymentAccounts.find(a => a.id === paymentMethodId)?.provider || 'Bank Transfer'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">{isSelling ? 'Buyer' : 'Seller'}</span>
-                  <span className="font-bold text-text-primary">{selectedOffer?.userName || 'Trader_XK9'}</span>
+                  <span className="font-bold text-text-primary">{selectedOffer?.userName || 'Trader'}</span>
                 </div>
-                <div className="border-t border-glass-border/50 pt-3">
-                  <p className="text-xs text-text-secondary font-medium mb-1">{selectedOffer?.type === 'buy' ? 'Your' : "Seller's"} account details</p>
-                  <p className="text-sm font-semibold text-text-primary">Account: {selectedOffer?.accountNumber || '1234567890'}</p>
-                  <p className="text-sm text-text-secondary">Bank: {selectedOffer?.provider || 'First National Bank'}</p>
-                  <p className="text-sm text-text-secondary">Name: {selectedOffer?.accountName || 'John T.'}</p>
-                </div>
+                {!isSelling && (
+                  <div className="border-t border-glass-border/50 pt-3">
+                    <p className="text-xs text-text-secondary font-medium mb-1">Seller's account details</p>
+                    <p className="text-sm font-semibold text-text-primary">Account: {sellerAccount?.account_number || 'Pending'}</p>
+                    <p className="text-sm text-text-secondary">Bank: {sellerAccount?.provider || 'Pending'}</p>
+                    <p className="text-sm text-text-secondary">Name: {sellerAccount?.account_name || 'Pending'}</p>
+                  </div>
+                )}
               </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowChat(true)}
-                  className="flex-1 py-3 rounded-xl bg-bg-secondary border border-glass-border text-text-secondary font-semibold flex items-center justify-center gap-2 text-sm"
-                >
-                  <MessageCircle size={16} /> Chat
-                </button>
-                <button
-                  onClick={() => setStep('upload-proof')}
-                  className="flex-2 flex-grow py-3 rounded-xl bg-accent-primary text-primary-foreground font-bold shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 text-sm"
-                >
-                  <Check size={16} /> Confirm Payment
-                </button>
+              {/* Scam Tips */}
+              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-amber-500">
+                  <ShieldAlert size={18} />
+                  <p className="text-sm font-bold">Scam Protection Tips</p>
+                </div>
+                <ul className="text-xs text-text-secondary space-y-1 list-disc list-inside leading-relaxed">
+                  {isSelling ? (
+                    <>
+                      <li>Only accept orders from users with good ratings</li>
+                      <li>Never release NRT until you confirm payment in your bank</li>
+                      <li>Do <span className="font-bold text-red-400">NOT</span> rely on SMS or email — check your bank app</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Only pay to the account details shown above</li>
+                      <li>Do <span className="font-bold text-red-400">NOT</span> pay to any account shared via chat</li>
+                      <li>Always upload proof of payment after completing the transfer</li>
+                    </>
+                  )}
+                </ul>
               </div>
+
+              {/* Seller: Accept/Decline, Buyer: Chat/Confirm */}
+              {isSelling ? (
+                <div className="flex gap-3">
+                  <button onClick={handleDeclineOrder} className="flex-1 py-3 rounded-xl bg-red-500/10 border border-red-500/30 font-bold text-red-400 text-sm">
+                    Decline
+                  </button>
+                  <button onClick={handleAcceptOrder} className="flex-2 flex-grow py-3 rounded-xl bg-accent-primary text-primary-foreground font-bold shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 text-sm">
+                    <Check size={16} /> Accept Order
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <button onClick={() => setShowChat(true)} className="flex-1 py-3 rounded-xl bg-bg-secondary border border-glass-border text-text-secondary font-semibold flex items-center justify-center gap-2 text-sm">
+                    <MessageCircle size={16} /> Chat
+                  </button>
+                  <button onClick={() => setStep('upload-proof')} className="flex-2 flex-grow py-3 rounded-xl bg-accent-primary text-primary-foreground font-bold shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 text-sm">
+                    <Check size={16} /> I've Paid
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -603,7 +920,15 @@ export default function P2PFlow() {
               </div>
 
               <button
-                onClick={() => setStep('awaiting-release')}
+                onClick={async () => {
+                  if (!currentOrderId) return;
+                  try {
+                    await markOrderPaid(currentOrderId);
+                    setStep('awaiting-release');
+                  } catch (err: any) {
+                    showToast(err.message || 'Failed to submit proof', 'error');
+                  }
+                }}
                 disabled={!proofFile}
                 className="w-full py-4 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -663,20 +988,36 @@ export default function P2PFlow() {
                   <Flag size={16} /> Report Trade
                 </button>
               </div>
-
-              {/* Simulate seller releasing */}
-              <button
-                onClick={handleReleaseEscrow}
-                className="w-full py-4 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20"
-              >
-                {isSelling ? 'Release NRT' : 'Simulate: Seller Released NRT'}
-              </button>
             </div>
           )}
 
           {/* ── SUCCESS ────────────────────────────────────────── */}
           {step === 'success' && (
-            <div className="flex flex-col items-center justify-center gap-6 pt-16 text-center">
+            <div className="flex flex-col items-center justify-center gap-6 pt-12 text-center relative overflow-hidden">
+              {/* Confetti particles */}
+              {[...Array(20)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-2 h-2 rounded-full"
+                  style={{
+                    backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'][i % 6],
+                    left: `${10 + Math.random() * 80}%`,
+                    top: '-10px',
+                  }}
+                  animate={{
+                    y: [0, 500 + Math.random() * 200],
+                    x: [0, (Math.random() - 0.5) * 100],
+                    rotate: [0, Math.random() * 720],
+                    opacity: [1, 0],
+                  }}
+                  transition={{
+                    duration: 2 + Math.random(),
+                    delay: Math.random() * 0.5,
+                    ease: 'easeOut',
+                  }}
+                />
+              ))}
+
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -686,9 +1027,9 @@ export default function P2PFlow() {
                 <CheckCircle2 size={56} className="text-emerald-400" />
               </motion.div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">NRT Received!</h2>
+                <h2 className="text-2xl font-bold">{isSelling ? 'You have sold' : 'NRT Received!'}</h2>
                 <p className="text-4xl font-black text-accent-primary">{nrtAmountDisplay} <span className="text-lg">NRT</span></p>
-                <p className="text-sm text-text-secondary">Successfully credited to your wallet</p>
+                <p className="text-sm font-bold text-emerald-400">{isSelling ? 'Order successfully completed' : 'Successfully credited to your wallet'}</p>
               </div>
               <div className="glass rounded-xl border border-glass-border p-4 w-full text-sm space-y-2">
                 <div className="flex justify-between">
@@ -709,10 +1050,10 @@ export default function P2PFlow() {
                 </div>
               </div>
               <button
-                onClick={() => navigate('/wallet')}
+                onClick={() => navigate('/wallet/deposit/p2p')}
                 className="w-full py-4 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20"
               >
-                Back to Wallet
+                Return to P2P Market
               </button>
             </div>
           )}
@@ -754,7 +1095,7 @@ export default function P2PFlow() {
                   Keep Trading
                 </button>
                 <button
-                  onClick={() => { setShowCancelConfirm(false); setStep('cancelled'); setTimeout(() => navigate('/wallet/deposit/p2p'), 2000); }}
+                  onClick={() => { setShowCancelConfirm(false); handleCancelOrder(); }}
                   className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold shadow-lg shadow-red-500/20"
                 >
                   Cancel Trade
@@ -767,12 +1108,20 @@ export default function P2PFlow() {
 
       {/* Cancelled state */}
       {step === 'cancelled' && (
-        <div className="fixed inset-0 flex flex-col items-center justify-center gap-4 bg-bg-primary z-50">
+        <div className="fixed inset-0 flex flex-col items-center justify-center gap-6 bg-bg-primary z-50 p-4 text-center">
           <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center">
             <X size={40} className="text-red-400" />
           </div>
-          <h2 className="text-xl font-bold">Trade Cancelled</h2>
-          <p className="text-sm text-text-secondary">Returning to P2P…</p>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold">Trade Cancelled</h2>
+            <p className="text-sm text-text-secondary">This order has been cancelled and any locked escrow has been refunded.</p>
+          </div>
+          <button
+            onClick={() => navigate('/wallet/deposit/p2p/my-offers')}
+            className="w-full max-w-sm py-4 bg-bg-secondary border border-glass-border font-bold rounded-xl mt-4"
+          >
+            Return to My Orders
+          </button>
         </div>
       )}
 

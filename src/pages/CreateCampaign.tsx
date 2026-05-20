@@ -240,9 +240,15 @@ export default function CreateCampaign() {
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-text-secondary">NRT</span>
               <input 
-                type="number" 
+                type="number"
+                step="any"
                 value={budgetNrt}
-                onChange={e => setBudgetNrt(Number(e.target.value) || '')}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === '') { setBudgetNrt(''); return; }
+                  const num = parseFloat(val);
+                  if (!isNaN(num)) setBudgetNrt(num);
+                }}
                 placeholder="0.00"
                 className="w-full bg-bg-secondary border border-glass-border rounded-xl pl-14 pr-4 py-3.5 text-lg font-bold text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
               />

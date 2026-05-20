@@ -18,6 +18,9 @@ interface AdminDevice {
   userEmail: string;
   country: string;
   isp: string;
+  totalCampaignsJoined: number;
+  activeCampaignsCount: number;
+  lastCampaign: string;
   dataUsedGb: number;
   nrtEarned: number;
   claimedNrt: number;
@@ -42,8 +45,8 @@ export default function AdminDevices() {
         .from('devices')
         .select(`
           *, 
-          users!user_id(email, country),
-          campaigns!last_campaign_id(title)
+          users:user_id(email, country),
+          last_campaign:campaigns!last_campaign_id(title)
         `)
         .order('created_at', { ascending: false });
       
@@ -77,12 +80,14 @@ export default function AdminDevices() {
         userEmail: d.users?.email || d.user_email || 'Unknown',
         country: d.users?.country || d.country || 'Global',
         isp: d.isp_name || d.isp || '',
+        totalCampaignsJoined: d.total_campaigns_joined || 0,
+        activeCampaignsCount: d.active_campaigns_count || 0,
+        lastCampaign: d.last_campaign?.title || 'None',
         dataUsedGb: dataGb,
         nrtEarned: earned,
         claimedNrt: claimed,
         unclaimedNrt: earned - claimed,
         duration: `${totalDurationHrs}h`,
-        campaignJoined: (d.campaigns as any)?.title || 'None',
         createdAt: d.created_at,
         activeEarnings: d.active_earnings || [],
         pastEarnings: d.past_earnings || [],
@@ -156,7 +161,9 @@ export default function AdminDevices() {
               <tr>
                 <th className="px-6 py-4">Device</th>
                 <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4">Campaign</th>
+                <th className="px-6 py-4 text-center">Total Campaigns</th>
+                <th className="px-6 py-4 text-center">Active Campaigns</th>
+                <th className="px-6 py-4">Last Campaign</th>
                 <th className="px-6 py-4">Duration</th>
                 <th className="px-6 py-4 text-center">Data (GB)</th>
                 <th className="px-6 py-4 text-center">NRT Earned</th>
@@ -184,9 +191,15 @@ export default function AdminDevices() {
                     <p className="text-text-primary font-medium">{d.userEmail}</p>
                     <p className="text-[10px] text-text-secondary uppercase">{d.country}</p>
                   </td>
+                  <td className="px-6 py-4 text-center font-bold text-text-primary">
+                    {d.totalCampaignsJoined}
+                  </td>
+                  <td className="px-6 py-4 text-center font-bold text-green-500">
+                    {d.activeCampaignsCount}
+                  </td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-1 rounded-lg bg-accent-primary/10 text-accent-primary text-[10px] font-bold uppercase truncate max-w-[120px] block">
-                      {d.campaignJoined}
+                      {d.lastCampaign}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-text-secondary font-medium">{d.duration}</td>
@@ -247,13 +260,13 @@ export default function AdminDevices() {
                 {/* NRT Stats */}
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { label: 'Total Earned', value: `$<NrtAmount value={selectedDevice.nrtEarned} />`, color: 'text-accent-primary' },
-                    { label: 'Claimed', value: `$<NrtAmount value={selectedDevice.claimedNrt} />`, color: 'text-green-500' },
-                    { label: 'Unclaimed', value: `$<NrtAmount value={selectedDevice.unclaimedNrt} />`, color: 'text-amber-500' },
+                    { label: 'Total Earned', value: <span className="flex items-center justify-center gap-0.5"><span className="text-sm font-medium">$</span><NrtAmount value={selectedDevice.nrtEarned} /></span>, color: 'text-accent-primary' },
+                    { label: 'Claimed', value: <span className="flex items-center justify-center gap-0.5"><span className="text-sm font-medium">$</span><NrtAmount value={selectedDevice.claimedNrt} /></span>, color: 'text-green-500' },
+                    { label: 'Unclaimed', value: <span className="flex items-center justify-center gap-0.5"><span className="text-sm font-medium">$</span><NrtAmount value={selectedDevice.unclaimedNrt} /></span>, color: 'text-amber-500' },
                   ].map(({ label, value, color }) => (
                     <div key={label} className="glass rounded-xl p-3 border border-glass-border text-center">
                       <p className="text-[10px] text-text-secondary uppercase tracking-wider">{label}</p>
-                      <p className={`text-lg font-bold ${color} mt-0.5`}>{value}</p>
+                      <div className={`text-lg font-bold ${color} mt-0.5`}>{value}</div>
                     </div>
                   ))}
                 </div>

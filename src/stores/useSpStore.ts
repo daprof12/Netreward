@@ -25,6 +25,12 @@ export interface SpService {
   status: 'pending_verification' | 'active' | 'suspended';
   country?: string;
   createdAt: string;
+  // Gaming platform URLs (only for category: Gaming)
+  playstationUrl?: string;
+  xboxUrl?: string;
+  steamUrl?: string;
+  oculusUrl?: string;
+  nintendoUrl?: string;
 }
 
 
@@ -123,7 +129,9 @@ export const useSpStore = create<SpStore>()(
             androidPackageName: d.android_package_name, iosBundleId: d.ios_bundle_id,
             webDomain: d.web_domain, webhookUrl: d.webhook_url, logoUrl: d.logo_url,
             apiKey: d.api_key, secretKey: d.secret_key, webhookSecret: d.webhook_secret,
-            verified: d.verified, status: d.status, country: d.country, createdAt: d.created_at
+            verified: d.verified, status: d.status, country: d.country, createdAt: d.created_at,
+            playstationUrl: d.playstation_url, xboxUrl: d.xbox_url, steamUrl: d.steam_url,
+            oculusUrl: d.oculus_url, nintendoUrl: d.nintendo_url,
           }));
 
           const campaignsData: SpCampaign[] = campaignsRes.data.map(d => ({
@@ -157,7 +165,9 @@ export const useSpStore = create<SpStore>()(
             android_package_name: service.androidPackageName, ios_bundle_id: service.iosBundleId,
             web_domain: service.webDomain, webhook_url: service.webhookUrl, logo_url: service.logoUrl,
             api_key: service.apiKey, secret_key: service.secretKey, webhook_secret: service.webhookSecret,
-            country: service.country
+            country: service.country,
+            playstation_url: service.playstationUrl, xbox_url: service.xboxUrl, steam_url: service.steamUrl,
+            oculus_url: service.oculusUrl, nintendo_url: service.nintendoUrl,
           };
           
           const { data, error } = await supabase.from('services').insert(dbService).select().single();
@@ -197,6 +207,11 @@ export const useSpStore = create<SpStore>()(
           if (updates.verified !== undefined) dbUpdates.verified = updates.verified;
           if (updates.status !== undefined) dbUpdates.status = updates.status;
           if (updates.country !== undefined) dbUpdates.country = updates.country;
+          if (updates.playstationUrl !== undefined) dbUpdates.playstation_url = updates.playstationUrl;
+          if (updates.xboxUrl !== undefined) dbUpdates.xbox_url = updates.xboxUrl;
+          if (updates.steamUrl !== undefined) dbUpdates.steam_url = updates.steamUrl;
+          if (updates.oculusUrl !== undefined) dbUpdates.oculus_url = updates.oculusUrl;
+          if (updates.nintendoUrl !== undefined) dbUpdates.nintendo_url = updates.nintendoUrl;
           
           const { error } = await supabase.from('services').update(dbUpdates).eq('id', id);
           if (error) throw error;

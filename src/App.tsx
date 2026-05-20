@@ -42,6 +42,7 @@ import TermsOfService from '@/pages/TermsOfService';
 import PrivacyPolicyFull from '@/pages/PrivacyPolicyFull';
 import AboutPage from '@/pages/AboutPage';
 import PinSetupPage from '@/pages/PinSetupPage';
+import GamingAccounts from '@/pages/GamingAccounts';
 import ToastContainer from '@/components/ui/ToastContainer';
 import NrtLoader from '@/components/ui/NrtLoader';
 import AppLock from '@/components/ui/AppLock';
@@ -344,6 +345,7 @@ function App() {
               <Route path="/wallet/deposit/p2p/create" element={<CreateP2POffer />} />
               <Route path="/wallet/deposit/p2p/accounts" element={<P2PPaymentAccounts />} />
               <Route path="/wallet/deposit/p2p/flow" element={<P2PFlow />} />
+              <Route path="/wallet/deposit/p2p/orders/:orderId" element={<P2PFlow />} />
               <Route path="/wallet/deposit/p2p/disputes" element={<DisputeCenter />} />
               <Route path="/wallet/deposit/p2p/my-offers" element={<P2PMarketplace />} />
               <Route path="/wallet/deposit/instant" element={<InstantPurchase />} />
@@ -363,6 +365,7 @@ function App() {
               <Route path="/settings/privacy" element={<PrivacySettings />} />
               <Route path="/settings/privacy/terms" element={<TermsOfService />} />
               <Route path="/settings/privacy/full" element={<PrivacyPolicyFull />} />
+              <Route path="/settings/gaming" element={<GamingAccounts />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/support" element={<Support />} />
               <Route path="/transactions" element={<TransactionHistory />} />

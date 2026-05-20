@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Globe, Smartphone, Play, Image as ImageIcon, CheckCircle2, Loader2, ArrowRight, ChevronDown, Lock, ShieldCheck, Copy, Check } from 'lucide-react';
+import { ChevronLeft, Globe, Smartphone, Play, Image as ImageIcon, CheckCircle2, Loader2, ArrowRight, ChevronDown, Lock, ShieldCheck, Copy, Check, Gamepad2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSpStore, type SpService } from '@/stores/useSpStore';
 import { useToastStore } from '@/stores/useToastStore';
+import { PlatformLogoCircle } from '@/components/ui/PlatformLogos';
 
 const CATEGORIES = ['Streaming', 'AI Service', 'Gaming', 'Social', 'Browsing', 'Cloud', 'Other'];
 
@@ -42,12 +43,28 @@ export default function CreateService() {
   const setIosUrl = (val: string) => updateServiceDraft({ iosUrl: val });
   const setLogoPreview = (val: string | null) => updateServiceDraft({ logoPreview: val });
 
+  // Gaming platform URLs (only when category is Gaming)
+  const playstationUrl = draft.playstationUrl || '';
+  const xboxUrl = draft.xboxUrl || '';
+  const steamUrl = draft.steamUrl || '';
+  const oculusUrl = draft.oculusUrl || '';
+  const nintendoUrl = draft.nintendoUrl || '';
+  const setPlaystationUrl = (val: string) => updateServiceDraft({ playstationUrl: val });
+  const setXboxUrl = (val: string) => updateServiceDraft({ xboxUrl: val });
+  const setSteamUrl = (val: string) => updateServiceDraft({ steamUrl: val });
+  const setOculusUrl = (val: string) => updateServiceDraft({ oculusUrl: val });
+  const setNintendoUrl = (val: string) => updateServiceDraft({ nintendoUrl: val });
+
+  const isGaming = category.toLowerCase() === 'gaming';
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   
   const [credentials, setCredentials] = useState<{apiKey: string} | null>(null);
 
-  const canContinue = name.trim().length > 0 && (webUrl.trim() || androidUrl.trim() || iosUrl.trim());
+  const hasAnyPlatformUrl = webUrl.trim() || androidUrl.trim() || iosUrl.trim() ||
+    (isGaming && (playstationUrl.trim() || xboxUrl.trim() || steamUrl.trim() || oculusUrl.trim() || nintendoUrl.trim()));
+  const canContinue = name.trim().length > 0 && hasAnyPlatformUrl;
 
   const handleContinue = () => {
     if (!canContinue) return;
@@ -68,7 +85,14 @@ export default function CreateService() {
           androidUrl,
           iosUrl,
           logoUrl: logoPreview || undefined,
-          apiKey: generatedApiKey
+          apiKey: generatedApiKey,
+          ...(isGaming && {
+            playstationUrl: playstationUrl || undefined,
+            xboxUrl: xboxUrl || undefined,
+            steamUrl: steamUrl || undefined,
+            oculusUrl: oculusUrl || undefined,
+            nintendoUrl: nintendoUrl || undefined,
+          }),
         });
         setStep('success');
       } catch (err: any) {
@@ -290,6 +314,109 @@ export default function CreateService() {
                 </div>
               </div>
             </div>
+
+            {/* Gaming Console/Platform URLs — only shown when category is Gaming */}
+            {isGaming && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-6 pt-4 border-t border-glass-border"
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Gamepad2 size={16} className="text-accent-primary" />
+                    <h3 className="text-sm font-bold text-text-primary">Console & Platform Store URLs</h3>
+                  </div>
+                  <p className="text-xs text-text-secondary">Enter the store listing URL for each platform where your game is available.</p>
+                </div>
+
+                {/* PlayStation */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <PlatformLogoCircle platform="playstation" size={22} iconSize={10} />
+                    <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">PlayStation Store</span>
+                  </div>
+                  <div className="pl-4 border-l-2" style={{ borderColor: '#003791' }}>
+                    <input
+                      type="url"
+                      value={playstationUrl}
+                      onChange={e => setPlaystationUrl(e.target.value)}
+                      placeholder="https://store.playstation.com/..."
+                      className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-[#003791]"
+                    />
+                  </div>
+                </div>
+
+                {/* Xbox */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <PlatformLogoCircle platform="xbox" size={22} iconSize={10} />
+                    <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Xbox / Microsoft Store</span>
+                  </div>
+                  <div className="pl-4 border-l-2" style={{ borderColor: '#107C10' }}>
+                    <input
+                      type="url"
+                      value={xboxUrl}
+                      onChange={e => setXboxUrl(e.target.value)}
+                      placeholder="https://www.xbox.com/games/..."
+                      className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-[#107C10]"
+                    />
+                  </div>
+                </div>
+
+                {/* Steam */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <PlatformLogoCircle platform="steam" size={22} iconSize={10} />
+                    <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Steam Store</span>
+                  </div>
+                  <div className="pl-4 border-l-2" style={{ borderColor: '#1B2838' }}>
+                    <input
+                      type="url"
+                      value={steamUrl}
+                      onChange={e => setSteamUrl(e.target.value)}
+                      placeholder="https://store.steampowered.com/app/..."
+                      className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-[#1B2838]"
+                    />
+                  </div>
+                </div>
+
+                {/* Oculus / Meta Quest */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <PlatformLogoCircle platform="oculus_vr" size={22} iconSize={10} />
+                    <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Meta Quest / Oculus</span>
+                  </div>
+                  <div className="pl-4 border-l-2" style={{ borderColor: '#8B5CF6' }}>
+                    <input
+                      type="url"
+                      value={oculusUrl}
+                      onChange={e => setOculusUrl(e.target.value)}
+                      placeholder="https://www.meta.com/experiences/..."
+                      className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-[#8B5CF6]"
+                    />
+                  </div>
+                </div>
+
+                {/* Nintendo eShop */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <PlatformLogoCircle platform="nintendo_switch" size={22} iconSize={10} />
+                    <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Nintendo eShop</span>
+                  </div>
+                  <div className="pl-4 border-l-2" style={{ borderColor: '#E60012' }}>
+                    <input
+                      type="url"
+                      value={nintendoUrl}
+                      onChange={e => setNintendoUrl(e.target.value)}
+                      placeholder="https://www.nintendo.com/store/..."
+                      className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-[#E60012]"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             <button
               onClick={handleContinue}

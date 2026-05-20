@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Network, Database, Settings, Activity, Lock, Rocket, CheckCircle, ArrowRight, ArrowLeft, Terminal, Upload, Image } from 'lucide-react';
 import { useToastStore } from '@/stores/useToastStore';
@@ -29,23 +29,39 @@ export default function AdminTokenLaunch() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoUrl, setLogoUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [publishingMeta, setPublishingMeta] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToastStore();
   const { connection } = useConnection();
   const { publicKey, signTransaction } = useWallet();
 
+  // Load saved logo URL and metadata URI on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from('kv_settings').select('key, value').in('key', ['nrt_logo_url', 'nrt_metadata_uri']);
+        (data || []).forEach((s: any) => {
+          if (s.key === 'nrt_logo_url' && s.value) setLogoUrl(s.value);
+          if (s.key === 'nrt_metadata_uri' && s.value) setConfig(prev => ({ ...prev, uri: s.value }));
+        });
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
   const [config, setConfig] = useState<TokenLaunchConfig>({
     name: 'NetReward Token',
     symbol: 'NRT',
+    uri: 'https://arweave.net/metadata.json',
     decimals: 9,
     initialSupply: 1000000000,
     transferFeeBasisPoints: 50,
     maxTransferFee: 5000000000,
     interestRate: 0,
     treasuryBuckets: [
-      { name: 'Rewards Pool (40%)', address: '', allocation: 400000000 },
-      { name: 'Treasury (20%)', address: '', allocation: 200000000 },
-      { name: 'Team (15%)', address: '', allocation: 150000000 }
+      { name: 'Rewards Pool', address: '', percentage: 40 },
+      { name: 'Treasury', address: '', percentage: 20 },
+      { name: 'Team', address: '', percentage: 15 },
+      { name: 'Liquidity & Public', address: '', percentage: 25 }
     ],
     multiSigAddress: ''
   });
@@ -58,13 +74,42 @@ export default function AdminTokenLaunch() {
     setLogoFile(file);
     setUploading(true);
     try {
+      // 1. Upload logo image
       const ext = file.name.split('.').pop();
-      const path = `nrt-logo.${ext}`;
-      await supabase.storage.from('assets').upload(path, file, { upsert: true });
-      const { data: urlData } = supabase.storage.from('assets').getPublicUrl(path);
-      setLogoUrl(urlData.publicUrl);
-      await supabase.from('kv_settings').upsert({ key: 'nrt_logo_url', value: urlData.publicUrl }, { onConflict: 'key' });
-      showToast('Logo uploaded successfully', 'success');
+      const logoPath = `nrt-logo.${ext}`;
+      await supabase.storage.from('assets').upload(logoPath, file, { upsert: true });
+      const { data: urlData } = supabase.storage.from('assets').getPublicUrl(logoPath);
+      const uploadedLogoUrl = urlData.publicUrl;
+      setLogoUrl(uploadedLogoUrl);
+
+      // 2. Auto-generate and upload the metadata JSON so Phantom can read name/symbol/logo
+      const metadata = {
+        name: config.name,
+        symbol: config.symbol,
+        description: 'NetReward Token (NRT) is the foundational asset of the NetReward ecosystem. It incentivizes high-quality network connectivity and powers decentralized rewards for SPs, ISPs, and users worldwide.',
+        image: uploadedLogoUrl,
+        attributes: [
+          { trait_type: 'Standard', value: 'Token-2022' },
+          { trait_type: 'Utility', value: 'Connectivity Rewards' },
+        ],
+        properties: {
+          files: [{ uri: uploadedLogoUrl, type: `image/${ext}` }],
+          category: 'image',
+          links: { website: 'https://netreward.online' },
+        },
+      };
+      const metaBlob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
+      const metaFile = new File([metaBlob], 'nrt-metadata.json', { type: 'application/json' });
+      await supabase.storage.from('assets').upload('nrt-metadata.json', metaFile, { upsert: true, contentType: 'application/json' });
+      const { data: metaUrlData } = supabase.storage.from('assets').getPublicUrl('nrt-metadata.json');
+      const metadataUri = metaUrlData.publicUrl;
+
+      // 3. Save both URLs and auto-set the config URI
+      await supabase.from('kv_settings').upsert({ key: 'nrt_logo_url', value: uploadedLogoUrl }, { onConflict: 'key' });
+      await supabase.from('kv_settings').upsert({ key: 'nrt_metadata_uri', value: metadataUri }, { onConflict: 'key' });
+      setConfig(prev => ({ ...prev, uri: metadataUri }));
+
+      showToast('Logo uploaded and metadata JSON auto-generated!', 'success');
     } catch (e: any) {
       showToast(e.message || 'Upload failed', 'error');
     } finally { setUploading(false); }
@@ -75,16 +120,61 @@ export default function AdminTokenLaunch() {
 
   const [isVerifyingSquads, setIsVerifyingSquads] = useState(false);
 
+  // Generates the metadata JSON from current config + logoUrl and uploads it to Supabase Storage.
+  // This can be run at any time independently of the logo upload.
+  const handlePublishMetadata = async () => {
+    if (!logoUrl) {
+      showToast('Upload a logo first so it can be embedded in the metadata.', 'warning');
+      return;
+    }
+    setPublishingMeta(true);
+    try {
+      const ext = logoUrl.split('.').pop()?.split('?')[0] || 'png';
+      const metadata = {
+        name: config.name,
+        symbol: config.symbol,
+        description: 'NetReward Token (NRT) is the foundational asset of the NetReward ecosystem. It incentivizes high-quality network connectivity and powers decentralized rewards for SPs, ISPs, and users worldwide.',
+        image: logoUrl,
+        attributes: [
+          { trait_type: 'Standard', value: 'Token-2022' },
+          { trait_type: 'Utility', value: 'Connectivity Rewards' },
+        ],
+        properties: {
+          files: [{ uri: logoUrl, type: `image/${ext}` }],
+          category: 'image',
+          links: { website: 'https://netreward.online' },
+        },
+      };
+      const metaBlob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
+      const metaFile = new File([metaBlob], 'nrt-metadata.json', { type: 'application/json' });
+      const { error } = await supabase.storage.from('assets').upload('nrt-metadata.json', metaFile, { upsert: true, contentType: 'application/json' });
+      if (error) throw error;
+      const { data: metaUrlData } = supabase.storage.from('assets').getPublicUrl('nrt-metadata.json');
+      const metadataUri = metaUrlData.publicUrl;
+      await supabase.from('kv_settings').upsert({ key: 'nrt_metadata_uri', value: metadataUri }, { onConflict: 'key' });
+      setConfig(prev => ({ ...prev, uri: metadataUri }));
+      showToast('Metadata JSON published to Supabase! URI auto-filled below.', 'success');
+    } catch (e: any) {
+      showToast(e.message || 'Publish failed', 'error');
+    } finally { setPublishingMeta(false); }
+  };
+
   const handleDownloadMetadata = () => {
-    const metadata = generateNRTMetadata(logoUrl);
+    const metadata = {
+      name: config.name,
+      symbol: config.symbol,
+      description: 'NetReward Token (NRT) is the foundational asset of the NetReward ecosystem.',
+      image: logoUrl || 'https://your-logo-url-here.png',
+      properties: { files: [{ uri: logoUrl, type: 'image/png' }], category: 'image' },
+    };
     const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'nrt-metadata.json';
     a.click();
-    showToast('Metadata JSON generated. Upload this to Arweave or IPFS.', 'success');
-  };
+    showToast('Metadata JSON downloaded.', 'success');
+  };;
 
   const verifySquadsAddress = async (address: string) => {
     if (!address) return;
@@ -249,7 +339,7 @@ export default function AdminTokenLaunch() {
                   </div>
                   <div className="col-span-2">
                     <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Metadata URI</label>
-                    <input type="text" defaultValue="https://arweave.net/metadata.json" className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-accent-primary" />
+                    <input type="text" value={config.uri} onChange={e => setConfig({...config, uri: e.target.value})} className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-accent-primary" />
                   </div>
                   <div className="col-span-2">
                     <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Decimals</label>
@@ -277,13 +367,23 @@ export default function AdminTokenLaunch() {
                           {uploading ? 'Uploading…' : logoUrl ? 'Change Logo' : 'Upload Logo'}
                         </button>
                         <button
-                          onClick={handleDownloadMetadata}
-                          className="px-4 py-2 bg-bg-secondary text-text-primary font-bold text-sm rounded-xl border border-glass-border hover:bg-glass-bg transition-colors ml-2 mt-2 inline-flex items-center gap-2"
+                          onClick={handlePublishMetadata}
+                          disabled={publishingMeta || !logoUrl}
+                          className="px-4 py-2 bg-green-500/10 text-green-400 font-bold text-sm rounded-xl border border-green-500/20 hover:bg-green-500/20 transition-colors disabled:opacity-50 ml-2 mt-2 inline-flex items-center gap-2"
                         >
-                          <Database size={14} /> Metadata JSON
+                          {publishingMeta ? 'Publishing…' : <><Upload size={13} /> Publish Metadata JSON</>}
                         </button>
-                        <p className="text-[10px] text-text-secondary mt-1">PNG, SVG, or WebP · Max 2MB</p>
-                        {logoUrl && <p className="text-[10px] text-accent-primary mt-0.5 truncate max-w-[200px]">{logoUrl}</p>}
+                        <p className="text-[10px] text-text-secondary mt-1">PNG, SVG, or WebP · Max 2MB · Metadata JSON auto-hosted on Supabase</p>
+                        {logoUrl && <p className="text-[10px] text-text-secondary mt-0.5 truncate max-w-[250px]">Logo: {logoUrl}</p>}
+                        {config.uri && !config.uri.includes('arweave') && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <p className="text-[10px] text-green-400 font-bold truncate max-w-[220px]">✓ URI: {config.uri}</p>
+                            <a href={config.uri} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 underline shrink-0">Preview ↗</a>
+                          </div>
+                        )}
+                        {(!config.uri || config.uri.includes('arweave')) && (
+                          <p className="text-[10px] text-amber-400 mt-1">⚠ No metadata hosted yet. Click "Publish Metadata JSON" above.</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -331,18 +431,39 @@ export default function AdminTokenLaunch() {
                 </div>
                 <div className="space-y-4">
                   <h4 className="font-bold text-sm border-b border-glass-border pb-2">Treasury Buckets (Target Wallets)</h4>
+                  {(() => {
+                    const totalPct = config.treasuryBuckets.reduce((s, b) => s + b.percentage, 0);
+                    const emptyCount = config.treasuryBuckets.filter(b => !b.address).length;
+                    return (
+                      <>
+                        {totalPct !== 100 && (
+                          <div className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mb-2">
+                            ⚠ Percentages total {totalPct}% — must equal 100% for full supply distribution.
+                          </div>
+                        )}
+                        {emptyCount > 0 && (
+                          <div className="text-[11px] text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 mb-2">
+                            ℹ {emptyCount} bucket(s) without an address will be skipped during minting.
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                   {config.treasuryBuckets.map((b, i) => (
                     <div key={b.name} className="flex gap-4 items-center">
                       <div className="flex-1">
-                        <label className="text-[10px] font-bold text-text-secondary block">{b.name}</label>
+                        <label className="text-[10px] font-bold text-text-secondary block">{b.name} ({b.percentage}%)</label>
                         <input type="text" placeholder="Solana Address" value={b.address} onChange={e => {
                           const newBuckets = [...config.treasuryBuckets];
                           newBuckets[i].address = e.target.value;
                           setConfig({...config, treasuryBuckets: newBuckets});
-                        }} className="w-full bg-bg-secondary border border-glass-border rounded-lg px-3 py-2 text-xs font-mono" />
+                        }} className={`w-full bg-bg-secondary border rounded-lg px-3 py-2 text-xs font-mono ${
+                          b.address ? 'border-glass-border' : 'border-amber-500/40'
+                        }`} />
                       </div>
-                      <div className="w-24 text-right">
-                        <span className="text-xs font-bold">{(config.initialSupply * (b.allocation / 1000000000)).toLocaleString()}</span>
+                      <div className="w-32 text-right">
+                        <span className="text-xs font-bold">{Math.floor(config.initialSupply * (b.percentage / 100)).toLocaleString()}</span>
+                        <span className="text-[10px] text-text-secondary block">Tokens</span>
                       </div>
                     </div>
                   ))}

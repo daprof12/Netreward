@@ -71,9 +71,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
       
-      const role = (session.user.user_metadata?.role as UserRole) || 'user';
-      const active_role = (session.user.user_metadata?.active_role as UserRole) || role;
-      const { profile } = get();
+      const { profile, role: currentRole, active_role: currentActiveRole } = get();
+      
+      // If we already have a profile in state, preserve the current role to prevent UI flashing
+      // Otherwise, try to get it from JWT metadata, fallback to 'user'
+      const role = profile ? currentRole : ((session.user.user_metadata?.role as UserRole) || 'user');
+      const active_role = profile ? currentActiveRole : ((session.user.user_metadata?.active_role as UserRole) || role);
       
       // ONLY set isLoading to true if we don't have a profile yet.
       // This prevents the global "spinner" from clearing the UI during navigations.

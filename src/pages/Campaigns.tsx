@@ -4,7 +4,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Filter, Play, CheckCircle2, Loader2, X,
   Tv, Music, Globe, MapPin, TrendingUp, Info,
-  ChevronRight, Wifi, ArrowDownToLine, ArrowUpFromLine, Clock
+  ChevronRight, Wifi, ArrowDownToLine, ArrowUpFromLine, Clock,
+  Gamepad2, Link2
 } from 'lucide-react';
 import { useCampaigns } from '@/hooks/useCampaigns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +18,8 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import NrtAmount from '@/components/ui/NrtAmount';
+import { useGamingAccounts, GAMING_PLATFORMS, type GamingPlatform } from '@/hooks/useGamingAccounts';
+import { PlatformLogoCircle } from '@/components/ui/PlatformLogos';
 
 // No static mock data needed here anymore
 
@@ -66,6 +69,21 @@ export default function Campaigns() {
   // Data fetching
   const { activeCampaigns, userEnrollments, isLoading, joinCampaign, isJoining } = useCampaigns();
   const { claimRewards, isClaiming } = useClaimRewards();
+
+  // Gaming accounts guard
+  const { gamingAccounts, linkedPlatforms, linkAccount, isLinking, isLoading: isLoadingGaming } = useGamingAccounts();
+  const [showGamingPrompt, setShowGamingPrompt] = useState(false);
+  const [pendingGamingCampaignId, setPendingGamingCampaignId] = useState<string | null>(null);
+  const [gamingPlatformSelect, setGamingPlatformSelect] = useState<GamingPlatform>('playstation');
+  const [gamingUsernameInput, setGamingUsernameInput] = useState('');
+  const availableGamingPlatforms = (Object.keys(GAMING_PLATFORMS) as GamingPlatform[]).filter(p => !linkedPlatforms.has(p));
+
+  // Robust category matcher — handles 'Gaming', 'Game', 'Games' etc.
+  const isGamingCategory = (cat?: string) => {
+    if (!cat) return false;
+    const n = cat.toLowerCase().trim();
+    return n === 'gaming' || n === 'game' || n === 'games';
+  };
 
   const { data: recentActivity } = useQuery({
     queryKey: ['recent_activity_campaigns', useAuthStore.getState().user?.id],
@@ -150,7 +168,16 @@ export default function Campaigns() {
       return true;
     });
 
-  const handleJoin = async (id: string) => {
+  const handleJoin = async (id: string, category?: string) => {
+    // Gaming campaign guard: check if user has linked gaming accounts
+    if (isGamingCategory(category) && !isLoadingGaming && gamingAccounts.length === 0) {
+      setPendingGamingCampaignId(id);
+      setGamingPlatformSelect(availableGamingPlatforms[0] || 'playstation');
+      setGamingUsernameInput('');
+      setShowGamingPrompt(true);
+      return;
+    }
+
     setJoiningId(id);
     try {
       await joinCampaign(id);
@@ -164,6 +191,27 @@ export default function Campaigns() {
       }
     } finally {
       setJoiningId(null);
+    }
+  };
+
+  const handleLinkAndJoin = async () => {
+    if (!gamingUsernameInput.trim() || !pendingGamingCampaignId) return;
+    try {
+      await linkAccount({ platform: gamingPlatformSelect, username: gamingUsernameInput });
+      setShowGamingPrompt(false);
+      // Now join the campaign
+      setJoiningId(pendingGamingCampaignId);
+      await joinCampaign(pendingGamingCampaignId);
+      showToast('Account linked & campaign joined!', 'success');
+    } catch (err: any) {
+      if (err.code === '23505') {
+        showToast('Platform already linked', 'warning');
+      } else {
+        showToast(err.message || 'Failed', 'danger');
+      }
+    } finally {
+      setJoiningId(null);
+      setPendingGamingCampaignId(null);
     }
   };
 
@@ -330,7 +378,7 @@ export default function Campaigns() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => handleJoin(campaign.id)}
+                        onClick={() => handleJoin(campaign.id, campaign.category)}
                         disabled={isJoining || isThisJoining}
                         className="flex items-center justify-center gap-2 bg-accent-primary text-primary-foreground py-2.5 rounded-lg text-sm font-semibold shadow-lg shadow-accent-primary/20 active:scale-[0.98] transition-transform disabled:opacity-70"
                       >
@@ -685,6 +733,103 @@ export default function Campaigns() {
             </motion.div>
           );
         })()}
+      </AnimatePresence>
+
+      {/* ── Gaming Account Link Prompt ───────────────────────────────────── */}
+      <AnimatePresence>
+        {showGamingPrompt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => { setShowGamingPrompt(false); setPendingGamingCampaignId(null); }}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="w-full max-w-md glass rounded-t-[24px] border-t border-glass-border flex flex-col max-h-[85vh]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-5 space-y-5 overflow-y-auto flex-1">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-lg">Link Gaming Account</h3>
+                  <button onClick={() => { setShowGamingPrompt(false); setPendingGamingCampaignId(null); }} className="p-1.5 bg-bg-secondary rounded-full">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Info */}
+                <div className="flex items-start gap-3 bg-accent-primary/5 border border-accent-primary/20 rounded-xl px-4 py-3">
+                  <Gamepad2 size={20} className="text-accent-primary mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">This is a Gaming campaign</p>
+                    <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
+                      Link at least one gaming platform so the publisher can match your gameplay data and reward you with NRT.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Platform Selector */}
+                <div>
+                  <p className="text-[10px] font-black text-text-secondary uppercase tracking-wider mb-3">Select Platform</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableGamingPlatforms.map(platform => {
+                      const meta = GAMING_PLATFORMS[platform];
+                      const isSelected = gamingPlatformSelect === platform;
+                      return (
+                        <button
+                          key={platform}
+                          onClick={() => { setGamingPlatformSelect(platform); setGamingUsernameInput(''); }}
+                          className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all text-left ${
+                            isSelected
+                              ? 'bg-accent-primary/10 border-accent-primary ring-1 ring-accent-primary'
+                              : 'glass border-glass-border hover:bg-glass-bg'
+                          }`}
+                        >
+                          <PlatformLogoCircle platform={platform} size={28} iconSize={12} />
+                          <span className="font-semibold text-xs text-text-primary truncate">{meta.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Username Input */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-wider">
+                    {GAMING_PLATFORMS[gamingPlatformSelect]?.usernameLabel || 'Username'}
+                  </label>
+                  <input
+                    type="text"
+                    value={gamingUsernameInput}
+                    onChange={e => setGamingUsernameInput(e.target.value)}
+                    placeholder={GAMING_PLATFORMS[gamingPlatformSelect]?.usernamePlaceholder || 'Enter username'}
+                    className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent-primary transition-colors"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {/* CTA */}
+              <div className="px-5 pt-4 pb-10 border-t border-glass-border/50">
+                <button
+                  onClick={handleLinkAndJoin}
+                  disabled={isLinking || isJoining || !gamingUsernameInput.trim()}
+                  className="w-full py-3.5 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.98] transition-transform"
+                >
+                  {isLinking || isJoining ? (
+                    <><Loader2 size={16} className="animate-spin" /> Linking & Joining...</>
+                  ) : (
+                    <><Link2 size={16} /> Link & Join Campaign</>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </motion.div>
   );

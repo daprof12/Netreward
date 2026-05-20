@@ -5,7 +5,7 @@ import {
   User, ShieldCheck, Globe, Bell, Moon, ChevronRight, 
   LogOut, HelpCircle, Wallet, Banknote, CreditCard, 
   Code, UserCog, AlertCircle, X, Lock, Check, Key, Copy, Signal, ArrowRight, Loader2,
-  History, FileText, Gift, QrCode, Info
+  History, FileText, Gift, QrCode, Info, Gamepad2
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -18,6 +18,7 @@ import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { useProfile } from '@/hooks/useProfile';
 import LogoutConfirmModal from '@/components/ui/LogoutConfirmModal';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useGamingAccounts } from '@/hooks/useGamingAccounts';
 
 interface MenuItem {
   icon: LucideIcon;
@@ -41,6 +42,7 @@ export default function Settings() {
   const { services, profileLogo: spLogo, checkoutSessions, createCheckoutSession } = useSpStore();
   const { networks, profileLogo: ispLogo, initialize: initIsp } = useIspStore();
   const { profile, switchRole, isSwitchingRole } = useProfile();
+  const { gamingAccounts } = useGamingAccounts();
 
   // KYC status fetched from Supabase
   const [kycStatus, setKycStatus] = useState<'none' | 'pending' | 'verified' | 'rejected'>('none');
@@ -152,6 +154,7 @@ export default function Settings() {
         { icon: ShieldCheck, label: 'KYC Verification', value: kycLabel, highlight: kycHighlight, to: '/settings/kyc', onClick: () => navigate('/settings/kyc', { state: { targetRole: role === 'sp' ? 'sp' : role === 'isp' ? 'isp' : 'user' } }) },
         { icon: Lock, label: 'Security & 2FA', to: '/settings/security' },
         { icon: UserCog, label: 'Switch Account Type', onClick: () => setShowUpgradeSheet(true) },
+        { icon: Gamepad2, label: 'Gaming Accounts', value: gamingAccounts.length > 0 ? `${gamingAccounts.length} Linked` : 'None', highlight: gamingAccounts.length === 0, to: '/settings/gaming' },
       ]
     },
     {

@@ -5,8 +5,9 @@ import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { PublicKey, Transaction, ComputeBudgetProgram } from '@solana/web3.js';
+import { PublicKey, Transaction, ComputeBudgetProgram, SystemProgram } from '@solana/web3.js';
 import { createMintToInstruction, getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
+import { createUpdateFieldInstruction, Field } from '@solana/spl-token-metadata';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
 const DEFAULT_CONFIG = {
@@ -15,6 +16,7 @@ const DEFAULT_CONFIG = {
   totalSupply: 10000000000,
   circulatingSupply: 0,
   currentValue: 0.000042,
+  priceMode: 'fixed' as 'fixed' | 'algorithm',
   status: 'active' as string,
   valueSources: [
     { source: 'Data Consumption', weight: 40, currentPrice: 0.00005 },
@@ -37,17 +39,21 @@ export default function AdminTokenConfig() {
   const { connection } = useConnection();
   const { publicKey, signTransaction } = useWallet();
   const [mintAmount, setMintAmount] = useState('');
+  const [recipientAddress, setRecipientAddress] = useState('');
   const [isMinting, setIsMinting] = useState(false);
+  const [metadataUri, setMetadataUri] = useState('');
+  const [isUpdatingUri, setIsUpdatingUri] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await supabase.from('kv_settings').select('key, value').in('key', ['token_config', 'token_frozen', 'nrt_mint_address']);
+        const { data } = await supabase.from('kv_settings').select('key, value').in('key', ['token_config', 'token_frozen', 'nrt_mint_address', 'nrt_metadata_uri']);
         let config = { ...DEFAULT_CONFIG };
         (data || []).forEach((s: any) => {
           if (s.key === 'token_config') { try { config = { ...config, ...JSON.parse(s.value) }; } catch {} }
           if (s.key === 'token_frozen') config.status = s.value === 'true' ? 'frozen' : 'active';
           if (s.key === 'nrt_mint_address') setMintAddress(s.value);
+          if (s.key === 'nrt_metadata_uri') setMetadataUri(s.value || '');
         });
         setTokenConfig(config);
         setForm(config);
@@ -58,6 +64,7 @@ export default function AdminTokenConfig() {
 
   // Dynamically calculate the NRT currentValue whenever valueSources change
   useEffect(() => {
+    if (form.priceMode === 'fixed') return;
     const calculatedValue = form.valueSources.reduce((total, source) => {
       return total + (source.currentPrice * (source.weight / 100));
     }, 0);
@@ -66,15 +73,26 @@ export default function AdminTokenConfig() {
     if (Math.abs(calculatedValue - form.currentValue) > 0.000000001) {
       setForm(prev => ({ ...prev, currentValue: calculatedValue }));
     }
-  }, [form.valueSources]);
+  }, [form.valueSources, form.priceMode]);
 
   const handleSave = async () => {
     try {
+      // 1. Save token config
       const { error } = await supabase.from('kv_settings').upsert([
         { key: 'token_config', value: JSON.stringify(form), category: 'token', updated_at: new Date().toISOString() },
         { key: 'nrt_mint_address', value: mintAddress, category: 'token', updated_at: new Date().toISOString() }
       ], { onConflict: 'key' });
       if (error) throw error;
+
+      // 2. Sync this value to reward_config so the rest of the app uses it
+      const { data: rwData } = await supabase.from('kv_settings').select('value').eq('key', 'reward_config').single();
+      let rwConfig = rwData?.value ? (typeof rwData.value === 'string' ? JSON.parse(rwData.value) : rwData.value) : {};
+      rwConfig.nrtUsdValue = form.currentValue;
+      await supabase.from('kv_settings').upsert(
+        { key: 'reward_config', value: JSON.stringify(rwConfig), category: 'rewards', updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+
       setTokenConfig(form);
       showToast('Token configuration updated.', 'success');
     } catch (e: any) { showToast(e.message || 'Save failed', 'error'); }
@@ -102,11 +120,12 @@ export default function AdminTokenConfig() {
     try {
       const mintPubkey = new PublicKey(mintAddress);
       const amountToMint = BigInt(Number(mintAmount) * Math.pow(10, 9)); // 9 Decimals
+      const destinationPubkey = recipientAddress ? new PublicKey(recipientAddress) : publicKey;
 
-      // Calculate the Associated Token Account (ATA) for the connected wallet
+      // Calculate the Associated Token Account (ATA) for the target wallet
       const ata = getAssociatedTokenAddressSync(
         mintPubkey,
-        publicKey,
+        destinationPubkey,
         false,
         TOKEN_2022_PROGRAM_ID
       );
@@ -124,7 +143,7 @@ export default function AdminTokenConfig() {
           createAssociatedTokenAccountInstruction(
             publicKey, // payer
             ata, // ata
-            publicKey, // owner
+            destinationPubkey, // owner
             mintPubkey, // mint
             TOKEN_2022_PROGRAM_ID
           )
@@ -160,13 +179,86 @@ export default function AdminTokenConfig() {
 
       if (confirmation.value.err) throw new Error('Transaction failed to confirm.');
 
-      showToast(`Successfully minted ${mintAmount} NRT to your wallet!`, 'success');
+      showToast(`Successfully minted ${mintAmount} NRT to ${recipientAddress || 'your wallet'}!`, 'success');
       setMintAmount('');
       
     } catch (err: any) {
       showToast(err.message || 'Minting failed', 'error');
     } finally {
       setIsMinting(false);
+    }
+  };
+
+  const handleUpdateMetadataUri = async () => {
+    if (!publicKey || !signTransaction) return showToast('Connect your Solana wallet first.', 'warning');
+    if (!mintAddress) return showToast('Mint address is not configured.', 'error');
+    if (!metadataUri) return showToast('Enter a metadata URI first.', 'error');
+
+    setIsUpdatingUri(true);
+    try {
+      const mintPubkey = new PublicKey(mintAddress);
+
+      // ── Rent calculation ─────────────────────────────────────────────────
+      // UpdateField reallocates the mint account when the new value is longer.
+      // We must explicitly transfer the extra rent-exempt lamports to the mint
+      // BEFORE the updateField instruction, otherwise Phantom shows
+      // "not enough SOL" even when the wallet has a sufficient balance.
+      const mintAccountInfo = await connection.getAccountInfo(mintPubkey);
+      if (!mintAccountInfo) throw new Error('Mint account not found on-chain. Check the Mint Address setting.');
+
+      // Extra bytes = new URI length - conservative estimate of old URI length.
+      // We add +50 bytes as a safety buffer for TLV overhead differences.
+      const extraBytes = Math.max(0, metadataUri.length + 50);
+      const newLen = mintAccountInfo.data.length + extraBytes;
+      const rentExemptForNewSize = await connection.getMinimumBalanceForRentExemption(newLen);
+      const additionalRentNeeded = Math.max(0, rentExemptForNewSize - mintAccountInfo.lamports);
+
+      const tx = new Transaction();
+      tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 300_000 }));
+
+      // Transfer additional rent to mint if the account needs to grow
+      if (additionalRentNeeded > 0) {
+        tx.add(SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: mintPubkey,
+          lamports: additionalRentNeeded,
+        }));
+      }
+
+      tx.add(
+        createUpdateFieldInstruction({
+          programId: TOKEN_2022_PROGRAM_ID,
+          metadata: mintPubkey,
+          updateAuthority: publicKey,
+          field: Field.Uri,
+          value: metadataUri,
+        })
+      );
+
+      const bh = await connection.getLatestBlockhash('confirmed');
+      tx.recentBlockhash = bh.blockhash;
+      tx.feePayer = publicKey;
+
+      const signed = await signTransaction(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: true, maxRetries: 5 });
+
+      showToast(`URI TX sent: ${sig.slice(0, 20)}... Confirming...`, 'success');
+
+      // Poll for confirmation
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const { value } = await connection.getSignatureStatus(sig, { searchTransactionHistory: true });
+        if (value?.confirmationStatus === 'confirmed' || value?.confirmationStatus === 'finalized') break;
+        if (value?.err) throw new Error(`TX failed on-chain: ${JSON.stringify(value.err)}`);
+      }
+
+      // Save URI to kv_settings for persistence
+      await supabase.from('kv_settings').upsert({ key: 'nrt_metadata_uri', value: metadataUri }, { onConflict: 'key' });
+      showToast('Metadata URI updated on-chain!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Update failed', 'error');
+    } finally {
+      setIsUpdatingUri(false);
     }
   };
 
@@ -194,7 +286,7 @@ export default function AdminTokenConfig() {
             </div>
             <span className="text-[10px] font-bold text-green-500">+2.4%</span>
           </div>
-          <p className="text-xs text-text-secondary font-medium">Calculated NRT Value</p>
+          <p className="text-xs text-text-secondary font-medium">{form.priceMode === 'fixed' ? 'Fixed NRT Value' : 'Calculated NRT Value'}</p>
           <h3 className="text-xl font-bold text-text-primary mt-0.5">${form.currentValue.toLocaleString(undefined, { maximumFractionDigits: 7 })}</h3>
         </div>
 
@@ -278,6 +370,18 @@ export default function AdminTokenConfig() {
                 ))}
 
                 <div>
+                  <label className="flex items-center justify-between text-xs font-bold text-text-secondary mb-1 uppercase tracking-wider">
+                    <span>NRT USD Value</span>
+                    <label className="flex items-center gap-2 cursor-pointer normal-case tracking-normal">
+                      <input type="checkbox" checked={form.priceMode === 'fixed'} onChange={e => setForm({...form, priceMode: e.target.checked ? 'fixed' : 'algorithm'})} />
+                      <span className="text-[10px]">Fixed Price Override</span>
+                    </label>
+                  </label>
+                  <input type="number" step="0.000001" disabled={form.priceMode !== 'fixed'} value={form.currentValue} onChange={e => setForm({ ...form, currentValue: Number(e.target.value) })}
+                    className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary disabled:opacity-50" />
+                </div>
+
+                <div>
                   <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Total Supply</label>
                   <input type="number" value={form.totalSupply} onChange={e => setForm({ ...form, totalSupply: Number(e.target.value) })}
                     className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-primary" />
@@ -293,7 +397,7 @@ export default function AdminTokenConfig() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-text-primary">{source.source}</span>
                       <span className="text-[10px] text-text-secondary font-mono">
-                        Contrib: ${((source.weight * source.currentPrice) / 100).toLocaleString(undefined, { maximumFractionDigits: 7 })}
+                        {form.priceMode === 'fixed' ? 'Override Active' : `Contrib: $${((source.weight * source.currentPrice) / 100).toLocaleString(undefined, { maximumFractionDigits: 7 })}`}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -361,30 +465,83 @@ export default function AdminTokenConfig() {
               {/* Mint Additional Tokens Panel */}
               <div className="mt-6 pt-6 border-t border-glass-border">
                 <h4 className="font-bold text-sm mb-3">Mint Additional Supply</h4>
-                <p className="text-[10px] text-text-secondary mb-4">Because you still hold the MintAuthority, you can mint new NRT directly to your connected Phantom wallet.</p>
+                <p className="text-[10px] text-text-secondary mb-4">Because you still hold the MintAuthority, you can mint new NRT to any Solana address (or leave empty to mint to your connected wallet).</p>
                 
                 {!publicKey ? (
                   <div className="bg-amber-500/10 text-amber-500 text-xs p-3 rounded-xl border border-amber-500/20">
                     Connect your Solana wallet (top right) to mint tokens.
                   </div>
                 ) : (
-                  <div className="flex gap-2">
-                    <input 
-                      type="number"
-                      value={mintAmount}
-                      onChange={(e) => setMintAmount(e.target.value)}
-                      placeholder="Amount of NRT..."
-                      className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2 text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary" 
-                    />
-                    <button 
-                      onClick={handleMintTokens}
-                      disabled={isMinting}
-                      className="bg-accent-primary text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
-                    >
-                      {isMinting ? <Loader2 size={16} className="animate-spin" /> : 'Mint'}
-                    </button>
+                  <div className="space-y-3">
+                    <div>
+                      <input 
+                        type="text"
+                        value={recipientAddress}
+                        onChange={(e) => setRecipientAddress(e.target.value)}
+                        placeholder="Recipient Address (Optional: defaults to you)"
+                        className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-2 text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary" 
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <input 
+                        type="number"
+                        value={mintAmount}
+                        onChange={(e) => setMintAmount(e.target.value)}
+                        placeholder="Amount of NRT..."
+                        className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2 text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary" 
+                      />
+                      <button 
+                        onClick={handleMintTokens}
+                        disabled={isMinting}
+                        className="bg-accent-primary text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+                      >
+                        {isMinting ? <Loader2 size={16} className="animate-spin" /> : 'Mint Tokens'}
+                      </button>
+                    </div>
                   </div>
                 )}
+              </div>
+            </div>
+
+            <div className="bg-bg-primary border border-glass-border rounded-xl p-5 space-y-4">
+              <h3 className="font-bold border-b border-glass-border pb-3">Token Metadata (On-Chain)</h3>
+              <p className="text-[11px] text-text-secondary">
+                The Metadata URI points to a publicly-hosted JSON file containing the token name, symbol, and logo image. Phantom and other wallets fetch this URL to display the token correctly.
+              </p>
+
+              <div>
+                <label className="text-xs font-bold text-text-secondary mb-1 block uppercase tracking-wider">Metadata URI</label>
+                <input
+                  type="text"
+                  value={metadataUri}
+                  onChange={e => setMetadataUri(e.target.value)}
+                  placeholder="https://...supabase.co/.../nrt-metadata.json"
+                  className="w-full bg-bg-secondary border border-glass-border rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-accent-primary"
+                />
+                {metadataUri && (
+                  <a href={metadataUri} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 underline mt-1 inline-block">
+                    Preview JSON ↗
+                  </a>
+                )}
+              </div>
+
+              {!publicKey ? (
+                <div className="bg-amber-500/10 text-amber-500 text-xs p-3 rounded-xl border border-amber-500/20">
+                  Connect your Solana wallet (top right) to update the on-chain URI.
+                </div>
+              ) : (
+                <button
+                  onClick={handleUpdateMetadataUri}
+                  disabled={isUpdatingUri || !metadataUri}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-primary text-white font-bold text-sm rounded-xl disabled:opacity-50 hover:opacity-90 transition-opacity"
+                >
+                  {isUpdatingUri ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                  {isUpdatingUri ? 'Updating on-chain...' : 'Update Metadata URI On-Chain'}
+                </button>
+              )}
+
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-[11px] text-blue-300 leading-relaxed">
+                <strong>Tip:</strong> Upload your logo in the Token Launch wizard (Step 2). The metadata JSON is auto-generated and hosted on Supabase — the URI is automatically filled in here once uploaded.
               </div>
             </div>
 

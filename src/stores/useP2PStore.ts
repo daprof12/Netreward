@@ -67,7 +67,9 @@ function normalizeOffer(o: any): P2POffer {
     rating: null,
     reviewCount: 0,
     completionRate: 100,
-    maxAmount: o.max_limit || o.nrt_amount,
+    price: o.price_per_nrt || 0,
+    minAmount: o.min_limit || 0,
+    maxAmount: o.max_limit || o.nrt_amount || 0,
     paymentMethods: o.payment_methods || [],
   };
 }
@@ -82,6 +84,9 @@ interface P2PState {
   fetchPaymentAccounts: (userId: string) => Promise<void>;
   subscribeToOrders: (userId: string) => () => void;
   createOrder: (order: Omit<P2POrder, 'id' | 'created_at' | 'status' | 'escrow_locked' | 'has_dispute' | 'proof_url'>) => Promise<P2POrder | null>;
+  acceptOrder: (orderId: string) => Promise<void>;
+  declineOrder: (orderId: string) => Promise<void>;
+  markOrderPaid: (orderId: string, proofUrl?: string) => Promise<void>;
   addOffer: (offer: any) => Promise<void>;
   updateOffer: (id: string, updates: any) => Promise<void>;
   deleteOffer: (id: string) => Promise<void>;
@@ -114,7 +119,7 @@ export const useP2PStore = create<P2PState>((set, get) => ({
     set({ isLoading: true });
     const { data, error } = await supabase
       .from('p2p_orders')
-      .select('*')
+      .select('*, p2p_offers(*, users(display_name))')
       .or(`seller_id.eq.${userId},buyer_id.eq.${userId}`)
       .order('created_at', { ascending: false });
 
@@ -180,6 +185,31 @@ export const useP2PStore = create<P2PState>((set, get) => ({
       return data;
     }
     return null;
+  },
+
+  acceptOrder: async (orderId) => {
+    const { error } = await supabase
+      .from('p2p_orders')
+      .update({ status: 'accepted' })
+      .eq('id', orderId);
+    if (error) throw error;
+  },
+
+  declineOrder: async (orderId) => {
+    const { error } = await supabase.rpc('cancel_p2p_order', {
+      p_order_id: orderId
+    });
+    if (error) throw error;
+  },
+
+  markOrderPaid: async (orderId, proofUrl) => {
+    const updates: any = { status: 'paid' };
+    if (proofUrl) updates.proof_url = proofUrl;
+    const { error } = await supabase
+      .from('p2p_orders')
+      .update(updates)
+      .eq('id', orderId);
+    if (error) throw error;
   },
 
   addOffer: async (offerData) => {

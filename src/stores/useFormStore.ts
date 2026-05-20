@@ -19,6 +19,11 @@ interface FormDrafts {
     androidUrl: string;
     iosUrl: string;
     logoPreview: string | null;
+    playstationUrl: string;
+    xboxUrl: string;
+    steamUrl: string;
+    oculusUrl: string;
+    nintendoUrl: string;
   };
 }
 
@@ -48,6 +53,11 @@ const initialDrafts: FormDrafts = {
     androidUrl: '',
     iosUrl: '',
     logoPreview: null,
+    playstationUrl: '',
+    xboxUrl: '',
+    steamUrl: '',
+    oculusUrl: '',
+    nintendoUrl: '',
   },
 };
 

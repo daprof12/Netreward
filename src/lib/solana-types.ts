@@ -6,11 +6,12 @@
 export interface TokenLaunchConfig {
   name: string;
   symbol: string;
+  uri: string;
   decimals: number;
   initialSupply: number;
   transferFeeBasisPoints: number;
   maxTransferFee: number;
   interestRate: number;
-  treasuryBuckets: { name: string; address: string; allocation: number }[];
+  treasuryBuckets: { name: string; address: string; percentage: number }[];
   multiSigAddress?: string;
 }
