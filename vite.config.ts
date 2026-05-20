@@ -11,8 +11,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      buffer: 'buffer/',
-      events: 'events/',
+      buffer: 'buffer',
+      events: 'events',
       crypto: 'crypto-browserify',
       stream: 'stream-browserify',
       process: 'process/browser',
@@ -24,8 +24,8 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
-      'buffer/',
-      'events/',
+      'buffer',
+      'events',
       'process',
       '@solana/web3.js',
       '@solana/spl-token',

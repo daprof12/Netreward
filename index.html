@@ -8,16 +8,10 @@
     <meta name="description" content="NetReward — Earn NRT tokens by sharing your bandwidth. Join campaigns, manage devices, and track rewards in real time." />
     <meta name="theme-color" content="#7C3AED" />
     <title>NetReward</title>
-    <script>
-      window.global = window;
-    </script>
-    <script type="module">
-      import { Buffer } from 'buffer/';
-      window.Buffer = Buffer;
-    </script>
   </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/src/polyfills.ts"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
