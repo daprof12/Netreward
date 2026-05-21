@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, AlertTriangle, CheckCircle, Clock, XCircle, MoreVertical, Key, Activity, Smartphone, Server, Eye, Settings } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Search, AlertTriangle, CheckCircle, Key, Activity, Smartphone, Server, Settings, Gamepad2, Zap, RefreshCw } from 'lucide-react';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -49,6 +49,9 @@ export default function AdminTracking() {
   // Stats
   const pendingAnomalies = trackingAnomalies.filter(a => a.status === 'open').length;
   const activeKeys = spApiKeys.filter(k => k.status === 'active').length;
+  const verifiedSessions = trackingSessions.filter(s => s.status === 'verified').length;
+  const pendingSessions = trackingSessions.filter(s => s.status === 'pending').length;
+  const gamingSessions = trackingSessions.filter(s => (s.source || '').startsWith('gaming_')).length;
 
   const handleActionAnomaly = async (id: string, newStatus: 'reviewed' | 'cleared' | 'actioned' | 'open') => {
     try {
@@ -68,9 +71,13 @@ export default function AdminTracking() {
   };
 
   const filteredSessions = trackingSessions.filter(s => {
-    const matchSearch = (s.sessionId || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-                        (s.userEmail || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchStatus = statusFilter === 'All' || s.status === statusFilter.toLowerCase();
+    const q = searchQuery.toLowerCase();
+    const matchSearch = (s.sessionId || '').toLowerCase().includes(q) ||
+                        (s.userEmail || '').toLowerCase().includes(q) ||
+                        (s.campaignName || '').toLowerCase().includes(q) ||
+                        (s.source || '').toLowerCase().includes(q) ||
+                        (s.deviceIp || '').toLowerCase().includes(q);
+    const matchStatus = statusFilter === 'All' || s.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
@@ -82,26 +89,40 @@ export default function AdminTracking() {
   });
 
   const getSourceIcon = (source: string) => {
+    if (source?.startsWith('gaming_')) return <Gamepad2 size={14} className="text-purple-400" />;
     switch (source) {
       case 'sdk': return <Settings size={14} className="text-blue-500" />;
+      case 'isp_sdk': return <Server size={14} className="text-cyan-500" />;
       case 'android_service': return <Smartphone size={14} className="text-green-500" />;
-      case 'extension': return <Server size={14} className="text-purple-500" />;
-      default: return <Activity size={14} />;
+      case 'extension': return <Zap size={14} className="text-yellow-500" />;
+      default: return <Activity size={14} className="text-text-secondary" />;
     }
+  };
+
+  const getGamingPlatformLabel = (source: string) => {
+    if (!source?.startsWith('gaming_')) return null;
+    const platform = source.replace('gaming_', '');
+    const labels: Record<string, string> = {
+      playstation: 'PlayStation', xbox: 'Xbox', steam: 'Steam',
+      oculus_vr: 'Oculus VR', nintendo_switch: 'Nintendo', android: 'Android', ios: 'iOS'
+    };
+    return labels[platform] || platform;
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'verified': return 'bg-green-500/10 text-green-500';
       case 'rewarded': return 'bg-green-500/10 text-green-500';
-      case 'pending': return 'bg-amber-500/10 text-amber-500';
+      case 'pending': return 'bg-amber-500/10 text-amber-500 border border-amber-500/30';
+      case 'duplicate': return 'bg-gray-500/10 text-gray-400';
+      case 'skipped': return 'bg-gray-500/10 text-gray-400';
+      case 'error': return 'bg-red-500/10 text-red-500';
       case 'rejected': return 'bg-red-500/10 text-red-500';
       case 'held': return 'bg-purple-500/10 text-purple-500';
-      
       case 'open': return 'bg-amber-500/10 text-amber-500 border border-amber-500/20';
       case 'reviewed': return 'bg-blue-500/10 text-blue-500';
       case 'cleared': return 'bg-green-500/10 text-green-500';
       case 'actioned': return 'bg-purple-500/10 text-purple-500';
-      
       case 'active': return 'bg-green-500/10 text-green-500';
       case 'revoked': return 'bg-red-500/10 text-red-500';
       default: return 'bg-gray-500/10 text-gray-500';
@@ -128,33 +149,42 @@ export default function AdminTracking() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="glass p-4 rounded-2xl border border-glass-border">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-              <Activity size={16} className="text-blue-500" />
-            </div>
-            <h3 className="font-bold">Total Sessions</h3>
+          <div className="flex items-center gap-2 mb-1">
+            <Activity size={14} className="text-blue-500" />
+            <span className="text-xs text-text-secondary font-semibold">Total Sessions</span>
           </div>
           <p className="text-2xl font-black">{trackingSessions.length}</p>
         </div>
         <div className="glass p-4 rounded-2xl border border-glass-border">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
-              <AlertTriangle size={16} className="text-red-500" />
-            </div>
-            <h3 className="font-bold">Open Anomalies</h3>
+          <div className="flex items-center gap-2 mb-1">
+            <CheckCircle size={14} className="text-green-500" />
+            <span className="text-xs text-text-secondary font-semibold">Verified</span>
           </div>
-          <p className="text-2xl font-black text-red-500">{pendingAnomalies}</p>
+          <p className="text-2xl font-black text-green-500">{verifiedSessions}</p>
         </div>
         <div className="glass p-4 rounded-2xl border border-glass-border">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
-              <Key size={16} className="text-green-500" />
-            </div>
-            <h3 className="font-bold">Active SDK Keys</h3>
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle size={14} className="text-amber-500" />
+            <span className="text-xs text-text-secondary font-semibold">Pending</span>
           </div>
-          <p className="text-2xl font-black text-green-500">{activeKeys}</p>
+          <p className="text-2xl font-black text-amber-500">{pendingSessions}</p>
+          {pendingSessions > 0 && <p className="text-[10px] text-amber-400 mt-0.5">Gaming account unlinked</p>}
+        </div>
+        <div className="glass p-4 rounded-2xl border border-glass-border">
+          <div className="flex items-center gap-2 mb-1">
+            <Gamepad2 size={14} className="text-purple-400" />
+            <span className="text-xs text-text-secondary font-semibold">Gaming</span>
+          </div>
+          <p className="text-2xl font-black text-purple-400">{gamingSessions}</p>
+        </div>
+        <div className="glass p-4 rounded-2xl border border-glass-border">
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle size={14} className="text-red-500" />
+            <span className="text-xs text-text-secondary font-semibold">Anomalies</span>
+          </div>
+          <p className="text-2xl font-black text-red-500">{pendingAnomalies}</p>
         </div>
       </div>
 
@@ -191,17 +221,18 @@ export default function AdminTracking() {
                 <option value="All">All Status</option>
                 {activeTab === 'sessions' ? (
                   <>
-                    <option value="Rewarded">Rewarded</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Held">Held</option>
-                    <option value="Rejected">Rejected</option>
+                    <option value="verified">Verified</option>
+                    <option value="pending">Pending (Gaming unlinked)</option>
+                    <option value="duplicate">Duplicate</option>
+                    <option value="skipped">Skipped</option>
+                    <option value="error">Error</option>
                   </>
                 ) : (
                   <>
-                    <option value="Open">Open</option>
-                    <option value="Reviewed">Reviewed</option>
-                    <option value="Cleared">Cleared</option>
-                    <option value="Actioned">Actioned</option>
+                    <option value="open">Open</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="cleared">Cleared</option>
+                    <option value="actioned">Actioned</option>
                   </>
                 )}
               </select>
@@ -260,28 +291,40 @@ export default function AdminTracking() {
                   <td className="p-4">
                     <div className="flex items-center gap-1.5 bg-bg-secondary w-fit px-2 py-1 rounded-md mb-1.5 border border-glass-border">
                       {getSourceIcon(session.source)}
-                      <span className="text-xs font-medium capitalize">{session.source.replace('_', ' ')}</span>
+                      <span className="text-xs font-medium capitalize">
+                        {getGamingPlatformLabel(session.source) || session.source.replace(/_/g, ' ')}
+                      </span>
                     </div>
-                    <p className="text-[10px] text-text-secondary">Dev: {session.deviceIp}</p>
+                    {/* Gaming username stored in device_ip field as [gaming:username] */}
+                    {session.deviceIp?.startsWith('[gaming:') ? (
+                      <p className="text-[10px] text-purple-400 font-mono">{session.deviceIp}</p>
+                    ) : (
+                      <p className="text-[10px] text-text-secondary">Dev: {session.deviceIp}</p>
+                    )}
                     <p className="text-[10px] text-text-secondary">Usr: {session.userIp}</p>
                   </td>
                   <td className="p-4 text-right">
                     <p className="font-bold text-sm">{((session.dataRxBytes + session.dataTxBytes) / (1024 * 1024)).toFixed(2)} MB</p>
-                    <p className="text-[10px] text-text-secondary">in {Math.floor(session.durationSeconds / 60)} min</p>
+                    <p className="text-[10px] text-text-secondary">in {Math.floor(session.durationSeconds / 60)}m {session.durationSeconds % 60}s</p>
                   </td>
                   <td className="p-4 text-right">
                     <p className="font-bold text-accent-primary">{session.nrtAwarded} NRT</p>
                     <div className="flex justify-end mt-1">
-                      <div className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${session.validationScore > 0.8 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                      <div className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${session.validationScore >= 1.0 ? 'bg-green-500/10 text-green-500' : session.validationScore >= 0.5 ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>
                         {(session.validationScore * 100).toFixed(0)}% score
                       </div>
                     </div>
                   </td>
                   <td className="p-4 text-right">
                     <span className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider inline-block mb-1 ${getStatusColor(session.status)}`}>
-                      {session.status}
+                      {session.status === 'pending' ? '⚠ Pending' : session.status}
                     </span>
-                    {session.rejectReason && <p className="text-[10px] text-red-500 truncate max-w-[120px] ml-auto">{session.rejectReason}</p>}
+                    {session.status === 'pending' && (
+                      <p className="text-[10px] text-amber-400 truncate max-w-[140px] ml-auto">Gaming account not linked</p>
+                    )}
+                    {session.rejectReason && session.status !== 'pending' && (
+                      <p className="text-[10px] text-red-500 truncate max-w-[140px] ml-auto">{session.rejectReason}</p>
+                    )}
                   </td>
                 </tr>
               ))}
