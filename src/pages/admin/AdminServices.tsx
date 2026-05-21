@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Layers, CheckCircle2, XCircle, Trash2, Eye, Globe, Smartphone, Play, Info, X, ShieldAlert, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { Search, Layers, CheckCircle2, XCircle, Trash2, Eye, Globe, Smartphone, Play, Info, X, ShieldAlert, AlertCircle, Loader2, RefreshCw, Gamepad2, Terminal } from 'lucide-react';
 import { adminServiceApi } from '@/lib/adminApi';
 import { supabase } from '@/lib/supabase';
 import { useToastStore } from '@/stores/useToastStore';
 import { usePageTitle } from '@/hooks/usePageTitle';
-
+import { PlatformLogo } from '@/components/ui/PlatformLogos';
 export default function AdminServices() {
   usePageTitle('Admin — Services');
   const { showToast } = useToastStore();
@@ -158,11 +158,16 @@ export default function AdminServices() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-1">
+                    <div className="flex flex-wrap gap-1">
                       {s.web_url && <Globe size={12} className="text-accent-primary" title="Web" />}
                       {s.android_url && <Smartphone size={12} className="text-[#3DDC84]" title="Android" />}
                       {s.ios_url && <Play size={12} className="text-[#007AFF]" title="iOS" />}
                       {s.webhook_url && <Terminal size={12} className="text-orange-400" title="Webhook" />}
+                      {s.playstation_url && <div className="text-[#003791]" title="PlayStation"><PlatformLogo platform="playstation" size={12} /></div>}
+                      {s.xbox_url && <div className="text-[#107C10]" title="Xbox"><PlatformLogo platform="xbox" size={12} /></div>}
+                      {s.steam_url && <div className="text-[#1B2838]" title="Steam"><PlatformLogo platform="steam" size={12} /></div>}
+                      {s.oculus_url && <div className="text-[#8B5CF6]" title="Oculus VR"><PlatformLogo platform="oculus_vr" size={12} /></div>}
+                      {s.nintendo_url && <div className="text-[#E60012]" title="Nintendo Switch"><PlatformLogo platform="nintendo_switch" size={12} /></div>}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -231,6 +236,12 @@ export default function AdminServices() {
                     { icon: Globe, label: 'Web Platform', url: selectedService.web_url, color: 'text-accent-primary' },
                     { icon: Smartphone, label: 'Android App', url: selectedService.android_url, color: 'text-[#3DDC84]' },
                     { icon: Play, label: 'iOS App', url: selectedService.ios_url, color: 'text-[#007AFF]' },
+                    { icon: Terminal, label: 'Webhook URL', url: selectedService.webhook_url, color: 'text-orange-400' },
+                    { icon: (p:any) => <PlatformLogo platform="playstation" {...p} />, label: 'PlayStation', url: selectedService.playstation_url, color: 'text-[#003791]' },
+                    { icon: (p:any) => <PlatformLogo platform="xbox" {...p} />, label: 'Xbox', url: selectedService.xbox_url, color: 'text-[#107C10]' },
+                    { icon: (p:any) => <PlatformLogo platform="steam" {...p} />, label: 'Steam', url: selectedService.steam_url, color: 'text-[#1B2838]' },
+                    { icon: (p:any) => <PlatformLogo platform="oculus_vr" {...p} />, label: 'Oculus VR', url: selectedService.oculus_url, color: 'text-[#8B5CF6]' },
+                    { icon: (p:any) => <PlatformLogo platform="nintendo_switch" {...p} />, label: 'Nintendo Switch', url: selectedService.nintendo_url, color: 'text-[#E60012]' },
                   ].map((item, i) => item.url && (
                     <div key={i} className="p-4 bg-bg-secondary/50 rounded-2xl border border-glass-border space-y-3">
                       <div className="flex items-center gap-2">

@@ -65,11 +65,18 @@ export function useCampaignAnalytics(campaignId: string) {
       const participants = await Promise.all((enrollments || []).map(async (en: any) => {
         const { data: devices } = await supabase
           .from('devices')
-          .select('device_name, device_type, country')
+          .select('device_name, device_type, country, status, updated_at')
           .eq('user_id', en.user_id)
           .limit(1);
 
-        const device = devices?.[0] || { device_name: 'Unknown Device', device_type: 'phone', country: 'Unknown' };
+        const device = devices?.[0] || { device_name: 'Unknown Device', device_type: 'phone', country: 'Unknown', status: 'offline' };
+
+        let deviceStatus = 'offline';
+        if (device.status === 'active') {
+          deviceStatus = 'active';
+        } else if (device.updated_at && (Date.now() - new Date(device.updated_at).getTime() < 15 * 60 * 1000)) {
+          deviceStatus = 'active';
+        }
 
         return {
           user_id: en.user_id,
@@ -79,7 +86,7 @@ export function useCampaignAnalytics(campaignId: string) {
           country: device.country,
           data_consumed_gb: Number(en.data_consumed_gb || 0),
           nrt_earned: Number(en.nrt_earned || 0),
-          status: en.status
+          status: deviceStatus
         } as CampaignParticipant;
       }));
 

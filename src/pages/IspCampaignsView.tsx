@@ -8,6 +8,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useIspStore, type IspCampaign } from '@/stores/useIspStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { useCampaignAnalytics } from '@/hooks/useCampaignAnalytics';
+import CampaignAnalyticsModal from '@/components/campaigns/CampaignAnalyticsModal';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import NrtAmount from '@/components/ui/NrtAmount';
 import { 
@@ -39,6 +40,17 @@ export default function IspCampaignsView() {
   // Search & filter state for campaigns tab
   const [campaignSearch, setCampaignSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all');
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
+  
+  // Confirmation Modal state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    confirmVariant: 'danger' | 'warning';
+    onConfirm: () => Promise<void> | void;
+  } | null>(null);
 
   const filteredCampaigns = campaigns.filter(campaign => {
     const network = networks.find(n => n.id === campaign.networkId);
@@ -49,29 +61,46 @@ export default function IspCampaignsView() {
       (campaign.country || '').toLowerCase().includes(q);
     const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
     return matchesSearch && matchesStatus;
-  });
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const handleDeleteNetwork = (id: string) => {
-    if (confirm('Are you sure you want to delete this network? All associated campaigns will be stopped.')) {
-      deleteNetwork(id);
-      showToast('Network deleted.', 'success');
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Network',
+      message: 'Are you sure you want to delete this network? All associated campaigns will be stopped.',
+      confirmText: 'Delete Network',
+      confirmVariant: 'danger',
+      onConfirm: () => {
+        deleteNetwork(id);
+        showToast('Network deleted.', 'success');
+      }
+    });
   };
 
   const handleCampaignAction = async (id: string, action: 'pause' | 'resume' | 'stop') => {
     if (action === 'stop') {
-      if (confirm('Are you sure you want to stop this campaign? Unspent NRT will be refunded and earned rewards auto-claimed.')) {
-        try {
-          const result = await stopCampaign(id);
-          const refundMsg = result.refundedAmount > 0
-            ? ` ${result.refundedAmount.toLocaleString()} NRT refunded to your wallet.`
-            : '';
-          showToast(`Campaign stopped.${refundMsg} Earned rewards auto-claimed.`, 'success');
-        } catch (e: any) {
-          showToast(e.message || 'Error stopping campaign', 'danger');
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Stop Campaign',
+        message: 'Are you sure you want to stop this campaign? Unspent NRT will be refunded and earned rewards auto-claimed.',
+        confirmText: 'Stop Campaign',
+        confirmVariant: 'danger',
+        onConfirm: async () => {
+          setIsProcessingAction(true);
+          try {
+            const result = await stopCampaign(id);
+            const refundMsg = result.refundedAmount > 0
+              ? ` ${result.refundedAmount.toLocaleString()} NRT refunded to your wallet.`
+              : '';
+            showToast(`Campaign stopped.${refundMsg} Earned rewards auto-claimed.`, 'success');
+            setManagingCampaign(null);
+          } catch (e: any) {
+            showToast(e.message || 'Error stopping campaign', 'danger');
+          } finally {
+            setIsProcessingAction(false);
+          }
         }
-        setManagingCampaign(null);
-      }
+      });
     } else if (action === 'pause') {
       updateCampaign(id, { status: 'paused' });
       showToast('Campaign paused.', 'success');
@@ -87,15 +116,26 @@ export default function IspCampaignsView() {
     const msg = hasUnspent
       ? `Delete this campaign? ${(campaign.budgetNrt - campaign.spentNrt).toLocaleString()} NRT unspent budget will be refunded.`
       : 'Are you sure you want to delete this campaign?';
-    if (confirm(msg)) {
-      try {
-        await deleteCampaign(id);
-        showToast('Campaign deleted. Unspent NRT refunded.', 'success');
-      } catch (e: any) {
-        showToast(e.message || 'Error deleting campaign', 'danger');
+      
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Campaign',
+      message: msg,
+      confirmText: 'Delete Campaign',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        setIsProcessingAction(true);
+        try {
+          await deleteCampaign(id);
+          showToast('Campaign deleted. Unspent NRT refunded.', 'success');
+          setManagingCampaign(null);
+        } catch (e: any) {
+          showToast(e.message || 'Error deleting campaign', 'danger');
+        } finally {
+          setIsProcessingAction(false);
+        }
       }
-      setManagingCampaign(null);
-    }
+    });
   };
 
   return (
@@ -339,11 +379,12 @@ export default function IspCampaignsView() {
       <AnimatePresence>
         {managingCampaign && (
           <motion.div
+            key="manage-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={() => setManagingCampaign(null)}
+            onClick={() => !isProcessingAction && setManagingCampaign(null)}
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
@@ -354,7 +395,11 @@ export default function IspCampaignsView() {
             >
               <div className="p-4 border-b border-glass-border flex justify-between items-center bg-bg-secondary">
                 <h3 className="font-bold">Manage {managingCampaign.name}</h3>
-                <button onClick={() => setManagingCampaign(null)} className="p-1 bg-bg-primary rounded-full">
+                <button 
+                  onClick={() => !isProcessingAction && setManagingCampaign(null)}
+                  disabled={isProcessingAction}
+                  className="p-1 bg-bg-primary rounded-full disabled:opacity-50"
+                >
                   <X size={16} />
                 </button>
               </div>
@@ -363,7 +408,8 @@ export default function IspCampaignsView() {
                 {managingCampaign.status === 'paused' ? (
                   <button
                     onClick={() => handleCampaignAction(managingCampaign.id, 'resume')}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-bg-secondary transition-colors text-left"
+                    disabled={isProcessingAction}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-bg-secondary transition-colors text-left disabled:opacity-50"
                   >
                     <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500"><Play size={16} /></div>
                     <span className="font-semibold text-sm text-text-primary">Resume Campaign</span>
@@ -371,7 +417,8 @@ export default function IspCampaignsView() {
                 ) : managingCampaign.status === 'active' ? (
                   <button
                     onClick={() => handleCampaignAction(managingCampaign.id, 'pause')}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-bg-secondary transition-colors text-left"
+                    disabled={isProcessingAction}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-bg-secondary transition-colors text-left disabled:opacity-50"
                   >
                     <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500"><Pause size={16} /></div>
                     <span className="font-semibold text-sm text-text-primary">Pause Campaign</span>
@@ -381,9 +428,12 @@ export default function IspCampaignsView() {
                 {managingCampaign.status !== 'completed' && (
                   <button
                     onClick={() => handleCampaignAction(managingCampaign.id, 'stop')}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-bg-secondary transition-colors text-left"
+                    disabled={isProcessingAction}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-bg-secondary transition-colors text-left disabled:opacity-50"
                   >
-                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-500"><Square size={16} /></div>
+                    <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+                      {isProcessingAction ? <Loader2 size={16} className="animate-spin" /> : <Square size={16} />}
+                    </div>
                     <div>
                       <p className="font-semibold text-sm text-text-primary">Stop Campaign</p>
                       <p className="text-[10px] text-text-secondary">Triggers auto-claim for users</p>
@@ -392,8 +442,8 @@ export default function IspCampaignsView() {
                 )}
 
                 <Link 
-                  to={`/campaigns/edit-isp-campaign/${managingCampaign.id}`}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-bg-secondary transition-colors text-left"
+                  to={isProcessingAction ? "#" : `/campaigns/edit-isp-campaign/${managingCampaign.id}`}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl hover:bg-bg-secondary transition-colors text-left ${isProcessingAction ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center text-accent-primary"><Edit size={16} /></div>
                   <span className="font-semibold text-sm text-text-primary">Edit Campaign Details</span>
@@ -401,9 +451,12 @@ export default function IspCampaignsView() {
 
                 <button
                   onClick={() => handleDeleteCampaign(managingCampaign.id)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-destructive/10 transition-colors text-left mt-4 border border-destructive/20"
+                  disabled={isProcessingAction}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-destructive/10 transition-colors text-left mt-4 border border-destructive/20 disabled:opacity-50"
                 >
-                  <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center text-destructive"><Trash2 size={16} /></div>
+                  <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center text-destructive">
+                    {isProcessingAction ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  </div>
                   <span className="font-semibold text-sm text-destructive">Delete Campaign</span>
                 </button>
               </div>
@@ -411,148 +464,58 @@ export default function IspCampaignsView() {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
-  );
-}
-
-/** Sub-component for Campaign Analytics */
-function CampaignAnalyticsModal({ campaign, onClose }: { campaign: IspCampaign; onClose: () => void }) {
-  const { data: analytics, isLoading } = useCampaignAnalytics(campaign.id);
-  const [search, setSearch] = useState('');
-
-  const filtered = (analytics?.participants || []).filter(p => 
-    p.email.toLowerCase().includes(search.toLowerCase()) || 
-    p.country.toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[150] flex flex-col items-center bg-bg-primary pt-safe overflow-y-auto"
-    >
-      <div className="w-full max-w-md flex flex-col flex-1 min-h-screen">
-        <div className="sticky top-0 z-10 bg-bg-primary/80 backdrop-blur-lg border-b border-glass-border px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold">{campaign.name}</h1>
-          <button 
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-bg-secondary text-text-primary hover:bg-glass-bg transition-colors"
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {confirmDialog && confirmDialog.isOpen && (
+          <motion.div
+            key="confirm-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => !isProcessingAction && setConfirmDialog(null)}
           >
-            <X size={24} />
-          </button>
-        </div>
-
-        <div className="p-4 space-y-6">
-          {/* Growth Chart */}
-          <div className="glass p-4 rounded-2xl border border-glass-border">
-            <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
-              <TrendingUp size={16} className="text-accent-primary" />
-              Performance (Last 7 Days)
-            </h4>
-            <div className="h-48 w-full min-h-[200px]">
-              {isLoading ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Loader2 className="animate-spin text-accent-primary" size={24} />
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={analytics?.chartData}>
-                    <defs>
-                      <linearGradient id="colorNrt" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                    <XAxis 
-                      dataKey="date" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 10, fill: 'var(--text-secondary)' }}
-                    />
-                    <YAxis hide />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'var(--bg-primary)', 
-                        borderColor: 'var(--glass-border)',
-                        borderRadius: '12px',
-                        fontSize: '12px'
-                      }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="nrt" 
-                      stroke="var(--accent-primary)" 
-                      fillOpacity={1} 
-                      fill="url(#colorNrt)" 
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-            <p className="text-[10px] text-text-secondary text-center mt-2 italic">
-              Daily NRT rewards distributed to participants
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="glass p-4 rounded-2xl border border-glass-border">
-              <p className="text-xs text-text-secondary font-medium">Started</p>
-              <h3 className="text-sm font-bold text-text-primary mt-1">{new Date(campaign.startDate).toLocaleDateString()}</h3>
-            </div>
-            <div className="glass p-4 rounded-2xl border border-glass-border">
-              <p className="text-xs text-text-secondary font-medium">Users Reached</p>
-              <h3 className="text-sm font-bold text-text-primary mt-1">{isLoading ? '...' : analytics?.totalUsers}</h3>
-            </div>
-          </div>
-
-          <h3 className="font-semibold text-lg">Active Earning Devices</h3>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="Search by email or location..." 
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="flex-1 bg-bg-secondary border border-glass-border rounded-lg px-3 py-2 text-sm" 
-            />
-          </div>
-
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <Loader2 className="animate-spin text-accent-primary" size={32} />
-              <p className="text-sm text-text-secondary">Loading participants...</p>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-20 text-text-secondary text-sm">
-              No active participants found.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filtered.map((u, i) => (
-                <div key={i} className="glass p-4 rounded-xl border border-glass-border flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-accent-primary/10 flex items-center justify-center text-accent-primary">
-                      {u.device_type === 'laptop' || u.device_type === 'desktop' ? <Laptop size={20} /> : <Smartphone size={20} />}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-text-primary text-sm truncate max-w-[150px]">
-                        {u.email}
-                      </p>
-                      <p className="text-[10px] text-text-secondary uppercase font-bold">{u.device_name} • {u.country}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-accent-primary text-sm">+<NrtAmount value={u.nrt_earned} /></p>
-                    <p className="text-[10px] text-green-500 uppercase font-bold tracking-wider">{u.status}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-bg-primary rounded-2xl w-full max-w-sm overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-4 border-b border-glass-border">
+                <h3 className="font-bold text-lg">{confirmDialog.title}</h3>
+              </div>
+              <div className="p-5">
+                <p className="text-sm text-text-secondary leading-relaxed">{confirmDialog.message}</p>
+              </div>
+              <div className="p-4 pt-0 flex gap-3">
+                <button
+                  onClick={() => setConfirmDialog(null)}
+                  disabled={isProcessingAction}
+                  className="flex-1 py-2.5 rounded-xl bg-bg-secondary text-text-primary font-semibold hover:bg-glass-border transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (confirmDialog.onConfirm) {
+                      await confirmDialog.onConfirm();
+                      setConfirmDialog(null);
+                    }
+                  }}
+                  disabled={isProcessingAction}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-white transition-colors disabled:opacity-50 ${
+                    confirmDialog.confirmVariant === 'danger' ? 'bg-red-500 hover:bg-red-600' : 'bg-orange-500 hover:bg-orange-600'
+                  }`}
+                >
+                  {isProcessingAction && <Loader2 size={16} className="animate-spin" />}
+                  {confirmDialog.confirmText}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

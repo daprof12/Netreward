@@ -8,7 +8,8 @@
   // Optional: gaming platform identifier (e.g. 'steam', 'playstation', 'xbox')
   // Set this on the script tag if embedding on a gaming platform:
   //   <script data-gaming-platform="steam" ...></script>
-  const gamingPlatform = currentScript.getAttribute('data-gaming-platform') || null;
+  const explicitCategory = currentScript.getAttribute('data-category') || null;
+  let gamingPlatform = currentScript.getAttribute('data-gaming-platform') || null;
 
   if (!spApiKey && !ispApiKey) {
     console.warn('[NetReward Tracker] Missing data-api-key or data-isp-api-key. Tracker disabled.');
@@ -20,7 +21,7 @@
   // This MUST match the fingerprint stored in the DB devices table.
   // The edge function will resolve fingerprint → devices.id server-side.
   // NEVER use a locally-generated UUID that doesn't exist in the DB.
-  let deviceFingerprint = localStorage.getItem('nrt_device_fingerprint');
+  let deviceFingerprint = localStorage.getItem('nrt_device_id') || localStorage.getItem('nrt_device_fingerprint');
   if (!deviceFingerprint) {
     deviceFingerprint = (crypto.randomUUID ? crypto.randomUUID() : 'fp_' + Math.random().toString(36).substring(2, 18));
     localStorage.setItem('nrt_device_fingerprint', deviceFingerprint);
@@ -34,13 +35,31 @@
       this.bytesUp = 0;
       this.bytesDown = 0;
 
-      setInterval(() => this.flush(), 60000); // Flush every 60s
+      // Flush every 15s for better responsiveness during testing
+      setInterval(() => this.flush(), 15000); 
       window.addEventListener('beforeunload', () => this.flush(true));
     }
 
     report(up, down) {
       this.bytesUp += up;
       this.bytesDown += down;
+    }
+
+    identify(id, metadata = {}) {
+      if (id) {
+        deviceFingerprint = id;
+        localStorage.setItem('nrt_device_fingerprint', id);
+        console.log(`[NetReward Tracker] Device identified: ${id}`);
+      }
+      // Allow overriding the gaming platform dynamically at runtime
+      if (metadata.gamingPlatform) {
+        if (Array.isArray(metadata.gamingPlatform)) {
+          gamingPlatform = metadata.gamingPlatform.join(',');
+        } else {
+          gamingPlatform = String(metadata.gamingPlatform);
+        }
+        console.log(`[NetReward Tracker] Gaming platform set to: ${gamingPlatform}`);
+      }
     }
 
     async flush(isUnload = false) {
@@ -77,14 +96,25 @@
           if (spApiKey) headers['x-sp-api-key'] = spApiKey;
           if (ispApiKey) headers['x-isp-api-key'] = ispApiKey;
 
-          await fetch(endpoint, {
+          const res = await fetch(endpoint, {
             method: 'POST',
             headers: headers,
             body: payload,
             keepalive: isUnload
           });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.errors > 0) {
+              console.warn('[NetReward Tracker] Telemetry rejected by server:', data.results);
+            } else {
+              console.log(`[NetReward Tracker] Telemetry flushed successfully! Sent ${event.bytes_up} bytes up, ${event.bytes_down} bytes down.`);
+            }
+          } else {
+            console.warn(`[NetReward Tracker] Failed to send telemetry. Status: ${res.status}`);
+          }
         } catch (e) {
-          console.debug('[NetReward Tracker] Flush failed', e);
+          console.warn('[NetReward Tracker] Flush failed network error', e);
         }
       }
     }
@@ -96,23 +126,56 @@
   // --- Fetch Configuration & Auto-Detection Logic ---
 
   async function initSDK() {
-    let category = 'other';
-    try {
-      const headers = {};
-      if (spApiKey) headers['x-sp-api-key'] = spApiKey;
-      if (ispApiKey) headers['x-isp-api-key'] = ispApiKey;
+    let category = explicitCategory || 'other';
+    
+    if (!explicitCategory) {
+      try {
+        const headers = {};
+        if (spApiKey) headers['x-sp-api-key'] = spApiKey;
+        if (ispApiKey) headers['x-isp-api-key'] = ispApiKey;
 
-      const res = await fetch(endpoint, {
-        method: 'GET',
-        headers: headers
-      });
-      if (res.ok) {
-        const config = await res.json();
-        if (config.category) category = config.category;
+        const res = await fetch(endpoint, {
+          method: 'GET',
+          headers: headers
+        });
+        if (res.ok) {
+          const config = await res.json();
+          if (config.category && config.category !== 'other') {
+            category = config.category;
+          }
+        }
+      } catch (e) {
+        console.warn('[NetReward Tracker] Failed to fetch config, defaulting to "other".', e);
       }
-    } catch (e) {
-      console.warn('[NetReward Tracker] Failed to fetch config, defaulting to "other".', e);
     }
+
+    // Always apply fetch and XHR monkey-patching as a baseline for all categories
+    // This ensures we catch Web Audio API buffer fetches and API calls even in streaming apps.
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+      const reqSize = args[1] && args[1].body ? new Blob([args[1].body]).size : 0;
+      try {
+        const res = await originalFetch.apply(this, args);
+        const clone = res.clone();
+        clone.blob().then(blob => {
+          tracker.report(reqSize, blob.size);
+        }).catch(() => {});
+        return res;
+      } catch (e) {
+        tracker.report(reqSize, 0);
+        throw e;
+      }
+    };
+
+    const originalXHR = window.XMLHttpRequest.prototype.send;
+    window.XMLHttpRequest.prototype.send = function(body) {
+      const reqSize = body ? new Blob([body]).size : 0;
+      this.addEventListener('load', function() {
+        const resSize = this.responseText ? new Blob([this.responseText]).size : 0;
+        tracker.report(reqSize, resSize);
+      });
+      return originalXHR.apply(this, arguments);
+    };
 
     if (category === 'streaming') {
       // Monitor audio/video elements
@@ -151,34 +214,6 @@
         });
       });
       observer.observe(document.body, { childList: true, subtree: true });
-
-    } else if (category === 'ai-service' || category === 'other') {
-      // Monkey-patch fetch and XHR to estimate network traffic
-      const originalFetch = window.fetch;
-      window.fetch = async function(...args) {
-        const reqSize = args[1] && args[1].body ? new Blob([args[1].body]).size : 0;
-        try {
-          const res = await originalFetch.apply(this, args);
-          const clone = res.clone();
-          clone.blob().then(blob => {
-            tracker.report(reqSize, blob.size);
-          }).catch(() => {});
-          return res;
-        } catch (e) {
-          tracker.report(reqSize, 0);
-          throw e;
-        }
-      };
-
-      const originalXHR = window.XMLHttpRequest.prototype.send;
-      window.XMLHttpRequest.prototype.send = function(body) {
-        const reqSize = body ? new Blob([body]).size : 0;
-        this.addEventListener('load', function() {
-          const resSize = this.responseText ? new Blob([this.responseText]).size : 0;
-          tracker.report(reqSize, resSize);
-        });
-        return originalXHR.apply(this, arguments);
-      };
 
     } else if (category === 'gaming') {
       // Monkey-patch WebSocket for game traffic measurement

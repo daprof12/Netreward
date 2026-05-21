@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Smartphone, X, Activity, Clock, Zap, Coins, Wifi, RefreshCw } from 'lucide-react';
+import { Search, Smartphone, X, Activity, Clock, Zap, Coins, Wifi, RefreshCw, Gamepad2 } from 'lucide-react';
 import LocationSearch from '@/components/LocationSearch';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -28,7 +28,18 @@ interface AdminDevice {
   duration: string;
   createdAt: string;
   activeEarnings: any[];
+  activeEarnings: any[];
   pastEarnings: any[];
+}
+
+interface AdminGamingAccount {
+  id: string;
+  userEmail: string;
+  country: string;
+  platform: string;
+  platformUsername: string;
+  verified: boolean;
+  linkedAt: string;
 }
 
 export default function AdminDevices() {
@@ -38,7 +49,12 @@ export default function AdminDevices() {
   const [search, setSearch] = useState('');
   const [countryFilter, setCountryFilter] = useState('Global');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [selectedDevice, setSelectedDevice] = useState<AdminDevice | null>(null);  const fetchData = useCallback(async () => {
+  const [selectedDevice, setSelectedDevice] = useState<AdminDevice | null>(null);
+  
+  const [activeTab, setActiveTab] = useState<'devices' | 'gaming'>('devices');
+  const [gamingAccounts, setGamingAccounts] = useState<AdminGamingAccount[]>([]);
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -52,18 +68,33 @@ export default function AdminDevices() {
       
       if (error) {
         console.error('Fetch devices error:', error);
-        // Fallback for different join syntax
         const { data: fallbackData } = await supabase
           .from('devices')
           .select('*, users:user_id(email, country)')
           .order('created_at', { ascending: false });
-        if (fallbackData) {
-          processDevices(fallbackData);
-        }
+        if (fallbackData) processDevices(fallbackData);
       } else {
         processDevices(data);
       }
-    } catch (e: any) { console.error('Fetch devices:', e); }
+
+      // Fetch gaming accounts
+      const { data: gamingData } = await supabase
+        .from('gaming_accounts')
+        .select('*, users:user_id(email, country)')
+        .order('linked_at', { ascending: false });
+        
+      if (gamingData) {
+        setGamingAccounts(gamingData.map((g: any) => ({
+          id: g.id,
+          userEmail: g.users?.email || 'Unknown',
+          country: g.users?.country || 'Global',
+          platform: g.platform,
+          platformUsername: g.platform_username,
+          verified: g.verified,
+          linkedAt: g.linked_at,
+        })));
+      }
+    } catch (e: any) { console.error('Fetch devices/gaming:', e); }
     finally { setLoading(false); }
   }, []);
 
@@ -110,6 +141,14 @@ export default function AdminDevices() {
     return matchQ && matchCountry && matchStatus;
   });
 
+  const filteredGaming = gamingAccounts.filter(g => {
+    const q = search.toLowerCase();
+    const matchQ = !q || g.platformUsername.toLowerCase().includes(q) || g.userEmail.toLowerCase().includes(q);
+    const matchCountry = countryFilter === 'Global' || g.country === countryFilter;
+    const matchStatus = statusFilter === 'All' || (statusFilter === 'active' && g.verified) || (statusFilter === 'offline' && !g.verified);
+    return matchQ && matchCountry && matchStatus;
+  });
+
   return (
     <motion.div className="space-y-5" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <div className="flex items-center justify-between">
@@ -122,12 +161,36 @@ export default function AdminDevices() {
         </button>
       </div>
 
+      <div className="flex bg-bg-secondary p-1 rounded-lg w-full max-w-sm">
+        {(['devices', 'gaming'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-1.5 text-sm font-bold rounded-md transition-all capitalize ${activeTab === tab ? 'bg-bg-primary text-text-primary shadow-sm' : 'text-text-secondary'}`}
+          >
+            {tab === 'gaming' ? 'Gaming Accounts' : 'Devices'}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
+        {activeTab === 'devices' ? [
           { icon: Smartphone, label: 'Total Devices', value: devices.length.toString(), color: '#3B82F6', bg: 'bg-blue-500/10' },
           { icon: Activity, label: 'Active Devices', value: devices.filter(d => d.status === 'active').length.toString(), color: '#10B981', bg: 'bg-emerald-500/10' },
           { icon: Coins, label: 'Total NRT Earned', value: devices.reduce((s, d) => s + d.nrtEarned, 0).toLocaleString(undefined, { maximumFractionDigits: 7 }), color: '#8b5cf6', bg: 'bg-purple-500/10' },
           { icon: Zap, label: 'Unclaimed NRT', value: devices.reduce((s, d) => s + d.unclaimedNrt, 0).toLocaleString(undefined, { maximumFractionDigits: 7 }), color: '#F59E0B', bg: 'bg-amber-500/10' },
+        ].map(({ icon: Icon, label, value, color, bg }) => (
+          <div key={label} className="glass p-4 rounded-2xl border border-glass-border">
+            <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center mb-2`}>
+              <Icon size={18} style={{ color }} />
+            </div>
+            <p className="text-xs text-text-secondary font-medium">{label}</p>
+            <h3 className="text-xl font-bold text-text-primary mt-0.5">{value}</h3>
+          </div>
+        )) : [
+          { icon: Gamepad2, label: 'Total Gaming Accounts', value: gamingAccounts.length.toString(), color: '#8B5CF6', bg: 'bg-purple-500/10' },
+          { icon: Activity, label: 'Verified Accounts', value: gamingAccounts.filter(g => g.verified).length.toString(), color: '#10B981', bg: 'bg-emerald-500/10' },
+          { icon: Clock, label: 'Pending Verification', value: gamingAccounts.filter(g => !g.verified).length.toString(), color: '#F59E0B', bg: 'bg-amber-500/10' },
         ].map(({ icon: Icon, label, value, color, bg }) => (
           <div key={label} className="glass p-4 rounded-2xl border border-glass-border">
             <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center mb-2`}>
@@ -148,11 +211,22 @@ export default function AdminDevices() {
         <div className="min-w-[200px] flex-1 sm:flex-none"><LocationSearch value={countryFilter} onChange={setCountryFilter} /></div>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-bg-secondary border border-glass-border rounded-xl px-3 py-2.5 text-sm text-text-primary outline-none min-w-[140px]">
           <option value="All">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="offline">Offline</option>
-          <option value="disconnected">Disconnected</option>
+          {activeTab === 'devices' ? (
+            <>
+              <option value="active">Active</option>
+              <option value="offline">Offline</option>
+              <option value="disconnected">Disconnected</option>
+            </>
+          ) : (
+            <>
+              <option value="active">Verified</option>
+              <option value="offline">Unverified</option>
+            </>
+          )}
         </select>
       </div>
+
+      {activeTab === 'devices' ? (
 
       <div className="bg-bg-card border border-glass-border rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -229,6 +303,59 @@ export default function AdminDevices() {
           )}
         </div>
       </div>
+      ) : (
+      <div className="bg-bg-card border border-glass-border rounded-2xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-bg-secondary/50 border-b border-glass-border text-[10px] font-black uppercase text-text-secondary">
+              <tr>
+                <th className="px-6 py-4">Account</th>
+                <th className="px-6 py-4">User</th>
+                <th className="px-6 py-4 text-center">Status</th>
+                <th className="px-6 py-4 text-right">Linked At</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-glass-border">
+              {filteredGaming.map(g => (
+                <tr key={g.id} className="hover:bg-bg-secondary/30 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-secondary group-hover:text-accent-primary transition-colors">
+                        <Gamepad2 size={16} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-text-primary">{g.platformUsername}</p>
+                        <p className="text-[10px] text-text-secondary capitalize">{g.platform.replace('_', ' ')}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-text-primary font-medium">{g.userEmail}</p>
+                    <p className="text-[10px] text-text-secondary uppercase">{g.country}</p>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${g.verified ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                      {g.verified ? 'Verified' : 'Pending'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right text-text-secondary text-xs tabular-nums">
+                    {new Date(g.linkedAt).toLocaleDateString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filteredGaming.length === 0 && (
+            <div className="text-center py-20 bg-bg-card/50">
+              <div className="inline-flex w-12 h-12 rounded-full bg-bg-secondary items-center justify-center text-text-secondary mb-3">
+                <Gamepad2 size={24} />
+              </div>
+              <p className="text-sm text-text-secondary">No gaming accounts found.</p>
+            </div>
+          )}
+        </div>
+      </div>
+      )}
 
       {/* Device Detail Modal */}
       <AnimatePresence>

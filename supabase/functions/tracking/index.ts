@@ -193,10 +193,10 @@ serve(async (req) => {
     // Dynamic SDK Initialization endpoint
     try {
       const spApiKey = req.headers.get('x-sp-api-key');
-      if (!spApiKey) {
-        return jsonResponse({ error: 'Missing x-sp-api-key' }, 401);
+      const ispApiKey = req.headers.get('x-isp-api-key');
+      if (!spApiKey && !ispApiKey) {
+        return jsonResponse({ error: 'Missing API key' }, 401);
       }
-      
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -204,26 +204,40 @@ serve(async (req) => {
 
       // Try centralized keys first
       let category = 'other';
-      const { data: centralKey } = await supabase
-        .from('sp_api_keys')
-        .select('sp_email')
-        .eq('sdk_key', spApiKey)
-        .maybeSingle();
-        
-      if (centralKey) {
-        // If they use centralized keys, they might not have a specific 'service' with a category.
-        // We default to 'other' or could look up their sp_profile category.
-        category = 'other';
-      } else {
-        // Try legacy services table
-        const { data: service } = await supabase
-          .from('services')
-          .select('category')
-          .eq('api_key', spApiKey)
+      
+      if (spApiKey) {
+        const { data: centralKey } = await supabase
+          .from('sp_api_keys')
+          .select('sp_email')
+          .eq('sdk_key', spApiKey)
           .maybeSingle();
-        if (service && service.category) {
-          category = service.category.toLowerCase();
+          
+        if (centralKey) {
+          category = 'other';
+        } else {
+          // Try legacy services table
+          const { data: service } = await supabase
+            .from('services')
+            .select('category')
+            .eq('api_key', spApiKey)
+            .maybeSingle();
+          if (service && service.category) {
+            category = service.category.toLowerCase();
+          }
         }
+      } else if (ispApiKey) {
+        // ISPs don't have categories in the same way, but let's check validity
+        const { data: centralKey } = await supabase
+          .from('isp_api_keys')
+          .select('isp_email')
+          .eq('sdk_key', ispApiKey)
+          .maybeSingle();
+          
+        if (!centralKey) {
+          // Fallback legacy
+          await supabase.from('networks').select('id').eq('api_key', ispApiKey).maybeSingle();
+        }
+        category = 'other'; // ISP traffic is generally 'other'
       }
 
       return jsonResponse({ category });
@@ -296,7 +310,7 @@ serve(async (req) => {
         // 2. Fallback to legacy services table
         const { data: service, error } = await supabase
           .from('services')
-          .select('id, sp_id, secret_key, status')
+          .select('id, sp_id, status')
           .eq('api_key', spApiKey)
           .single();
 
@@ -308,7 +322,7 @@ serve(async (req) => {
           return jsonResponse({ error: `Service is ${service.status}` }, 403);
         }
 
-        secretKey = service.secret_key;
+        secretKey = null;
         serviceId = service.id;
       }
       providerType = 'sp';
@@ -329,7 +343,7 @@ serve(async (req) => {
         // 2. Fallback to legacy networks table
         const { data: network, error } = await supabase
           .from('networks')
-          .select('id, isp_id, api_secret, verified')
+          .select('id, isp_id, verified')
           .eq('api_key', ispApiKey)
           .single();
 
@@ -341,7 +355,7 @@ serve(async (req) => {
           return jsonResponse({ error: 'Network is not verified' }, 403);
         }
 
-        secretKey = network.api_secret;
+        secretKey = null;
         networkId = network.id;
       }
       providerType = 'isp';
@@ -372,12 +386,17 @@ serve(async (req) => {
     }
 
     // ── 3b. Device fingerprint resolver ────────────────────────────────────
-    // tracker.js sends nrt_device_fingerprint as device_id.
+    // tracker.js sends a browser fingerprint as device_id.
     // We resolve it to the actual devices.id UUID here server-side.
-    // If it's already a valid UUID in devices, we use it directly.
-    // If not, we attempt fingerprint column lookup.
-    async function resolveDeviceId(rawDeviceId: string): Promise<string | null> {
-      // First: check if rawDeviceId is an actual devices.id (UUID match)
+    //
+    // Resolution order:
+    //   1. Direct UUID match in devices.id
+    //   2. Fingerprint column match in devices.fingerprint
+    //   3. Find enrolled user's EXISTING device → link fingerprint to it
+    //      (No phantom "SDK Device" creation — telemetry flows to the real device)
+    //   4. Last resort: create a minimal device only if no existing device exists
+    async function resolveDeviceId(rawDeviceId: string, campaignId?: string): Promise<string | null> {
+      // 1. Direct UUID match
       const { data: directMatch } = await supabase
         .from('devices')
         .select('id')
@@ -385,7 +404,7 @@ serve(async (req) => {
         .maybeSingle();
       if (directMatch) return directMatch.id;
 
-      // Second: treat rawDeviceId as a fingerprint and look it up
+      // 2. Fingerprint match
       const { data: fpMatch } = await supabase
         .from('devices')
         .select('id')
@@ -393,6 +412,106 @@ serve(async (req) => {
         .maybeSingle();
       if (fpMatch) return fpMatch.id;
 
+      // 3. Find enrolled user's existing device and link the fingerprint
+      if (campaignId) {
+        // Get all users enrolled in this campaign
+        const { data: enrollments } = await supabase
+          .from('user_campaigns')
+          .select('user_id')
+          .eq('campaign_id', campaignId);
+
+        if (enrollments && enrollments.length > 0) {
+          const userIds = enrollments.map((e: any) => e.user_id);
+
+          // Find any existing device belonging to one of these users
+          // Prefer devices that don't already have a fingerprint (unlinked)
+          const { data: existingDevice } = await supabase
+            .from('devices')
+            .select('id, fingerprint')
+            .in('user_id', userIds)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          if (existingDevice && existingDevice.length > 0) {
+            // Prefer a device without a fingerprint, otherwise use the most recent
+            const unlinked = existingDevice.find((d: any) => !d.fingerprint);
+            const target = unlinked || existingDevice[0];
+
+            // Attach the browser fingerprint to this device for future lookups
+            await supabase
+              .from('devices')
+              .update({ fingerprint: rawDeviceId })
+              .eq('id', target.id);
+
+            console.log(`[Device Resolver] Linked fingerprint ${rawDeviceId} to existing device ${target.id}`);
+            return target.id;
+          }
+
+          // No device exists for enrolled users — create one under the first enrolled user
+          const { data: newDevice, error: insertErr } = await supabase
+            .from('devices')
+            .insert({
+              user_id: userIds[0],
+              device_name: 'Web Browser',
+              device_type: 'other',
+              os: 'Web',
+              fingerprint: rawDeviceId,
+              status: 'active',
+              signal_strength: 100,
+            })
+            .select('id')
+            .single();
+
+          if (!insertErr && newDevice) {
+            console.log(`[Device Resolver] Created device ${newDevice.id} for enrolled user ${userIds[0]} (no existing device found)`);
+            return newDevice.id;
+          }
+        }
+      }
+
+      // 4. Fallback: try SP/ISP owner's device
+      let ownerUserId: string | null = null;
+      if (serviceId) {
+        const { data: svc } = await supabase
+          .from('services')
+          .select('sp_id, sp:sp_profiles(user_id)')
+          .eq('id', serviceId)
+          .maybeSingle();
+        const sp = Array.isArray(svc?.sp) ? svc.sp[0] : svc?.sp;
+        if (sp?.user_id) ownerUserId = sp.user_id;
+      } else if (networkId) {
+        const { data: net } = await supabase
+          .from('networks')
+          .select('isp_id, isp:isp_profiles(user_id)')
+          .eq('id', networkId)
+          .maybeSingle();
+        const isp = Array.isArray(net?.isp) ? net.isp[0] : net?.isp;
+        if (isp?.user_id) ownerUserId = isp.user_id;
+      }
+
+      if (ownerUserId) {
+        // Try to use owner's existing device
+        const { data: ownerDevice } = await supabase
+          .from('devices')
+          .select('id')
+          .eq('user_id', ownerUserId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (ownerDevice) {
+          await supabase
+            .from('devices')
+            .update({ fingerprint: rawDeviceId })
+            .eq('id', ownerDevice.id);
+          console.log(`[Device Resolver] Linked fingerprint to SP/ISP owner's device ${ownerDevice.id}`);
+          return ownerDevice.id;
+        }
+      }
+
+      console.error(`[Device Resolver] No device found for fingerprint: ${rawDeviceId}`);
       return null;
     }
 
@@ -447,7 +566,7 @@ serve(async (req) => {
       }
 
       // Resolve rawDeviceId (may be a fingerprint) → actual devices.id
-      const device_id = await resolveDeviceId(rawDeviceId as string);
+      const device_id = await resolveDeviceId(rawDeviceId as string, finalCampaignId as string);
       if (!device_id) {
         results.push({
           session_id,

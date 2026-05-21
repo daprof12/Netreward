@@ -65,9 +65,9 @@ export default function SpDevicesView() {
     const totalDataGB = totalData / 1e9;
     return {
       devices: filteredDevices.length,
-      dataGB: totalDataGB.toFixed(2),
+      dataGB: totalDataGB.toFixed(6),
       nrt: totalNrt,
-      cashback: (totalNrt * 0.10).toFixed(2) // 10% of user earnings for SP
+      cashback: (totalNrt * 0.10).toFixed(6) // 10% of user earnings for SP
     };
   }, [filteredDevices]);
 
@@ -171,7 +171,7 @@ export default function SpDevicesView() {
         ) : filteredDevices.map(session => {
           const device = session.device;
           if (!device) return null;
-          const dataUsedGB = ((session.bytes_up + session.bytes_down) / 1e9).toFixed(2);
+          const dataUsedGB = ((session.bytes_up + session.bytes_down) / 1e9).toFixed(6);
           
           // Defensively handle Supabase potentially returning relationships as arrays
           const campaignObj = Array.isArray(session.campaign) ? session.campaign[0] : session.campaign;
@@ -199,7 +199,20 @@ export default function SpDevicesView() {
                     <span className="w-1 h-1 rounded-full bg-glass-border" />
                     <span className={`flex items-center gap-1 ${device.status === 'active' ? 'text-green-500' : ''}`}>
                       {device.status === 'active' ? <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> : <span className="w-1.5 h-1.5 rounded-full bg-text-secondary" />}
-                      {device.status}
+                      {(() => {
+                        if (device.status === 'active') return 'Active Now';
+                        if (device.updated_at) {
+                          const diffMs = Date.now() - new Date(device.updated_at).getTime();
+                          const diffM = Math.floor(diffMs / 60000);
+                          const diffH = Math.floor(diffM / 60);
+                          const diffD = Math.floor(diffH / 24);
+                          if (diffD > 0) return `Last active ${diffD}d ago`;
+                          if (diffH > 0) return `Last active ${diffH}h ago`;
+                          if (diffM > 0) return `Last active ${diffM}m ago`;
+                          return 'Last active just now';
+                        }
+                        return 'Offline';
+                      })()}
                     </span>
                   </div>
                 </div>
@@ -235,7 +248,7 @@ export default function SpDevicesView() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-1">NRT Earned</span>
-                  <span className="text-sm font-bold text-accent-primary">{session.nrt_awarded.toFixed(2)}</span>
+                  <span className="text-sm font-bold text-accent-primary">{session.nrt_awarded.toFixed(6)}</span>
                 </div>
               </div>
 

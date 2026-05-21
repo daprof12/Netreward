@@ -4,7 +4,8 @@ import { Search, AlertTriangle, CheckCircle, Key, Activity, Smartphone, Server, 
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
-
+import { PlatformLogo } from '@/components/ui/PlatformLogos';
+import type { GamingPlatform } from '@/hooks/useGamingAccounts';
 type TabType = 'sessions' | 'anomalies' | 'sdk_keys';
 
 export default function AdminTracking() {
@@ -25,14 +26,26 @@ export default function AdminTracking() {
           supabase.from('tracking_anomalies').select('*').order('created_at', { ascending: false }).limit(200),
           supabase.from('sp_api_keys').select('*').order('created_at', { ascending: false }),
         ]);
-        setTrackingSessions((s.data || []).map((x: any) => ({
-          ...x, sessionId: x.session_id || x.id, userEmail: x.user_email || 'Unknown',
-          campaignName: x.campaign_name || '', spEmail: x.sp_email || '', source: x.source || 'sdk',
-          deviceIp: x.device_ip || '', userIp: x.user_ip || '', dataRxBytes: Number(x.data_rx_bytes || 0),
-          dataTxBytes: Number(x.data_tx_bytes || 0), durationSeconds: Number(x.duration_seconds || 0),
-          nrtAwarded: Number(x.nrt_awarded || 0), validationScore: Number(x.validation_score || 0),
-          recordedAt: x.recorded_at || x.created_at, rejectReason: x.reject_reason || '',
-        })));
+        setTrackingSessions((s.data || []).map((x: any) => {
+          return {
+            ...x,
+            sessionId: x.session_id || x.id,
+            userEmail: x.user_email || 'Unknown',
+            campaignName: x.campaign_name || 'Unknown Campaign',
+            spEmail: x.sp_email || '',
+            source: x.source || 'sdk',
+            deviceIp: x.device_ip || '',
+            userIp: x.user_ip || '',
+            dataRxBytes: Number(x.data_rx_bytes || 0),
+            dataTxBytes: Number(x.data_tx_bytes || 0),
+            durationSeconds: Number(x.duration_seconds || 0),
+            nrtAwarded: Number(x.nrt_awarded || 0),
+            validationScore: Number(x.validation_score || 0),
+            recordedAt: x.recorded_at || x.created_at,
+            rejectReason: x.reject_reason || '',
+            status: x.status || 'pending'
+          };
+        }));
         setTrackingAnomalies((a.data || []).map((x: any) => ({
           ...x, sessionId: x.session_id || '', userEmail: x.user_email || 'Unknown',
           flagType: x.flag_type || 'UNKNOWN', details: x.details || '', createdAt: x.created_at,
@@ -73,23 +86,26 @@ export default function AdminTracking() {
   const filteredSessions = trackingSessions.filter(s => {
     const q = searchQuery.toLowerCase();
     const matchSearch = (s.sessionId || '').toLowerCase().includes(q) ||
-                        (s.userEmail || '').toLowerCase().includes(q) ||
-                        (s.campaignName || '').toLowerCase().includes(q) ||
-                        (s.source || '').toLowerCase().includes(q) ||
-                        (s.deviceIp || '').toLowerCase().includes(q);
+      (s.userEmail || '').toLowerCase().includes(q) ||
+      (s.campaignName || '').toLowerCase().includes(q) ||
+      (s.source || '').toLowerCase().includes(q) ||
+      (s.deviceIp || '').toLowerCase().includes(q);
     const matchStatus = statusFilter === 'All' || s.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
   const filteredAnomalies = trackingAnomalies.filter(a => {
-    const matchSearch = (a.sessionId || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-                        (a.userEmail || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchSearch = (a.sessionId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (a.userEmail || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchStatus = statusFilter === 'All' || a.status === statusFilter.toLowerCase();
     return matchSearch && matchStatus;
   });
 
   const getSourceIcon = (source: string) => {
-    if (source?.startsWith('gaming_')) return <Gamepad2 size={14} className="text-purple-400" />;
+    if (source?.startsWith('gaming_')) {
+      const platform = source.replace('gaming_', '') as GamingPlatform;
+      return <div className="text-text-primary"><PlatformLogo platform={platform} size={14} /></div>;
+    }
     switch (source) {
       case 'sdk': return <Settings size={14} className="text-blue-500" />;
       case 'isp_sdk': return <Server size={14} className="text-cyan-500" />;
@@ -203,18 +219,18 @@ export default function AdminTracking() {
           <div className="flex gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
-              <input 
-                type="text" 
-                placeholder="Search by ID or email..." 
+              <input
+                type="text"
+                placeholder="Search by ID or email..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full bg-bg-secondary border border-glass-border rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-accent-primary"
               />
             </div>
-            
+
             {activeTab !== 'sdk_keys' && (
-              <select 
-                value={statusFilter} 
+              <select
+                value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
                 className="bg-bg-secondary border border-glass-border rounded-xl px-4 py-2 text-sm focus:outline-none"
               >
@@ -409,16 +425,16 @@ export default function AdminTracking() {
               ))}
             </tbody>
           </table>
-          
-          {((activeTab === 'sessions' && filteredSessions.length === 0) || 
+
+          {((activeTab === 'sessions' && filteredSessions.length === 0) ||
             (activeTab === 'anomalies' && filteredAnomalies.length === 0) ||
             (activeTab === 'sdk_keys' && spApiKeys.length === 0)) && (
-            <div className="flex flex-col items-center justify-center py-12 text-center h-full">
-              <Search className="w-12 h-12 text-glass-border mb-4" />
-              <h3 className="font-bold text-lg mb-1">No data found</h3>
-              <p className="text-sm text-text-secondary">No records match your current filters.</p>
-            </div>
-          )}
+              <div className="flex flex-col items-center justify-center py-12 text-center h-full">
+                <Search className="w-12 h-12 text-glass-border mb-4" />
+                <h3 className="font-bold text-lg mb-1">No data found</h3>
+                <p className="text-sm text-text-secondary">No records match your current filters.</p>
+              </div>
+            )}
         </div>
       </div>
     </motion.div>

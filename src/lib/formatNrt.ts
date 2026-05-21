@@ -41,8 +41,8 @@ export function formatNrt(
 
   // ── Compact subscript range (< 0.0001) ─────────────────────────────────────
   if (abs > 0 && abs < 0.0001) {
-    // Use toFixed(7) to adhere to platform-wide max 7 decimal place rule
-    const raw         = abs.toFixed(7).replace(/0+$/, ''); 
+    // Use toFixed(6) to adhere to platform-wide max 6 decimal place rule
+    const raw         = abs.toFixed(6).replace(/0+$/, ''); 
     if (raw === '0' || raw === '0.') return { type: 'plain', text: sign + '0' };
 
     const afterDot    = raw.split('.')[1] ?? '';
@@ -54,7 +54,7 @@ export function formatNrt(
       else break;
     }
 
-    // Extract significant digits (capped by the .toFixed(7) above)
+    // Extract significant digits (capped by the .toFixed(6) above)
     const sigStart = leadingZeros;
     const sig      = afterDot.slice(sigStart) || '0';
 
@@ -70,10 +70,10 @@ export function formatNrt(
   }
 
   // ── Normal range (≥ 0.0001) ───────────────────────────────────────────────
-  // Show digits capped at 7 decimal places per user request
+  // Show digits capped at 6 decimal places per user request
   const text = abs.toLocaleString(undefined, {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 7,
+    maximumFractionDigits: 6,
   });
 
   return {

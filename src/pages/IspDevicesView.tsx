@@ -87,7 +87,7 @@ export default function IspDevicesView() {
     const totalDataGB = totalData / 1e9;
     return {
       devices: filteredDevices.length,
-      dataGB: totalDataGB.toFixed(2),
+      dataGB: totalDataGB.toFixed(6),
       nrt: totalNrt,
       cashback: totalNrt * 0.05 // 5% of user earnings roughly
     };
@@ -200,7 +200,7 @@ export default function IspDevicesView() {
             devDataBytes += (s.bytes_up || 0) + (s.bytes_down || 0);
             devNrt += (s.nrt_awarded || 0);
           });
-          const devDataGB = (devDataBytes / 1e9).toFixed(2);
+          const devDataGB = (devDataBytes / 1e9).toFixed(6);
 
           const sessionObj = sessions[0];
           const campaignObjFromSession = sessionObj ? (Array.isArray(sessionObj.campaign) ? sessionObj.campaign[0] : sessionObj.campaign) : null;
@@ -229,15 +229,30 @@ export default function IspDevicesView() {
                     <span className="w-1 h-1 rounded-full bg-glass-border" />
                     <span className={`flex items-center gap-1 ${device.status === 'active' ? 'text-green-500' : ''}`}>
                       {device.status === 'active' ? <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> : <span className="w-1.5 h-1.5 rounded-full bg-text-secondary" />}
-                      {device.status}
+                      {(() => {
+                        if (device.status === 'active') return 'Active Now';
+                        if (device.updated_at) {
+                          const diffMs = Date.now() - new Date(device.updated_at).getTime();
+                          const diffM = Math.floor(diffMs / 60000);
+                          const diffH = Math.floor(diffM / 60);
+                          const diffD = Math.floor(diffH / 24);
+                          if (diffD > 0) return `Last active ${diffD}d ago`;
+                          if (diffH > 0) return `Last active ${diffH}h ago`;
+                          if (diffM > 0) return `Last active ${diffM}m ago`;
+                          return 'Last active just now';
+                        }
+                        return 'Offline';
+                      })()}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 bg-amber-500/10 text-amber-500">
-                <AlertCircle size={12} />
-                unclaimed
+              <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                devNrt > 0 ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'
+              }`}>
+                {devNrt > 0 ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                {devNrt > 0 ? 'claimed' : 'unclaimed'}
               </div>
             </div>
 
@@ -264,7 +279,7 @@ export default function IspDevicesView() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-1">NRT Earned</span>
-                  <span className="text-sm font-bold text-accent-primary">{devNrt.toFixed(2)}</span>
+                  <span className="text-sm font-bold text-accent-primary">{devNrt.toFixed(6)}</span>
                 </div>
               </div>
 

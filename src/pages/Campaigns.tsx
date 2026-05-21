@@ -166,6 +166,16 @@ export default function Campaigns() {
       if (filterRewardMin !== null && c.reward_rate_per_gb < filterRewardMin) return false;
       if (filterRewardMax !== null && c.reward_rate_per_gb > filterRewardMax) return false;
       return true;
+    })
+    .sort((a, b) => {
+      if (activeTab === 'joined') {
+        const enA = userEnrollments?.find((e: any) => e.campaign_id === a.id);
+        const enB = userEnrollments?.find((e: any) => e.campaign_id === b.id);
+        const dateA = enA?.created_at || a.created_at || 0;
+        const dateB = enB?.created_at || b.created_at || 0;
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      }
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
     });
 
   const handleJoin = async (id: string, category?: string) => {
@@ -681,7 +691,7 @@ export default function Campaigns() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-xs text-text-secondary">
                         <ArrowDownToLine size={12} className="text-accent-primary" />
-                        <span>Total Data Tracked: <span className="text-text-primary font-semibold">{totalData.toFixed(2)} GB</span></span>
+                        <span>Total Data Tracked: <span className="text-text-primary font-semibold">{totalData.toFixed(6)} GB</span></span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-text-secondary">
                         <Clock size={12} className="text-accent-primary" />
@@ -693,7 +703,7 @@ export default function Campaigns() {
                     <div className="flex items-center justify-between pt-2 border-t border-glass-border/50">
                       <div>
                         <p className="text-[10px] text-text-secondary uppercase tracking-wider">Total Data</p>
-                        <p className="font-bold text-text-primary">{totalData.toFixed(2)} GB</p>
+                        <p className="font-bold text-text-primary">{totalData.toFixed(6)} GB</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-text-secondary uppercase tracking-wider">NRT Earned</p>

@@ -15,6 +15,8 @@ import { useTelemetry } from '@/hooks/useTelemetry';
 import EmptyState from '@/components/ui/EmptyState';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import NrtAmount from '@/components/ui/NrtAmount';
+import CampaignAnalyticsModal from '@/components/campaigns/CampaignAnalyticsModal';
+import { AnimatePresence } from 'framer-motion';
 
 type TimeFilter = '24H' | '7D' | '3M' | 'All';
 
@@ -35,6 +37,7 @@ export default function SpDashboard() {
   const [isTestingSdk, setIsTestingSdk] = useState(false);
   const [sdkStatus, setSdkStatus] = useState<'verified' | 'test_pending' | 'not_integrated'>('verified');
   const [activeServiceIndex, setActiveServiceIndex] = useState(0);
+  const [viewingCampaignDetails, setViewingCampaignDetails] = useState<any | null>(null);
 
   useEffect(() => {
     refreshProfile();
@@ -43,7 +46,9 @@ export default function SpDashboard() {
     }
   }, [spProfileId, timeFilter, refreshProfile, fetchCampaignStats]);
 
-  const runningCampaigns = campaigns.filter(c => c.status === 'active');
+  const runningCampaigns = campaigns
+    .filter(c => c.status === 'active')
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const handleLogout = async () => {
     await signOut();
@@ -543,10 +548,10 @@ export default function SpDashboard() {
           </div>
         ) : (
           runningCampaigns.slice(0, 3).map((camp) => (
-            <Link 
+            <button 
               key={camp.id} 
-              to="/campaigns?tab=campaigns"
-              className="glass p-4 rounded-xl border border-glass-border flex justify-between items-center active:scale-[0.98] transition-transform"
+              onClick={() => setViewingCampaignDetails(camp)}
+              className="w-full text-left glass p-4 rounded-xl border border-glass-border flex justify-between items-center active:scale-[0.98] transition-transform hover:bg-glass-bg"
             >
               <div>
                 <h4 className="font-semibold text-text-primary text-sm">{camp.name}</h4>
@@ -559,7 +564,7 @@ export default function SpDashboard() {
                 <p className="font-semibold text-accent-primary text-sm">{camp.spentNrt} NRT</p>
                 <p className="text-xs text-text-secondary">budget spent</p>
               </div>
-            </Link>
+            </button>
           ))
         )}
       </div>
@@ -569,6 +574,16 @@ export default function SpDashboard() {
         onClose={() => setShowLogoutConfirm(false)} 
         onConfirm={handleLogout} 
       />
+
+      {/* Analytics Modal Component */}
+      <AnimatePresence>
+        {viewingCampaignDetails && (
+          <CampaignAnalyticsModal 
+            campaign={viewingCampaignDetails} 
+            onClose={() => setViewingCampaignDetails(null)} 
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -109,11 +109,26 @@ export default function DeviceDetail() {
             <span className="text-xs text-text-secondary flex items-center gap-1.5">
               {deviceStatus === 'active' && (
                 <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-100"></span>
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
                 </span>
               )}
-              {deviceStatus === 'active' ? 'Active' : 'Offline'} • {deviceIsp}
+              {(() => {
+                if (deviceStatus === 'active') return 'Active Now';
+                // Try to get last-seen from device
+                const updatedAt = (window as any).__nrtDeviceUpdatedAt;
+                if (updatedAt) {
+                  const diffMs = Date.now() - new Date(updatedAt).getTime();
+                  const diffM = Math.floor(diffMs / 60000);
+                  const diffH = Math.floor(diffM / 60);
+                  const diffD = Math.floor(diffH / 24);
+                  if (diffD > 0) return `Last active ${diffD}d ago`;
+                  if (diffH > 0) return `Last active ${diffH}h ago`;
+                  if (diffM > 0) return `Last active ${diffM}m ago`;
+                  return 'Last active just now';
+                }
+                return 'Offline';
+              })()} • {deviceIsp}
             </span>
           </div>
         </div>
@@ -123,7 +138,7 @@ export default function DeviceDetail() {
       <div className="grid grid-cols-2 gap-3">
         <div className="glass rounded-xl p-3 border border-glass-border text-center">
           <p className="text-xs text-text-secondary">Total Data</p>
-          <p className="text-lg font-bold text-text-primary">{totalData.toFixed(1)} GB</p>
+          <p className="text-lg font-bold text-text-primary">{totalData.toFixed(6)} GB</p>
         </div>
         <div className="glass rounded-xl p-3 border border-glass-border text-center">
           <p className="text-xs text-text-secondary">NRT Earned</p>
@@ -391,10 +406,10 @@ export default function DeviceDetail() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
-                    <ArrowDownToLine size={10} className="text-accent-primary" /> {app.total_data_gb ? (app.total_data_gb * 0.8).toFixed(2) : '0.00'} GB
+                    <ArrowDownToLine size={10} className="text-accent-primary" /> {app.total_data_gb ? (app.total_data_gb * 0.8).toFixed(6) : '0.00'} GB
                   </span>
                   <span className="flex items-center gap-1">
-                    <ArrowUpFromLine size={10} className="text-[#a78bfa]" /> {app.total_data_gb ? (app.total_data_gb * 0.2).toFixed(2) : '0.00'} GB
+                    <ArrowUpFromLine size={10} className="text-[#a78bfa]" /> {app.total_data_gb ? (app.total_data_gb * 0.2).toFixed(6) : '0.00'} GB
                   </span>
                 </div>
               </div>
@@ -404,7 +419,7 @@ export default function DeviceDetail() {
                 <div className="flex items-center gap-4">
                   <div>
                     <p className="text-[10px] text-text-secondary uppercase tracking-wider">Total</p>
-                    <p className="text-sm font-bold text-text-primary">{Number(app.total_data_gb).toFixed(2)} GB</p>
+                    <p className="text-sm font-bold text-text-primary">{Number(app.total_data_gb).toFixed(6)} GB</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-text-secondary uppercase tracking-wider">Earned</p>

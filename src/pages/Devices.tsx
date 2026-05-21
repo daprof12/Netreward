@@ -104,7 +104,7 @@ function UserDevicesView() {
         <div className="flex justify-between items-start mb-2">
           <div>
             <p className="text-sm text-text-secondary font-medium">Data Consumed</p>
-            <h2 className="text-2xl font-bold text-text-primary">{Number(summary.totalData).toFixed(2)} GB</h2>
+            <h2 className="text-2xl font-bold text-text-primary">{Number(summary.totalData).toFixed(6)} GB</h2>
           </div>
           <div className="text-right">
             <p className="text-sm text-text-secondary font-medium">NRT Earned</p>
@@ -282,13 +282,13 @@ function UserDevicesView() {
                       <span className="text-[10px] text-text-secondary">{device.isp_name || 'Unknown ISP'}</span>
                       <span className="text-[10px] text-text-secondary">•</span>
                       <span className="text-[10px] text-text-secondary font-medium">
-                        {devSummary ? devSummary.total_data_gb.toFixed(2) : '0.00'} GB
+                        {devSummary ? devSummary.total_data_gb.toFixed(6) : '0.00'} GB
                       </span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end justify-center gap-1 mt-6">
                     <p className="font-semibold text-accent-primary text-sm pr-6">
-                      +{devSummary ? devSummary.total_nrt_earned.toFixed(2) : '0.00'} NRT
+                      +{devSummary ? devSummary.total_nrt_earned.toFixed(6) : '0.00'} NRT
                     </p>
                     <ChevronRight size={16} className="text-text-secondary absolute right-4 top-1/2 -translate-y-1/2 mt-3" />
                   </div>
