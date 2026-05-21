@@ -371,6 +371,31 @@ serve(async (req) => {
       if (camp) autoCampaignId = camp.id;
     }
 
+    // ── 3b. Device fingerprint resolver ────────────────────────────────────
+    // tracker.js sends nrt_device_fingerprint as device_id.
+    // We resolve it to the actual devices.id UUID here server-side.
+    // If it's already a valid UUID in devices, we use it directly.
+    // If not, we attempt fingerprint column lookup.
+    async function resolveDeviceId(rawDeviceId: string): Promise<string | null> {
+      // First: check if rawDeviceId is an actual devices.id (UUID match)
+      const { data: directMatch } = await supabase
+        .from('devices')
+        .select('id')
+        .eq('id', rawDeviceId)
+        .maybeSingle();
+      if (directMatch) return directMatch.id;
+
+      // Second: treat rawDeviceId as a fingerprint and look it up
+      const { data: fpMatch } = await supabase
+        .from('devices')
+        .select('id')
+        .eq('fingerprint', rawDeviceId)
+        .maybeSingle();
+      if (fpMatch) return fpMatch.id;
+
+      return null;
+    }
+
     // Verify HMAC signature if provided or if this is an ISP (ISPs must always use HMAC)
     if (providerType === 'isp' && !hmacSig) {
       return jsonResponse({ error: 'ISPs must sign requests with x-hmac-sig.' }, 401);
@@ -396,7 +421,7 @@ serve(async (req) => {
 
     for (const event of events) {
       const {
-        device_id,
+        device_id: rawDeviceId,
         campaign_id,
         session_id,
         bytes_up = 0,
@@ -408,12 +433,24 @@ serve(async (req) => {
 
       let finalCampaignId = campaign_id || autoCampaignId;
 
-      // Validate required fields
-      if (!device_id || !finalCampaignId || !session_id) {
+      // Validate required fields (raw)
+      if (!rawDeviceId || !finalCampaignId || !session_id) {
         results.push({
           session_id: session_id || 'unknown',
           status: 'error',
           message: 'Missing required fields: device_id, campaign_id (or no active campaign found), session_id',
+        });
+        errorCount++;
+        continue;
+      }
+
+      // Resolve rawDeviceId (may be a fingerprint) → actual devices.id
+      const device_id = await resolveDeviceId(rawDeviceId as string);
+      if (!device_id) {
+        results.push({
+          session_id,
+          status: 'error',
+          message: `Device not found. Ensure the device is registered in NetReward before sending telemetry. (lookup: ${rawDeviceId})`,
         });
         errorCount++;
         continue;
@@ -478,8 +515,60 @@ serve(async (req) => {
         });
         errorCount++;
       } else {
-        results.push(data as Record<string, unknown>);
+        const rpcData = data as Record<string, unknown>;
+        results.push(rpcData);
         successCount++;
+
+        // Write to tracking_sessions for admin visibility
+        // Resolve user email and campaign name for the admin table
+        try {
+          const { data: deviceUser } = await supabase
+            .from('devices')
+            .select('users(email)')
+            .eq('id', device_id)
+            .maybeSingle();
+
+          const { data: campInfo } = await supabase
+            .from('campaigns')
+            .select(`
+              title,
+              sp:sp_profiles(users(email)),
+              isp:isp_profiles(users(email))
+            `)
+            .eq('id', finalCampaignId)
+            .maybeSingle();
+
+          const userEmail = (deviceUser?.users as any)?.email || 'unknown';
+          const campaignName = campInfo?.title || String(finalCampaignId);
+          const spArr = campInfo?.sp;
+          const spEmail = spArr
+            ? (Array.isArray(spArr) ? (spArr[0]?.users as any)?.email : (spArr as any)?.users?.email) || ''
+            : '';
+
+          const nrtAwarded = rpcData.status === 'success'
+            ? Number((rpcData.splits as any)?.user ?? 0)
+            : 0;
+
+          await supabase.from('tracking_sessions').insert({
+            session_id: String(session_id),
+            user_email: userEmail,
+            campaign_name: campaignName,
+            sp_email: spEmail,
+            source: providerType === 'isp' ? 'isp_sdk' : 'sdk',
+            data_rx_bytes: Number(bytes_down),
+            data_tx_bytes: Number(bytes_up),
+            duration_seconds: Number(duration_seconds),
+            nrt_awarded: nrtAwarded,
+            validation_score: validation.isAnomaly ? 0.5 : 1.0,
+            status: rpcData.status === 'success' ? 'verified' :
+                    rpcData.status === 'duplicate' ? 'duplicate' :
+                    rpcData.status === 'skipped' ? 'skipped' : 'error',
+            reject_reason: rpcData.status !== 'success' ? String(rpcData.message ?? '') : '',
+          });
+        } catch (tsErr) {
+          // Non-fatal: log but don't fail the response
+          console.error('[tracking_sessions write failed]', tsErr);
+        }
       }
     }
 
