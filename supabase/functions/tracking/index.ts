@@ -429,6 +429,8 @@ serve(async (req) => {
         duration_seconds = 60,
         session_start,
         session_end,
+        // Optional gaming metadata: set by tracker.js data-gaming-platform attribute
+        gaming_platform = null,
       } = event as Record<string, unknown>;
 
       let finalCampaignId = campaign_id || autoCampaignId;
@@ -549,21 +551,44 @@ serve(async (req) => {
             ? Number((rpcData.splits as any)?.user ?? 0)
             : 0;
 
+          // Resolve gaming context from RPC response (populated for gaming campaigns)
+          const rpcGamingPlatform = rpcData.gaming_platform as string | null || gaming_platform as string | null || null;
+          const rpcGamingUsername = rpcData.gaming_username as string | null || null;
+
+          // Determine source label
+          let sessionSource = providerType === 'isp' ? 'isp_sdk' : 'sdk';
+          if (rpcGamingPlatform) sessionSource = `gaming_${rpcGamingPlatform}`;
+
+          // Map all RPC statuses to tracking_sessions status values
+          const rpcStatus = rpcData.status as string;
+          const tsStatus =
+            rpcStatus === 'success' ? 'verified' :
+            rpcStatus === 'recorded' ? 'verified' :
+            rpcStatus === 'duplicate' ? 'duplicate' :
+            rpcStatus === 'pending_gaming_account' ? 'pending' :
+            rpcStatus === 'skipped' ? 'skipped' : 'error';
+
+          const rejectReason =
+            rpcStatus === 'pending_gaming_account'
+              ? 'Gaming account not linked — rewards withheld until account is linked'
+              : rpcStatus !== 'success' && rpcStatus !== 'recorded'
+                ? String(rpcData.message ?? '')
+                : '';
+
           await supabase.from('tracking_sessions').insert({
             session_id: String(session_id),
             user_email: userEmail,
             campaign_name: campaignName,
             sp_email: spEmail,
-            source: providerType === 'isp' ? 'isp_sdk' : 'sdk',
+            source: sessionSource,
+            device_ip: rpcGamingUsername ? `[gaming:${rpcGamingUsername}]` : '',
             data_rx_bytes: Number(bytes_down),
             data_tx_bytes: Number(bytes_up),
             duration_seconds: Number(duration_seconds),
             nrt_awarded: nrtAwarded,
             validation_score: validation.isAnomaly ? 0.5 : 1.0,
-            status: rpcData.status === 'success' ? 'verified' :
-                    rpcData.status === 'duplicate' ? 'duplicate' :
-                    rpcData.status === 'skipped' ? 'skipped' : 'error',
-            reject_reason: rpcData.status !== 'success' ? String(rpcData.message ?? '') : '',
+            status: tsStatus,
+            reject_reason: rejectReason,
           });
         } catch (tsErr) {
           // Non-fatal: log but don't fail the response

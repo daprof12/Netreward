@@ -5,6 +5,10 @@
   const spApiKey = currentScript.getAttribute('data-api-key');
   const ispApiKey = currentScript.getAttribute('data-isp-api-key');
   const endpoint = currentScript.getAttribute('data-endpoint') || 'https://pmpeyfkbqipfnhokfksl.supabase.co/functions/v1/tracking';
+  // Optional: gaming platform identifier (e.g. 'steam', 'playstation', 'xbox')
+  // Set this on the script tag if embedding on a gaming platform:
+  //   <script data-gaming-platform="steam" ...></script>
+  const gamingPlatform = currentScript.getAttribute('data-gaming-platform') || null;
 
   if (!spApiKey && !ispApiKey) {
     console.warn('[NetReward Tracker] Missing data-api-key or data-isp-api-key. Tracker disabled.');
@@ -51,7 +55,9 @@
         bytes_down: Math.floor(this.bytesDown),
         duration_seconds: Math.max(1, Math.floor((Date.now() - this.sessionStart) / 1000)),
         session_start: new Date(this.sessionStart).toISOString(),
-        session_end: new Date().toISOString()
+        session_end: new Date().toISOString(),
+        // Include gaming platform if this is a gaming integration
+        ...(gamingPlatform ? { gaming_platform: gamingPlatform } : {})
       };
 
       // Reset for next batch

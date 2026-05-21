@@ -1,17 +1,14 @@
 -- =============================================================
--- 00083: Fix process_tracking_report to always record sessions
---        + Gaming account validation for gaming campaigns
+-- PASTE THIS ENTIRE BLOCK in Supabase Dashboard SQL Editor
+-- Dashboard → SQL Editor → New Query → Paste → Run
 -- =============================================================
---
--- Changes:
--- 1. Always insert device_data_sessions (even zero-reward heartbeats)
---    so the pulsing liveness indicator works immediately.
--- 2. Always update device aggregate stats (total_data_bytes, etc.).
--- 3. For gaming category campaigns: validate the user has a linked
---    gaming_accounts row. If not, session is recorded but rewards
---    are withheld (pending_gaming_account) for admin review.
--- 4. The gaming platform username is returned in the RPC result
---    so the edge function can include it in tracking_sessions.
+-- Changes vs previous version:
+-- + Always records device_data_sessions (even zero-reward heartbeats)
+-- + Updates device aggregate stats on every call
+-- + Gaming campaigns: validates gaming_accounts linkage
+--   If no account linked: records session (verified=false) but withholds rewards
+-- + Returns gaming_platform + gaming_username in response
+-- =============================================================
 
 CREATE OR REPLACE FUNCTION process_tracking_report(
   p_device_id UUID,
@@ -76,26 +73,22 @@ BEGIN
     RETURN jsonb_build_object('status', 'error', 'message', 'Campaign not found or inactive');
   END IF;
 
-  -- Resolve SP user_id from sp_profiles
   IF v_campaign_sp_id IS NOT NULL THEN
     SELECT user_id INTO v_sp_user_id FROM public.sp_profiles WHERE id = v_campaign_sp_id;
   END IF;
 
-  -- Resolve ISP user_id from isp_profiles
   IF v_campaign_isp_id IS NOT NULL THEN
     SELECT user_id INTO v_isp_user_id FROM public.isp_profiles WHERE id = v_campaign_isp_id;
   END IF;
 
-  -- 3. Fetch Device details
+  -- 3. Fetch Device
   SELECT user_id, isp_name INTO v_user_id, v_device_isp_name
-  FROM public.devices
-  WHERE id = p_device_id;
+  FROM public.devices WHERE id = p_device_id;
 
   IF v_user_id IS NULL THEN
     RETURN jsonb_build_object('status', 'error', 'message', 'Device not found');
   END IF;
 
-  -- ISP auto-match via device ISP name
   IF v_isp_user_id IS NULL AND v_device_isp_name IS NOT NULL THEN
     SELECT ip.user_id INTO v_isp_user_id
     FROM public.networks n
@@ -116,7 +109,6 @@ BEGIN
 
     -- No gaming account linked: record the session but withhold rewards
     IF v_gaming_username IS NULL THEN
-      -- Still insert session (real traffic) but mark as pending review
       INSERT INTO public.device_data_sessions (
         device_id, campaign_id, session_id, bytes_up, bytes_down,
         duration_seconds, session_start, session_end, verified, nrt_awarded
@@ -127,11 +119,11 @@ BEGIN
 
       -- Update device stats even for unverified gaming sessions
       UPDATE public.devices
-      SET total_data_bytes      = COALESCE(total_data_bytes, 0) + (p_bytes_up + p_bytes_down),
+      SET total_data_bytes       = COALESCE(total_data_bytes, 0) + (p_bytes_up + p_bytes_down),
           total_duration_seconds = COALESCE(total_duration_seconds, 0) + p_duration_seconds,
-          last_campaign_id      = p_campaign_id,
-          status                = 'active',
-          updated_at            = now()
+          last_campaign_id       = p_campaign_id,
+          status                 = 'active',
+          updated_at             = now()
       WHERE id = p_device_id;
 
       RETURN jsonb_build_object(
@@ -147,21 +139,17 @@ BEGIN
 
   -- 4. Calculate Earnings
   v_total_bytes := p_bytes_up + p_bytes_down;
-  -- Use a LOWER minimum of 0.000001 GB (1 KB) so small sessions still count
   v_total_gb := GREATEST(v_total_bytes::NUMERIC / 1000000000.0, 0);
-
   v_total_nrt_earned := v_total_gb * v_campaign_reward_rate * v_nhs_multiplier;
 
-  -- Budget cap
   IF v_budget_remaining <= 0 THEN
-    -- Still record the session, just award 0
     v_total_nrt_earned := 0;
   ELSIF v_total_nrt_earned > v_budget_remaining THEN
     v_total_nrt_earned := v_budget_remaining;
     UPDATE public.campaigns SET status = 'completed' WHERE id = p_campaign_id;
   END IF;
 
-  -- 5. ALWAYS insert session record (even zero-reward sessions are real activity)
+  -- 5. ALWAYS insert session record (even zero-reward heartbeats count as real activity)
   INSERT INTO public.device_data_sessions (
     device_id, campaign_id, session_id, bytes_up, bytes_down,
     duration_seconds, session_start, session_end, verified, nrt_awarded
@@ -173,15 +161,15 @@ BEGIN
   -- 6. Update device aggregate stats
   UPDATE public.devices
   SET
-    total_data_bytes = COALESCE(total_data_bytes, 0) + v_total_bytes,
+    total_data_bytes       = COALESCE(total_data_bytes, 0) + v_total_bytes,
     total_duration_seconds = COALESCE(total_duration_seconds, 0) + p_duration_seconds,
-    nrt_earned = COALESCE(nrt_earned, 0) + v_total_nrt_earned,
-    last_campaign_id = p_campaign_id,
-    status = 'active',
-    updated_at = now()
+    nrt_earned             = COALESCE(nrt_earned, 0) + v_total_nrt_earned,
+    last_campaign_id       = p_campaign_id,
+    status                 = 'active',
+    updated_at             = now()
   WHERE id = p_device_id;
 
-  -- Skip wallet credits for zero-reward sessions (but session is recorded)
+  -- Skip wallet credits for zero-reward sessions (session is still recorded)
   IF v_total_nrt_earned <= 0 THEN
     RETURN jsonb_build_object(
       'status', 'recorded',
@@ -189,29 +177,26 @@ BEGIN
       'session_id', p_session_id,
       'data_gb', v_total_gb,
       'earned_nrt', 0,
+      'gaming_platform', v_gaming_platform,
+      'gaming_username', v_gaming_username,
       'message', 'Session recorded. Data volume below minimum reward threshold.'
     );
   END IF;
 
-  -- 7. Calculate Splits (85% User, 10% SP, 5% ISP)
+  -- 7. Splits (85% User, 10% SP, 5% ISP)
   v_user_share := ROUND(v_total_nrt_earned * 0.85, 9);
   v_sp_share   := ROUND(v_total_nrt_earned * 0.10, 9);
   v_isp_share  := ROUND(v_total_nrt_earned * 0.05, 9);
 
   -- 8. Update Campaign Spent
-  UPDATE public.campaigns
-  SET budget_spent = budget_spent + v_total_nrt_earned
-  WHERE id = p_campaign_id;
+  UPDATE public.campaigns SET budget_spent = budget_spent + v_total_nrt_earned WHERE id = p_campaign_id;
 
-  -- 9. Credit User wallet (unclaimed_nrt)
+  -- 9. Credit User
   SELECT id INTO v_user_wallet_id FROM public.wallets WHERE user_id = v_user_id;
   IF v_user_wallet_id IS NOT NULL THEN
-    UPDATE public.wallets
-    SET unclaimed_nrt = unclaimed_nrt + v_user_share
-    WHERE id = v_user_wallet_id;
+    UPDATE public.wallets SET unclaimed_nrt = unclaimed_nrt + v_user_share WHERE id = v_user_wallet_id;
   END IF;
 
-  -- 10. Credit user_campaigns (claim_all_rewards compatibility)
   UPDATE public.user_campaigns
   SET unclaimed_nrt = unclaimed_nrt + v_user_share,
       data_consumed_gb = data_consumed_gb + v_total_gb
@@ -225,31 +210,23 @@ BEGIN
         data_consumed_gb = public.user_campaigns.data_consumed_gb + EXCLUDED.data_consumed_gb;
   END IF;
 
-  -- 11. Credit SP Wallet (10% cashback)
+  -- 10. Credit SP
   IF v_sp_user_id IS NOT NULL THEN
     SELECT id INTO v_sp_wallet_id FROM public.wallets WHERE user_id = v_sp_user_id;
     IF v_sp_wallet_id IS NOT NULL THEN
-      UPDATE public.wallets
-      SET nrt_balance = nrt_balance + v_sp_share
-      WHERE id = v_sp_wallet_id;
-
+      UPDATE public.wallets SET nrt_balance = nrt_balance + v_sp_share WHERE id = v_sp_wallet_id;
       INSERT INTO public.transactions (wallet_id, amount, tx_type, description)
-      VALUES (v_sp_wallet_id, v_sp_share, 'reward',
-              'SP 10% cashback from campaign: ' || v_campaign_title);
+      VALUES (v_sp_wallet_id, v_sp_share, 'reward', 'SP 10% cashback from campaign: ' || v_campaign_title);
     END IF;
   END IF;
 
-  -- 12. Credit ISP Wallet (5% cashback)
+  -- 11. Credit ISP
   IF v_isp_user_id IS NOT NULL THEN
     SELECT id INTO v_isp_wallet_id FROM public.wallets WHERE user_id = v_isp_user_id;
     IF v_isp_wallet_id IS NOT NULL THEN
-      UPDATE public.wallets
-      SET nrt_balance = nrt_balance + v_isp_share
-      WHERE id = v_isp_wallet_id;
-
+      UPDATE public.wallets SET nrt_balance = nrt_balance + v_isp_share WHERE id = v_isp_wallet_id;
       INSERT INTO public.transactions (wallet_id, amount, tx_type, description)
-      VALUES (v_isp_wallet_id, v_isp_share, 'reward',
-              'ISP 5% cashback from campaign: ' || v_campaign_title);
+      VALUES (v_isp_wallet_id, v_isp_share, 'reward', 'ISP 5% cashback from campaign: ' || v_campaign_title);
     END IF;
   END IF;
 
@@ -259,11 +236,7 @@ BEGIN
     'session_id', p_session_id,
     'data_gb', v_total_gb,
     'earned_nrt', v_total_nrt_earned,
-    'splits', jsonb_build_object(
-      'user', v_user_share,
-      'sp', v_sp_share,
-      'isp', v_isp_share
-    ),
+    'splits', jsonb_build_object('user', v_user_share, 'sp', v_sp_share, 'isp', v_isp_share),
     'campaign_budget_remaining', (v_budget_remaining - v_total_nrt_earned),
     'gaming_platform', v_gaming_platform,
     'gaming_username', v_gaming_username
