@@ -168,14 +168,22 @@ function validateTelemetry(
   return { isAnomaly: false, flagType: 'UNKNOWN', details: '' };
 }
 
-function jsonResponse(body: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-
 serve(async (req) => {
+  const origin = req.headers.get('Origin') || '*';
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-sp-api-key, x-isp-api-key, x-hmac-sig',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+
+  function jsonResponse(body: Record<string, unknown>, status = 200) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
