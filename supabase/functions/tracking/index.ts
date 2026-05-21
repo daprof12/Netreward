@@ -56,6 +56,118 @@ function timingSafeEqual(a: string, b: string): boolean {
   return result === 0;
 }
 
+/** Resolves category for a campaign by querying linked service or network */
+async function getCampaignCategory(supabase: any, campaignId: string): Promise<string> {
+  try {
+    const { data: camp } = await supabase
+      .from('campaigns')
+      .select(`
+        service_id,
+        network_id,
+        svc:services (category),
+        net:networks (category)
+      `)
+      .eq('id', campaignId)
+      .maybeSingle();
+
+    if (camp) {
+      if (camp.svc && (camp.svc as any).category) {
+        return (camp.svc as any).category.toLowerCase();
+      }
+      if (camp.net && (camp.net as any).category) {
+        return (camp.net as any).category.toLowerCase();
+      }
+    }
+  } catch (err) {
+    console.error('Failed to resolve campaign category:', err);
+  }
+  return 'other';
+}
+
+/** Validates reported bandwidth telemetry bounds based on service/network category */
+function validateTelemetry(
+  category: string,
+  bytesUp: number,
+  bytesDown: number,
+  durationSec: number
+): { isAnomaly: boolean; flagType: string; details: string } {
+  const totalBytes = bytesUp + bytesDown;
+  if (durationSec <= 0) {
+    return {
+      isAnomaly: true,
+      flagType: 'IMPOSSIBLE_SPEED',
+      details: `Duration is zero or negative (${durationSec}s).`
+    };
+  }
+
+  const bytesPerSec = totalBytes / durationSec;
+
+  // Absolute physical boundary for standard consumer connections (100 MB/s)
+  const ABSOLUTE_MAX_BYTES_PER_SEC = 100 * 1024 * 1024;
+  if (bytesPerSec > ABSOLUTE_MAX_BYTES_PER_SEC) {
+    return {
+      isAnomaly: true,
+      flagType: 'IMPOSSIBLE_SPEED',
+      details: `Sustained rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds hardware speed limits (100 MB/s).`
+    };
+  }
+
+  // Category-specific heuristics
+  if (category === 'streaming') {
+    // 320 kbps streaming = 40 KB/s. Enforce generous 10 MB/s upper threshold for pre-buffering.
+    const STREAMING_MAX_BYTES_PER_SEC = 10 * 1024 * 1024;
+    if (bytesPerSec > STREAMING_MAX_BYTES_PER_SEC) {
+      return {
+        isAnomaly: true,
+        flagType: 'HIGH_VOLUME',
+        details: `Streaming average speed of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds logical limit (10 MB/s).`
+      };
+    }
+  } else if (category === 'gaming') {
+    // Gaming bandwidth is extremely light (rarely exceeding 150 KB/s). Enforce a 250 KB/s cap.
+    const GAMING_MAX_BYTES_PER_SEC = 250 * 1024;
+    if (bytesPerSec > GAMING_MAX_BYTES_PER_SEC) {
+      return {
+        isAnomaly: true,
+        flagType: 'HIGH_VOLUME',
+        details: `Gaming average transfer rate of ${(bytesPerSec / 1024).toFixed(2)} KB/s exceeds logical cap (250 KB/s).`
+      };
+    }
+  } else if (category === 'ai' || category === 'ai service') {
+    // AI queries consume up to 5 MB/s on bursts.
+    const AI_MAX_BYTES_PER_SEC = 5 * 1024 * 1024;
+    if (bytesPerSec > AI_MAX_BYTES_PER_SEC) {
+      return {
+        isAnomaly: true,
+        flagType: 'HIGH_VOLUME',
+        details: `AI service average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds threshold (5 MB/s).`
+      };
+    }
+  } else if (category === 'browsing') {
+    // Browsing average rate cap is 4 MB/s.
+    const BROWSING_MAX_BYTES_PER_SEC = 4 * 1024 * 1024;
+    if (bytesPerSec > BROWSING_MAX_BYTES_PER_SEC) {
+      return {
+        isAnomaly: true,
+        flagType: 'HIGH_VOLUME',
+        details: `Browsing average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds speed threshold (4 MB/s).`
+      };
+    }
+  } else if (category === 'cloud') {
+    // Cloud sync/backups can use up to 50 MB/s.
+    const CLOUD_MAX_BYTES_PER_SEC = 50 * 1024 * 1024;
+    if (bytesPerSec > CLOUD_MAX_BYTES_PER_SEC) {
+      return {
+        isAnomaly: true,
+        flagType: 'HIGH_VOLUME',
+        details: `Cloud transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds logical limit (50 MB/s).`
+      };
+    }
+  }
+
+  return { isAnomaly: false, flagType: 'UNKNOWN', details: '' };
+}
+
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -271,6 +383,9 @@ serve(async (req) => {
     let successCount = 0;
     let errorCount = 0;
 
+    // Caching resolved campaign categories to minimize DB queries in batch
+    const categoryCache: Record<string, string> = {};
+
     for (const event of events) {
       const {
         device_id,
@@ -294,6 +409,45 @@ serve(async (req) => {
         });
         errorCount++;
         continue;
+      }
+
+      // Dynamic Telemetry Sanitizer Validation
+      let category = categoryCache[finalCampaignId as string];
+      if (!category) {
+        category = await getCampaignCategory(supabase, finalCampaignId as string);
+        categoryCache[finalCampaignId as string] = category;
+      }
+
+      const validation = validateTelemetry(
+        category,
+        Number(bytes_up),
+        Number(bytes_down),
+        Number(duration_seconds)
+      );
+
+      if (validation.isAnomaly) {
+        // Option B: Log to tracking_anomalies, but proceed with RPC processing
+        try {
+          const { data: userData } = await supabase
+            .from('devices')
+            .select('users(email)')
+            .eq('id', device_id)
+            .maybeSingle();
+          
+          const userEmail = (userData?.users as any)?.email || 'unknown@netreward.online';
+
+          await supabase.from('tracking_anomalies').insert({
+            session_id: session_id as string,
+            user_email: userEmail,
+            flag_type: validation.flagType,
+            details: `[Category: ${category.toUpperCase()}] ${validation.details}`,
+            status: 'open'
+          });
+
+          console.log(`[Telemetry Anomaly Logged] Session: ${session_id}, Flag: ${validation.flagType}, Details: ${validation.details}`);
+        } catch (anomalyErr) {
+          console.error('Failed to log tracking anomaly:', anomalyErr);
+        }
       }
 
       // Call the Reward Engine RPC
