@@ -128,12 +128,12 @@ export default function AdminTransactions() {
     <motion.div className="space-y-5" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <div>
         <h1 className="text-2xl font-black">Transactions</h1>
-        <p className="text-sm text-text-secondary">{filtered.length} records · {totalNrt.toLocaleString()} NRT total</p>
+        <p className="text-sm text-text-secondary">{filtered.length} records · {totalNrt.toLocaleString(undefined, { maximumFractionDigits: 9 })} NRT total</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: Coins, label: 'Total Volume', value: `${totalNrt.toLocaleString()} NRT`, color: '#8b5cf6', bg: 'bg-purple-500/10' },
+          { icon: Coins, label: 'Total Volume', value: `${totalNrt.toLocaleString(undefined, { maximumFractionDigits: 9 })} NRT`, color: '#8b5cf6', bg: 'bg-purple-500/10' },
           { icon: ArrowDownLeft, label: 'Deposits', value: transactions.filter(t => t.type === 'deposit').length.toString(), color: '#10B981', bg: 'bg-emerald-500/10' },
           { icon: ArrowUpRight, label: 'Withdrawals', value: transactions.filter(t => t.type === 'withdrawal').length.toString(), color: '#EF4444', bg: 'bg-red-500/10' },
           { icon: AlertCircle, label: 'Pending', value: transactions.filter(t => t.status === 'pending').length.toString(), color: '#F59E0B', bg: 'bg-amber-500/10' },
@@ -214,7 +214,7 @@ export default function AdminTransactions() {
                   <td className="px-4 py-3 font-mono text-xs text-text-secondary">{t.id}</td>
                   <td className="px-4 py-3 text-text-primary">{t.userEmail}</td>
                   <td className="px-4 py-3"><Badge label={TYPE_LABELS[t.type] ?? t.type} color={TYPE_COLORS[t.type] ?? '#6B7280'} /></td>
-                  <td className="px-4 py-3 font-bold">{t.amount.toLocaleString()} {t.currency}</td>
+                  <td className="px-4 py-3 font-bold">{t.amount.toLocaleString(undefined, { maximumFractionDigits: 9 })} {t.currency}</td>
                   <td className="px-4 py-3 text-text-secondary">{t.country}</td>
                   <td className="px-4 py-3"><Badge label={t.status} color={STATUS_COLORS[t.status]} /></td>
                   <td className="px-4 py-3 text-text-secondary text-xs">{new Date(t.createdAt).toLocaleDateString()}</td>
@@ -241,7 +241,7 @@ export default function AdminTransactions() {
                   <div className="w-16 h-16 rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: `${color}20` }}>
                     <Icon size={32} style={{ color }} />
                   </div>
-                  <h3 className="text-2xl font-black">{receipt.amount.toLocaleString()} {receipt.currency}</h3>
+                  <h3 className="text-2xl font-black">{receipt.amount.toLocaleString(undefined, { maximumFractionDigits: 9 })} {receipt.currency}</h3>
                   <p className="text-sm text-text-secondary mt-1">{TYPE_LABELS[receipt.type] ?? receipt.type} Transaction</p>
                   <div className="mt-2"><Badge label={receipt.status} color={STATUS_COLORS[receipt.status]} /></div>
                 </div>
@@ -251,7 +251,7 @@ export default function AdminTransactions() {
                     { label: 'Transaction ID', value: receipt.id },
                     { label: 'User',           value: receipt.userEmail },
                     { label: 'Type',           value: TYPE_LABELS[receipt.type] ?? receipt.type },
-                    { label: 'Amount',         value: `${receipt.amount.toLocaleString()} ${receipt.currency}` },
+                    { label: 'Amount',         value: `${receipt.amount.toLocaleString(undefined, { maximumFractionDigits: 9 })} ${receipt.currency}` },
                     { label: 'Country',        value: receipt.country },
                     { label: 'Status',         value: receipt.status },
                     { label: 'Date & Time',    value: new Date(receipt.createdAt).toLocaleString() },

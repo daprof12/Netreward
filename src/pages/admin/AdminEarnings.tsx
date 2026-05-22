@@ -17,34 +17,101 @@ export default function AdminEarnings() {
   useEffect(() => {
     (async () => {
       try {
-        // Aggregate from transactions where type = reward/cashback
         const { data } = await supabase
-          .from('transactions')
-          .select('*, wallets(id, users(email, display_name, role, country, sp_profiles(company_name), isp_profiles(isp_name)))')
-          .in('tx_type', ['reward', 'cashback', 'referral_bonus'])
-          .order('created_at', { ascending: false })
-          .limit(300);
-        setEarnings((data || []).map((e: any) => {
-          const u = e.wallets?.users || {};
-          const isSp = u.role === 'sp';
-          const isIsp = u.role === 'isp';
-          const spName = Array.isArray(u.sp_profiles) ? u.sp_profiles[0]?.company_name : u.sp_profiles?.company_name;
-          const ispName = Array.isArray(u.isp_profiles) ? u.isp_profiles[0]?.isp_name : u.isp_profiles?.isp_name;
-          const entityName = isSp ? (spName || u.email) : isIsp ? (ispName || u.email) : (u.display_name || u.email || 'Unknown');
+          .from('user_campaigns')
+          .select(`
+            id, nrt_earned, data_consumed_gb, enrolled_at,
+            users!inner(email, display_name, role, country),
+            campaigns!inner(
+              id, title, created_at,
+              sp_profiles(company_name, users(email, country)),
+              isp_profiles(isp_name, users(email, country)),
+              services(category),
+              networks(category)
+            )
+          `)
+          .order('enrolled_at', { ascending: false });
+          
+        const campaignCashbacks = new Map();
+        const rows: any[] = [];
 
-          return {
-            ...e,
-            entityName: entityName,
-            entityEmail: u.email || '',
-            entityType: u.role || 'user',
-            nrtEarned: Number(e.amount || 0),
-            cashbackPct: e.tx_type === 'cashback' ? 5 : 0,
-            cashbackNrt: e.tx_type === 'cashback' ? Number(e.amount || 0) : 0,
-            dataConsumedGb: 0,
+        (data || []).forEach((uc: any) => {
+          const u = uc.users || {};
+          const cat = uc.campaigns?.services?.category || uc.campaigns?.networks?.category || 'General';
+          
+          // 1. User Earning Row
+          rows.push({
+            id: uc.id + '-user',
+            entityName: u.display_name || u.email || 'Unknown',
+            entityEmail: u.email,
+            entityType: 'user',
+            nrtEarned: Number(uc.nrt_earned || 0),
+            cashbackPct: 0,
+            cashbackNrt: 0,
+            dataConsumedGb: Number(uc.data_consumed_gb || 0),
             country: u.country || 'Global',
-            period: e.created_at ? new Date(e.created_at).toLocaleDateString() : 'N/A',
-          };
-        }));
+            period: new Date(uc.enrolled_at).toLocaleDateString(),
+            category: cat
+          });
+
+          // Accumulate campaign data for SP/ISP
+          const cid = uc.campaigns?.id;
+          if (!campaignCashbacks.has(cid)) {
+            campaignCashbacks.set(cid, {
+              campaign: uc.campaigns,
+              dataGb: 0,
+              nrtEarnedSum: 0
+            });
+          }
+          const cInfo = campaignCashbacks.get(cid);
+          cInfo.dataGb += Number(uc.data_consumed_gb || 0);
+          cInfo.nrtEarnedSum += Number(uc.nrt_earned || 0);
+        });
+
+        // 2. Generate SP & ISP Cashback Rows Per Campaign
+        campaignCashbacks.forEach((cInfo, cid) => {
+          const c = cInfo.campaign;
+          const cat = c.services?.category || c.networks?.category || 'General';
+          
+          if (c.sp_profiles) {
+            const sp = Array.isArray(c.sp_profiles) ? c.sp_profiles[0] : c.sp_profiles;
+            const spUser = sp?.users || {};
+            rows.push({
+              id: cid + '-sp',
+              entityName: sp?.company_name || spUser.email || 'Unknown',
+              entityEmail: spUser.email || '',
+              entityType: 'sp',
+              nrtEarned: 0,
+              cashbackPct: 10,
+              cashbackNrt: (cInfo.nrtEarnedSum / 0.85) * 0.10,
+              dataConsumedGb: cInfo.dataGb,
+              country: spUser.country || 'Global',
+              period: new Date(c.created_at).toLocaleDateString(),
+              category: cat
+            });
+          }
+          
+          if (c.isp_profiles) {
+            const isp = Array.isArray(c.isp_profiles) ? c.isp_profiles[0] : c.isp_profiles;
+            const ispUser = isp?.users || {};
+            rows.push({
+              id: cid + '-isp',
+              entityName: isp?.isp_name || ispUser.email || 'Unknown',
+              entityEmail: ispUser.email || '',
+              entityType: 'isp',
+              nrtEarned: 0,
+              cashbackPct: 5,
+              cashbackNrt: (cInfo.nrtEarnedSum / 0.85) * 0.05,
+              dataConsumedGb: cInfo.dataGb,
+              country: ispUser.country || 'Global',
+              period: new Date(c.created_at).toLocaleDateString(),
+              category: cat
+            });
+          }
+        });
+
+        rows.sort((a, b) => new Date(b.period).getTime() - new Date(a.period).getTime());
+        setEarnings(rows);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     })();
@@ -105,9 +172,9 @@ export default function AdminEarnings() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: Coins, label: 'Total NRT Earned', value: `${totalNrt.toLocaleString()} NRT`, color: '#8b5cf6', bg: 'bg-purple-500/10' },
-          { icon: TrendingUp, label: 'Total Cashback', value: `${totalCashback.toLocaleString()} NRT`, color: '#F59E0B', bg: 'bg-amber-500/10' },
-          { icon: Zap, label: 'SP Entities', value: earnings.filter(e => e.entityType === 'sp').length.toString(), color: '#10B981', bg: 'bg-emerald-500/10' },
+          { icon: Coins, label: 'Total NRT Earned', value: `${totalNrt.toLocaleString(undefined, { maximumFractionDigits: 9 })} NRT`, color: '#8b5cf6', bg: 'bg-purple-500/10' },
+          { icon: TrendingUp, label: 'Total Cashback', value: `${totalCashback.toLocaleString(undefined, { maximumFractionDigits: 9 })} NRT`, color: '#F59E0B', bg: 'bg-amber-500/10' },
+          { icon: Zap, label: 'SP & ISP Entities', value: earnings.filter(e => e.entityType === 'sp' || e.entityType === 'isp').length.toString(), color: '#10B981', bg: 'bg-emerald-500/10' },
           { icon: Users, label: 'Users', value: earnings.filter(e => e.entityType === 'user').length.toString(), color: '#3B82F6', bg: 'bg-blue-500/10' },
         ].map(({ icon: Icon, label, value, color, bg }) => (
           <div key={label} className="glass p-4 rounded-2xl border border-glass-border">
@@ -125,7 +192,7 @@ export default function AdminEarnings() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-glass-border bg-bg-secondary">
-                {['Entity', 'Type', 'Data (GB)', 'NRT Earned', 'Cashback %', 'Cashback NRT', 'Country', 'Period'].map(h => (
+                {['Entity', 'Type', 'Category', 'Data (GB)', 'NRT Earned', 'Cashback %', 'Cashback NRT', 'Country', 'Period'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -140,10 +207,11 @@ export default function AdminEarnings() {
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${e.entityType === 'sp' ? 'bg-green-500/10 text-green-500' : e.entityType === 'isp' ? 'bg-blue-500/10 text-blue-500' : 'bg-purple-500/10 text-purple-500'}`}>{e.entityType}</span>
                   </td>
+                  <td className="px-4 py-3 font-semibold capitalize text-text-primary">{e.category}</td>
                   <td className="px-4 py-3 font-bold">{e.dataConsumedGb.toLocaleString()}</td>
-                  <td className="px-4 py-3 font-bold text-accent-primary">{e.nrtEarned.toLocaleString()}</td>
+                  <td className="px-4 py-3 font-bold text-accent-primary">{e.nrtEarned.toLocaleString(undefined, { maximumFractionDigits: 9 })}</td>
                   <td className="px-4 py-3 text-text-secondary">{e.cashbackPct > 0 ? `${e.cashbackPct}%` : '—'}</td>
-                  <td className="px-4 py-3 font-bold text-amber-400">{e.cashbackNrt > 0 ? e.cashbackNrt.toLocaleString() : '—'}</td>
+                  <td className="px-4 py-3 font-bold text-amber-400">{e.cashbackNrt > 0 ? e.cashbackNrt.toLocaleString(undefined, { maximumFractionDigits: 9 }) : '—'}</td>
                   <td className="px-4 py-3 text-text-secondary">{e.country}</td>
                   <td className="px-4 py-3 text-text-secondary text-xs">{e.period}</td>
                 </tr>
