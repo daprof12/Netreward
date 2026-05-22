@@ -172,8 +172,8 @@ export default function AdminEarnings() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: Coins, label: 'Total NRT Earned', value: `${totalNrt.toLocaleString(undefined, { maximumFractionDigits: 9 })} NRT`, color: '#8b5cf6', bg: 'bg-purple-500/10' },
-          { icon: TrendingUp, label: 'Total Cashback', value: `${totalCashback.toLocaleString(undefined, { maximumFractionDigits: 9 })} NRT`, color: '#F59E0B', bg: 'bg-amber-500/10' },
+          { icon: Coins, label: 'Total NRT Earned', value: `${totalNrt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} NRT`, color: '#8b5cf6', bg: 'bg-purple-500/10' },
+          { icon: TrendingUp, label: 'Total Cashback', value: `${totalCashback.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} NRT`, color: '#F59E0B', bg: 'bg-amber-500/10' },
           { icon: Zap, label: 'SP & ISP Entities', value: earnings.filter(e => e.entityType === 'sp' || e.entityType === 'isp').length.toString(), color: '#10B981', bg: 'bg-emerald-500/10' },
           { icon: Users, label: 'Users', value: earnings.filter(e => e.entityType === 'user').length.toString(), color: '#3B82F6', bg: 'bg-blue-500/10' },
         ].map(({ icon: Icon, label, value, color, bg }) => (
@@ -208,10 +208,10 @@ export default function AdminEarnings() {
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${e.entityType === 'sp' ? 'bg-green-500/10 text-green-500' : e.entityType === 'isp' ? 'bg-blue-500/10 text-blue-500' : 'bg-purple-500/10 text-purple-500'}`}>{e.entityType}</span>
                   </td>
                   <td className="px-4 py-3 font-semibold capitalize text-text-primary">{e.category}</td>
-                  <td className="px-4 py-3 font-bold">{e.dataConsumedGb.toLocaleString()}</td>
-                  <td className="px-4 py-3 font-bold text-accent-primary">{e.nrtEarned.toLocaleString(undefined, { maximumFractionDigits: 9 })}</td>
+                  <td className="px-4 py-3 font-bold">{e.dataConsumedGb.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
+                  <td className="px-4 py-3 font-bold text-accent-primary">{e.nrtEarned.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</td>
                   <td className="px-4 py-3 text-text-secondary">{e.cashbackPct > 0 ? `${e.cashbackPct}%` : '—'}</td>
-                  <td className="px-4 py-3 font-bold text-amber-400">{e.cashbackNrt > 0 ? e.cashbackNrt.toLocaleString(undefined, { maximumFractionDigits: 9 }) : '—'}</td>
+                  <td className="px-4 py-3 font-bold text-amber-400">{e.cashbackNrt > 0 ? e.cashbackNrt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : '—'}</td>
                   <td className="px-4 py-3 text-text-secondary">{e.country}</td>
                   <td className="px-4 py-3 text-text-secondary text-xs">{e.period}</td>
                 </tr>
