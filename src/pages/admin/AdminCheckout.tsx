@@ -55,14 +55,14 @@ export default function AdminCheckout() {
     <motion.div className="space-y-5" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <div>
         <h1 className="text-2xl font-black">Checkout (SP Platform)</h1>
-        <p className="text-sm text-text-secondary">{filtered.length} checkouts · {totalNrt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} NRT · ${totalUsd.toFixed(3)} USD</p>
+        <p className="text-sm text-text-secondary">{filtered.length} checkouts · {totalNrt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} NRT · ${totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 9 })} USD</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {[
           { icon: ShoppingCart, label: 'Total Checkouts', value: filtered.length.toString(), color: '#3B82F6', bg: 'bg-blue-500/10' },
           { icon: DollarSign, label: 'Total NRT', value: `${totalNrt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} NRT`, color: '#8b5cf6', bg: 'bg-purple-500/10' },
-          { icon: Users, label: 'USD Value', value: `$${totalUsd.toFixed(3)}`, color: '#10B981', bg: 'bg-emerald-500/10' },
+          { icon: Users, label: 'USD Value', value: `$${totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 9 })}`, color: '#10B981', bg: 'bg-emerald-500/10' },
         ].map(({ icon: Icon, label, value, color, bg }) => (
           <div key={label} className="glass p-4 rounded-2xl border border-glass-border">
             <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center mb-2`}>
@@ -100,7 +100,7 @@ export default function AdminCheckout() {
                   <td className="px-4 py-3 font-semibold">{c.serviceName}</td>
                   <td className="px-4 py-3 text-text-secondary">{c.userEmail}</td>
                   <td className="px-4 py-3 font-bold text-accent-primary">{c.nrtAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} NRT</td>
-                  <td className="px-4 py-3 text-text-secondary">${c.usdValue.toFixed(3)}</td>
+                  <td className="px-4 py-3 text-text-secondary">${c.usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 9 })}</td>
                   <td className="px-4 py-3 text-text-secondary">{c.country}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${c.status === 'completed' ? 'bg-green-500/10 text-green-500' : c.status === 'pending' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>{c.status}</span>
@@ -138,7 +138,7 @@ export default function AdminCheckout() {
                   { label: 'SP', value: receipt.spEmail },
                   { label: 'User', value: receipt.userEmail },
                   { label: 'NRT Amount', value: `${receipt.nrtAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} NRT` },
-                  { label: 'USD Value', value: `$${receipt.usdValue.toFixed(3)}` },
+                  { label: 'USD Value', value: `$${receipt.usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 9 })}` },
                   { label: 'Country', value: receipt.country },
                   { label: 'Date & Time', value: new Date(receipt.createdAt).toLocaleString() },
                 ].map(({ label, value }) => (
