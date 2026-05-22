@@ -229,7 +229,7 @@ export default function Campaigns() {
     try {
       const res = await claimRewards();
       if (res?.success) {
-        showToast(`Successfully claimed $<NrtAmount value={res.net_amount} />!`, 'success');
+        showToast(`Successfully claimed ${Number(res.net_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} NRT!`, 'success');
         setEarningCampaign(null);
       } else {
         showToast(res?.message || 'Failed to claim rewards', 'warning');
