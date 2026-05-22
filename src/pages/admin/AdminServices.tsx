@@ -218,15 +218,30 @@ export default function AdminServices() {
                 <button onClick={() => setSelectedService(null)} className="p-2 bg-bg-secondary rounded-full hover:bg-glass-border transition-colors"><X size={20} /></button>
               </div>
 
-              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                {/* API Key */}
+                {selectedService.api_key && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-text-secondary">
+                      <ShieldAlert size={14} className="text-amber-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500/80">API Key</span>
+                    </div>
+                    <div className="p-4 bg-bg-secondary/80 border border-glass-border rounded-xl font-mono text-xs text-text-primary break-all select-all shadow-inner">
+                      {selectedService.api_key}
+                    </div>
+                  </div>
+                )}
+
                 {/* Description */}
                 {selectedService.description && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-text-secondary">
-                      <Info size={14} />
-                      <span className="text-[10px] font-bold uppercase tracking-widest">Description</span>
+                      <Info size={14} className="text-accent-primary" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-accent-primary/80">Description</span>
                     </div>
-                    <p className="text-sm text-text-primary leading-relaxed">{selectedService.description}</p>
+                    <div className="p-4 bg-bg-secondary/40 border border-glass-border rounded-xl">
+                      <p className="text-sm text-text-primary leading-relaxed">{selectedService.description}</p>
+                    </div>
                   </div>
                 )}
 

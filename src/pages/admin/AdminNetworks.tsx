@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Search, Network, CheckCircle2, XCircle, Trash2, RefreshCw, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Network, CheckCircle2, XCircle, Trash2, RefreshCw, Loader2, Eye, X, Globe, Terminal, ShieldAlert, Info } from 'lucide-react';
 import { adminNetworkApi } from '@/lib/adminApi';
 import { supabase } from '@/lib/supabase';
 import { useToastStore } from '@/stores/useToastStore';
@@ -13,6 +13,7 @@ export default function AdminNetworks() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [countryFilter, setCountryFilter] = useState('All');
+  const [selectedNetwork, setSelectedNetwork] = useState<any | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -145,12 +146,13 @@ export default function AdminNetworks() {
                   <td className="px-4 py-3 text-text-secondary text-xs">{new Date(n.created_at).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
+                      <button onClick={() => setSelectedNetwork(n)} className="p-1.5 text-accent-primary hover:bg-accent-primary/10 rounded-lg" title="View Details"><Eye size={16} /></button>
                       {!n.verified ? (
                         <button onClick={() => updateVerification(n.id, true)} className="p-1.5 text-green-500 hover:bg-green-500/10 rounded-lg" title="Verify Network"><CheckCircle2 size={16} /></button>
                       ) : (
                         <button onClick={() => updateVerification(n.id, false)} className="p-1.5 text-amber-500 hover:bg-amber-500/10 rounded-lg" title="Unverify Network"><XCircle size={16} /></button>
                       )}
-                      <button onClick={() => handleDelete(n.id)} className="p-1.5 text-text-secondary hover:text-destructive hover:bg-destructive/10 rounded-lg"><Trash2 size={16} /></button>
+                      <button onClick={() => handleDelete(n.id)} className="p-1.5 text-text-secondary hover:text-destructive hover:bg-destructive/10 rounded-lg" title="Delete"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
@@ -160,6 +162,99 @@ export default function AdminNetworks() {
           {!loading && filtered.length === 0 && <div className="text-center py-12 text-text-secondary">No networks found.</div>}
         </div>
       </div>
+
+      {/* Details Modal */}
+      <AnimatePresence>
+        {selectedNetwork && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-bg-card border border-glass-border rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl"
+            >
+              <div className="p-6 border-b border-glass-border flex justify-between items-center bg-bg-secondary/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center overflow-hidden">
+                    {selectedNetwork.logo_url ? <img src={selectedNetwork.logo_url} className="w-full h-full object-cover" /> : <Network size={24} className="text-blue-500" />}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-text-primary">{selectedNetwork.name}</h3>
+                    <p className="text-xs text-text-secondary">{selectedNetwork.category} Network • Provided by {selectedNetwork.provider_name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedNetwork(null)} className="p-2 bg-bg-secondary rounded-full hover:bg-glass-border transition-colors"><X size={20} /></button>
+              </div>
+
+              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                {/* API Key */}
+                {selectedNetwork.api_key && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-text-secondary">
+                      <ShieldAlert size={14} className="text-amber-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500/80">API Key</span>
+                    </div>
+                    <div className="p-4 bg-bg-secondary/80 border border-glass-border rounded-xl font-mono text-xs text-text-primary break-all select-all shadow-inner">
+                      {selectedNetwork.api_key}
+                    </div>
+                  </div>
+                )}
+
+                {/* Description */}
+                {selectedNetwork.description && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-text-secondary">
+                      <Info size={14} className="text-blue-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500/80">Description</span>
+                    </div>
+                    <div className="p-4 bg-bg-secondary/40 border border-glass-border rounded-xl">
+                      <p className="text-sm text-text-primary leading-relaxed">{selectedNetwork.description}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Integration Grid */}
+                <div className="grid grid-cols-1 gap-4">
+                  {[
+                    { icon: Globe, label: 'ASN', value: selectedNetwork.asn, color: 'text-blue-500' },
+                    { icon: Globe, label: 'IP Range', value: selectedNetwork.ip_range, color: 'text-indigo-400' },
+                    { icon: Terminal, label: 'Webhook URL', value: selectedNetwork.webhook_url, color: 'text-orange-400' },
+                  ].map((item, i) => item.value && (
+                    <div key={i} className="p-4 bg-bg-secondary/50 rounded-2xl border border-glass-border space-y-3">
+                      <div className="flex items-center gap-2">
+                        <item.icon size={16} className={item.color} />
+                        <span className="text-[11px] font-bold text-text-primary">{item.label}</span>
+                      </div>
+                      <div className="p-2 bg-bg-secondary border border-glass-border rounded-lg">
+                        <p className="text-sm text-text-primary truncate font-mono">{item.value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Metadata */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-glass-border">
+                  <div>
+                    <p className="text-[9px] font-bold text-text-secondary uppercase tracking-widest">Status</p>
+                    <p className="text-sm font-bold text-text-primary capitalize">{selectedNetwork.verified ? 'Verified' : 'Pending'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-text-secondary uppercase tracking-widest">Added On</p>
+                    <p className="text-sm font-bold text-text-primary">{new Date(selectedNetwork.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 bg-bg-secondary/30 border-t border-glass-border flex gap-3">
+                <button onClick={() => setSelectedNetwork(null)} className="flex-1 py-3 bg-bg-secondary text-text-primary font-bold rounded-xl border border-glass-border">Close</button>
+                {!selectedNetwork.verified && (
+                  <button onClick={() => { updateVerification(selectedNetwork.id, true); setSelectedNetwork(null); }} className="flex-1 py-3 bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-500/20">Verify Network</button>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
