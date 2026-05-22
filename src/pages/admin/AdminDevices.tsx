@@ -40,6 +40,14 @@ interface AdminGamingAccount {
   platformUsername: string;
   verified: boolean;
   linkedAt: string;
+  totalCampaignsJoined: number;
+  activeCampaignsCount: number;
+  lastCampaign: string;
+  duration: string;
+  dataUsedGb: number;
+  nrtEarned: number;
+  claimedNrt: number;
+  unclaimedNrt: number;
 }
 
 export default function AdminDevices() {
@@ -80,19 +88,34 @@ export default function AdminDevices() {
       // Fetch gaming accounts
       const { data: gamingData } = await supabase
         .from('gaming_accounts')
-        .select('*, users:user_id(email, country)')
+        .select('*, users:user_id(email, country), last_campaign:campaigns!last_campaign_id(title)')
         .order('linked_at', { ascending: false });
         
       if (gamingData) {
-        setGamingAccounts(gamingData.map((g: any) => ({
-          id: g.id,
-          userEmail: g.users?.email || 'Unknown',
-          country: g.users?.country || 'Global',
-          platform: g.platform,
-          platformUsername: g.platform_username,
-          verified: g.verified,
-          linkedAt: g.linked_at,
-        })));
+        setGamingAccounts(gamingData.map((g: any) => {
+          const totalDurationHrs = (Number(g.total_duration_seconds || 0) / 3600).toFixed(1);
+          const dataGb = Number(g.total_data_bytes || 0) / (1024 * 1024 * 1024);
+          const earned = Number(g.nrt_earned || 0);
+          const claimed = Number(g.nrt_claimed || 0);
+
+          return {
+            id: g.id,
+            userEmail: g.users?.email || 'Unknown',
+            country: g.users?.country || 'Global',
+            platform: g.platform,
+            platformUsername: g.platform_username,
+            verified: g.verified,
+            linkedAt: g.linked_at,
+            totalCampaignsJoined: g.total_campaigns_joined || 0,
+            activeCampaignsCount: g.active_campaigns_count || 0,
+            lastCampaign: g.last_campaign?.title || 'None',
+            duration: `${totalDurationHrs}h`,
+            dataUsedGb: dataGb,
+            nrtEarned: earned,
+            claimedNrt: claimed,
+            unclaimedNrt: earned - claimed,
+          };
+        }));
       }
     } catch (e: any) { console.error('Fetch devices/gaming:', e); }
     finally { setLoading(false); }
@@ -311,6 +334,14 @@ export default function AdminDevices() {
               <tr>
                 <th className="px-6 py-4">Account</th>
                 <th className="px-6 py-4">User</th>
+                <th className="px-6 py-4 text-center">Total Campaigns</th>
+                <th className="px-6 py-4 text-center">Active Campaigns</th>
+                <th className="px-6 py-4">Last Campaign</th>
+                <th className="px-6 py-4">Duration</th>
+                <th className="px-6 py-4 text-center">Data (GB)</th>
+                <th className="px-6 py-4 text-center">NRT Earned</th>
+                <th className="px-6 py-4 text-center">Claimed</th>
+                <th className="px-6 py-4 text-center">Unclaimed</th>
                 <th className="px-6 py-4 text-center">Status</th>
                 <th className="px-6 py-4 text-right">Linked At</th>
               </tr>
@@ -333,6 +364,22 @@ export default function AdminDevices() {
                     <p className="text-text-primary font-medium">{g.userEmail}</p>
                     <p className="text-[10px] text-text-secondary uppercase">{g.country}</p>
                   </td>
+                  <td className="px-6 py-4 text-center font-bold text-text-primary">
+                    {g.totalCampaignsJoined}
+                  </td>
+                  <td className="px-6 py-4 text-center font-bold text-green-500">
+                    {g.activeCampaignsCount}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="px-2 py-1 rounded-lg bg-accent-primary/10 text-accent-primary text-[10px] font-bold uppercase truncate max-w-[120px] block">
+                      {g.lastCampaign}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-text-secondary font-medium">{g.duration}</td>
+                  <td className="px-6 py-4 text-center font-bold text-text-primary">{g.dataUsedGb.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-center font-black text-accent-primary">{g.nrtEarned.toLocaleString(undefined, { maximumFractionDigits: 7 })}</td>
+                  <td className="px-6 py-4 text-center font-bold text-green-500">{g.claimedNrt.toLocaleString(undefined, { maximumFractionDigits: 7 })}</td>
+                  <td className="px-6 py-4 text-center font-bold text-amber-500">{g.unclaimedNrt.toLocaleString(undefined, { maximumFractionDigits: 7 })}</td>
                   <td className="px-6 py-4 text-center">
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${g.verified ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'}`}>
                       {g.verified ? 'Verified' : 'Pending'}

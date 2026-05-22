@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gaming Tracker Test</title>
+  <script src="/tracker.js" data-api-key="nr_live_mock" data-category="gaming" data-gaming-platform="xbox" defer></script>
+</head>
+<body>
+  <h1>Gaming Telemetry Test</h1>
+  <button id="wsBtn">Send Mock WebSocket Data</button>
+  <script>
+    // We will just mock window.WebSocket to verify the monkey patching works
+    setTimeout(() => {
+      console.log('Original WebSocket exists?', !!window.WebSocket);
+      
+      const btn = document.getElementById('wsBtn');
+      btn.onclick = () => {
+        // Mocking a basic WebSocket connection just to trigger the monkeypatch
+        const ws = new WebSocket('wss://echo.websocket.org');
+        
+        ws.onopen = () => {
+          console.log('Sending game data packet...');
+          ws.send(JSON.stringify({ playerMove: { x: 10, y: 20 }, time: Date.now() }));
+          ws.send(new Uint8Array(2048)); // 2KB binary payload
+        };
+        
+        ws.onmessage = (e) => {
+          console.log('Received game data packet:', e.data.length || e.data.byteLength, 'bytes');
+        };
+      };
+    }, 1000);
+  </script>
+</body>
+</html>
