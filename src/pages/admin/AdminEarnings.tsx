@@ -20,22 +20,31 @@ export default function AdminEarnings() {
         // Aggregate from transactions where type = reward/cashback
         const { data } = await supabase
           .from('transactions')
-          .select('*, wallets(id, users(email, display_name, role, country))')
+          .select('*, wallets(id, users(email, display_name, role, country, sp_profiles(company_name), isp_profiles(isp_name)))')
           .in('tx_type', ['reward', 'cashback', 'referral_bonus'])
           .order('created_at', { ascending: false })
           .limit(300);
-        setEarnings((data || []).map((e: any) => ({
-          ...e,
-          entityName: e.wallets?.users?.display_name || e.wallets?.users?.email || 'Unknown',
-          entityEmail: e.wallets?.users?.email || '',
-          entityType: e.wallets?.users?.role || 'user',
-          nrtEarned: Number(e.amount || 0),
-          cashbackPct: e.tx_type === 'cashback' ? 5 : 0,
-          cashbackNrt: e.tx_type === 'cashback' ? Number(e.amount || 0) : 0,
-          dataConsumedGb: 0,
-          country: e.wallets?.users?.country || 'Global',
-          period: e.created_at ? new Date(e.created_at).toLocaleDateString() : 'N/A',
-        })));
+        setEarnings((data || []).map((e: any) => {
+          const u = e.wallets?.users || {};
+          const isSp = u.role === 'sp';
+          const isIsp = u.role === 'isp';
+          const spName = Array.isArray(u.sp_profiles) ? u.sp_profiles[0]?.company_name : u.sp_profiles?.company_name;
+          const ispName = Array.isArray(u.isp_profiles) ? u.isp_profiles[0]?.isp_name : u.isp_profiles?.isp_name;
+          const entityName = isSp ? (spName || u.email) : isIsp ? (ispName || u.email) : (u.display_name || u.email || 'Unknown');
+
+          return {
+            ...e,
+            entityName: entityName,
+            entityEmail: u.email || '',
+            entityType: u.role || 'user',
+            nrtEarned: Number(e.amount || 0),
+            cashbackPct: e.tx_type === 'cashback' ? 5 : 0,
+            cashbackNrt: e.tx_type === 'cashback' ? Number(e.amount || 0) : 0,
+            dataConsumedGb: 0,
+            country: u.country || 'Global',
+            period: e.created_at ? new Date(e.created_at).toLocaleDateString() : 'N/A',
+          };
+        }));
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     })();

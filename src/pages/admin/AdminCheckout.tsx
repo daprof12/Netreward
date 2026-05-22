@@ -16,15 +16,19 @@ export default function AdminCheckout() {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await supabase.from('scan2pay_sessions').select('*').order('created_at', { ascending: false });
+        const { data } = await supabase
+          .from('scan2pay_sessions')
+          .select('*, merchant:merchant_id(email, country), payer:paid_by(email)')
+          .order('created_at', { ascending: false });
+          
         setCheckouts((data || []).map((c: any) => ({
           ...c,
-          spEmail: c.sp_email || c.merchant_email || 'Unknown',
-          userEmail: c.user_email || c.payer_email || 'Unknown',
-          serviceName: c.service_name || c.description || '',
-          nrtAmount: Number(c.nrt_amount || c.amount || 0),
-          usdValue: Number(c.usd_value || c.fiat_amount || 0),
-          country: c.country || 'Global',
+          spEmail: c.merchant?.email || 'Unknown',
+          userEmail: c.payer?.email || 'Unknown',
+          serviceName: c.description || 'Scan2Pay',
+          nrtAmount: Number(c.amount_nrt || 0),
+          usdValue: Number(c.amount_nrt || 0) * 0.05, // Assuming 1 NRT = $0.05
+          country: c.merchant?.country || 'Global',
           createdAt: c.created_at,
         })));
       } catch (e) { console.error(e); }

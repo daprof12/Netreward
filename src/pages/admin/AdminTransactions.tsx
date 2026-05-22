@@ -81,18 +81,27 @@ export default function AdminTransactions() {
     try {
       const { data, error } = await supabase
         .from('transactions')
-        .select('*, wallets(id, users(email, country))')
+        .select('*, wallets(id, users(email, country, role, display_name, sp_profiles(company_name), isp_profiles(isp_name)))')
         .order('created_at', { ascending: false })
         .limit(500);
       if (error) throw error;
-      setTransactions((data || []).map((t: any) => ({
-        ...t,
-        type: t.tx_type || t.type,
-        userEmail: t.wallets?.users?.email || 'Unknown',
-        country: t.wallets?.users?.country || 'Global',
-        createdAt: t.created_at,
-        currency: t.currency || 'NRT',
-      })));
+      setTransactions((data || []).map((t: any) => {
+        const u = t.wallets?.users || {};
+        const isSp = u.role === 'sp';
+        const isIsp = u.role === 'isp';
+        const spName = Array.isArray(u.sp_profiles) ? u.sp_profiles[0]?.company_name : u.sp_profiles?.company_name;
+        const ispName = Array.isArray(u.isp_profiles) ? u.isp_profiles[0]?.isp_name : u.isp_profiles?.isp_name;
+        const userEmail = isSp ? (spName || u.email) : isIsp ? (ispName || u.email) : (u.email || 'Unknown');
+
+        return {
+          ...t,
+          type: t.tx_type || t.type,
+          userEmail: userEmail,
+          country: u.country || 'Global',
+          createdAt: t.created_at,
+          currency: t.currency || 'NRT',
+        };
+      }));
     } catch (e: any) { console.error('Fetch transactions:', e); }
     finally { setLoading(false); }
   }, []);
