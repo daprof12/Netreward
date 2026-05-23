@@ -19,46 +19,41 @@ export default function AdminEarnings() {
       try {
         const { data } = await supabase
           .from('user_campaigns')
-          .select(`
-            id, nrt_earned, data_consumed_gb, enrolled_at,
-            users!inner(email, display_name, role, country),
-            campaigns!inner(
-              id, title, created_at,
-              sp_profiles(company_name, users(email, country)),
-              isp_profiles(isp_name, users(email, country)),
-              services(category),
-              networks(category)
-            )
-          `)
+          .select('*')
           .order('enrolled_at', { ascending: false });
           
         const campaignCashbacks = new Map();
         const rows: any[] = [];
 
         (data || []).forEach((uc: any) => {
-          const u = uc.users || {};
-          const cat = uc.campaigns?.services?.category || uc.campaigns?.networks?.category || 'General';
+          const cat = uc.category || 'General';
           
           // 1. User Earning Row
           rows.push({
             id: uc.id + '-user',
-            entityName: u.display_name || u.email || 'Unknown',
-            entityEmail: u.email,
+            entityName: uc.user_display_name || uc.user_email || 'Unknown',
+            entityEmail: uc.user_email || '',
             entityType: 'user',
             nrtEarned: Number(uc.nrt_earned || 0),
             cashbackPct: 0,
             cashbackNrt: 0,
             dataConsumedGb: Number(uc.data_consumed_gb || 0),
-            country: u.country || 'Global',
+            country: uc.user_country || 'Global',
             period: new Date(uc.enrolled_at).toLocaleDateString(),
             category: cat
           });
 
           // Accumulate campaign data for SP/ISP
-          const cid = uc.campaigns?.id;
+          const cid = uc.campaign_id;
           if (!campaignCashbacks.has(cid)) {
             campaignCashbacks.set(cid, {
-              campaign: uc.campaigns,
+              campaign_title: uc.campaign_title,
+              sp_company_name: uc.sp_company_name,
+              sp_email: uc.sp_email,
+              isp_name: uc.isp_name,
+              isp_email: uc.isp_email,
+              category: cat,
+              enrolled_at: uc.enrolled_at,
               dataGb: 0,
               nrtEarnedSum: 0
             });
@@ -70,42 +65,35 @@ export default function AdminEarnings() {
 
         // 2. Generate SP & ISP Cashback Rows Per Campaign
         campaignCashbacks.forEach((cInfo, cid) => {
-          const c = cInfo.campaign;
-          const cat = c.services?.category || c.networks?.category || 'General';
-          
-          if (c.sp_profiles) {
-            const sp = Array.isArray(c.sp_profiles) ? c.sp_profiles[0] : c.sp_profiles;
-            const spUser = sp?.users || {};
+          if (cInfo.sp_company_name || cInfo.sp_email) {
             rows.push({
               id: cid + '-sp',
-              entityName: sp?.company_name || spUser.email || 'Unknown',
-              entityEmail: spUser.email || '',
+              entityName: cInfo.sp_company_name || cInfo.sp_email || 'Unknown',
+              entityEmail: cInfo.sp_email || '',
               entityType: 'sp',
               nrtEarned: 0,
               cashbackPct: 10,
               cashbackNrt: (cInfo.nrtEarnedSum / 0.85) * 0.10,
               dataConsumedGb: cInfo.dataGb,
-              country: spUser.country || 'Global',
-              period: new Date(c.created_at).toLocaleDateString(),
-              category: cat
+              country: 'Global',
+              period: new Date(cInfo.enrolled_at).toLocaleDateString(),
+              category: cInfo.category
             });
           }
           
-          if (c.isp_profiles) {
-            const isp = Array.isArray(c.isp_profiles) ? c.isp_profiles[0] : c.isp_profiles;
-            const ispUser = isp?.users || {};
+          if (cInfo.isp_name || cInfo.isp_email) {
             rows.push({
               id: cid + '-isp',
-              entityName: isp?.isp_name || ispUser.email || 'Unknown',
-              entityEmail: ispUser.email || '',
+              entityName: cInfo.isp_name || cInfo.isp_email || 'Unknown',
+              entityEmail: cInfo.isp_email || '',
               entityType: 'isp',
               nrtEarned: 0,
               cashbackPct: 5,
               cashbackNrt: (cInfo.nrtEarnedSum / 0.85) * 0.05,
               dataConsumedGb: cInfo.dataGb,
-              country: ispUser.country || 'Global',
-              period: new Date(c.created_at).toLocaleDateString(),
-              category: cat
+              country: 'Global',
+              period: new Date(cInfo.enrolled_at).toLocaleDateString(),
+              category: cInfo.category
             });
           }
         });

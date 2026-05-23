@@ -37,14 +37,14 @@ export default function AdminWallets() {
     try {
       const { data, error } = await supabase
         .from('wallets')
-        .select('*, users!wallets_user_id_fkey(email, country, role)')
+        .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setWallets((data || []).map((w: any) => ({
         ...w,
-        userEmail: w.users?.email || 'Unknown',
-        country: w.users?.country || 'Global',
-        role: w.users?.role || 'user',
+        userEmail: w.user_email || w.users?.email || 'Unknown',
+        country: w.user_country || w.users?.country || 'Global',
+        role: w.user_role || w.users?.role || 'user',
         nrtBalance: Number(w.nrt_balance || 0),
         solanaAddress: w.solana_public_key || 'No address assigned',
       })));

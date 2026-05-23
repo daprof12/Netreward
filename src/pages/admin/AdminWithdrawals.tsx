@@ -92,15 +92,7 @@ export default function AdminWithdrawals() {
     try {
       const { data, error } = await supabase
         .from('withdrawal_requests')
-        .select(`
-          *,
-          users(email, country),
-          user_payment_methods(
-            account_number,
-            account_name,
-            platform_banks(name)
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(500);
 
@@ -108,11 +100,11 @@ export default function AdminWithdrawals() {
       
       setRequests((data || []).map((r: any) => ({
         ...r,
-        userEmail: r.users?.email || 'Unknown',
-        country: r.users?.country || 'Unknown',
-        accountName: r.user_payment_methods?.account_name || 'N/A',
-        accountNumber: r.user_payment_methods?.account_number || 'N/A',
-        bankName: r.user_payment_methods?.platform_banks?.name || 'N/A'
+        userEmail: r.user_email || r.users?.email || 'Unknown',
+        country: r.user_country || r.users?.country || 'Unknown',
+        accountName: r.account_name_cached || r.user_payment_methods?.account_name || 'N/A',
+        accountNumber: r.account_number_cached || r.user_payment_methods?.account_number || 'N/A',
+        bankName: r.bank_name || r.user_payment_methods?.platform_banks?.name || 'N/A'
       })));
     } catch (e: any) {
       console.error('Fetch withdrawals:', e);
@@ -126,10 +118,7 @@ export default function AdminWithdrawals() {
     try {
       const { data, error } = await supabase
         .from('transactions')
-        .select(`
-          id, amount, description, status, created_at,
-          wallets(users(email, country))
-        `)
+        .select('*')
         .ilike('description', 'Instant Purchase%')
         .order('created_at', { ascending: false })
         .limit(500);
@@ -142,8 +131,8 @@ export default function AdminWithdrawals() {
         description: d.description,
         status: d.status,
         created_at: d.created_at,
-        user_email: d.wallets?.users?.email || 'Unknown',
-        country: d.wallets?.users?.country || 'Unknown'
+        user_email: d.user_email || d.wallets?.users?.email || 'Unknown',
+        country: d.user_country || d.wallets?.users?.country || 'Unknown'
       })));
     } catch (e) {
       console.error('Fetch deposits:', e);

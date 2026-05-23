@@ -18,17 +18,17 @@ export default function AdminCheckout() {
       try {
         const { data } = await supabase
           .from('scan2pay_sessions')
-          .select('*, merchant:merchant_id(email, country), payer:paid_by(email)')
+          .select('*')
           .order('created_at', { ascending: false });
           
         setCheckouts((data || []).map((c: any) => ({
           ...c,
-          spEmail: c.merchant?.email || 'Unknown',
-          userEmail: c.payer?.email || 'Unknown',
+          spEmail: c.merchant_email || c.merchant?.email || 'Unknown',
+          userEmail: c.payer_email || c.payer?.email || 'Unknown',
           serviceName: c.description || 'Scan2Pay',
           nrtAmount: Number(c.amount_nrt || 0),
-          usdValue: Number(c.amount_nrt || 0) * 0.05, // Assuming 1 NRT = $0.05
-          country: c.merchant?.country || 'Global',
+          usdValue: Number(c.amount_nrt || 0) * 0.05,
+          country: c.merchant_country || c.merchant?.country || 'Global',
           createdAt: c.created_at,
         })));
       } catch (e) { console.error(e); }

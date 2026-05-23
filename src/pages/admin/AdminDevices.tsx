@@ -67,18 +67,14 @@ export default function AdminDevices() {
     try {
       const { data, error } = await supabase
         .from('devices')
-        .select(`
-          *, 
-          users:user_id(email, country),
-          last_campaign:campaigns!last_campaign_id(title)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
       if (error) {
         console.error('Fetch devices error:', error);
         const { data: fallbackData } = await supabase
           .from('devices')
-          .select('*, users:user_id(email, country)')
+          .select('*')
           .order('created_at', { ascending: false });
         if (fallbackData) processDevices(fallbackData);
       } else {
@@ -88,7 +84,7 @@ export default function AdminDevices() {
       // Fetch gaming accounts
       const { data: gamingData } = await supabase
         .from('gaming_accounts')
-        .select('*, users:user_id(email, country), last_campaign:campaigns!last_campaign_id(title)')
+        .select('*')
         .order('linked_at', { ascending: false });
         
       if (gamingData) {
@@ -131,12 +127,12 @@ export default function AdminDevices() {
       return {
         ...d,
         deviceName: d.device_name || d.name || 'Unknown Device',
-        userEmail: d.users?.email || d.user_email || 'Unknown',
-        country: d.users?.country || d.country || 'Global',
+        userEmail: d.user_email || d.users?.email || d.user_email || 'Unknown',
+        country: d.user_country || d.users?.country || d.country || 'Global',
         isp: d.isp_name || d.isp || '',
         totalCampaignsJoined: d.total_campaigns_joined || 0,
         activeCampaignsCount: d.active_campaigns_count || 0,
-        lastCampaign: d.last_campaign?.title || 'None',
+        lastCampaign: d.last_campaign_title || d.last_campaign?.title || 'None',
         dataUsedGb: dataGb,
         nrtEarned: earned,
         claimedNrt: claimed,
