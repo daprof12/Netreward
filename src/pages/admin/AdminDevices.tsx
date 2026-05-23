@@ -211,6 +211,7 @@ export default function AdminDevices() {
             <h3 className="text-xl font-bold text-text-primary mt-0.5">{value}</h3>
           </div>
         )) : [
+          { icon: Gamepad2, label: 'Total Gaming Accounts', value: gamingAccounts.length.toString(), color: '#3B82F6', bg: 'bg-blue-500/10' },
           { icon: Gamepad2, label: 'Active Account', value: gamingAccounts.filter(g => g.verified).length.toString(), color: '#8B5CF6', bg: 'bg-purple-500/10' },
           { icon: Coins, label: 'Total NRT Earned', value: gamingAccounts.reduce((s, g) => s + g.nrtEarned, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 9 }), color: '#10B981', bg: 'bg-emerald-500/10' },
           { icon: Zap, label: 'Unclaimed NRT', value: gamingAccounts.reduce((s, g) => s + g.unclaimedNrt, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 9 }), color: '#F59E0B', bg: 'bg-amber-500/10' },
