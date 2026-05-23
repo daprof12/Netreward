@@ -19,11 +19,11 @@ export interface Transaction {
 }
 
 export function useTransactions() {
-  const { user } = useAuthStore();
+  const { user, role } = useAuthStore();
   const { wallet } = useWallet();
 
   const { data: transactions, isLoading, error } = useQuery({
-    queryKey: ['transactions', user?.id],
+    queryKey: ['transactions', user?.id, role],
     queryFn: async () => {
       if (!wallet?.id) return [];
 
@@ -35,12 +35,39 @@ export function useTransactions() {
         .limit(200);
 
       if (error) throw error;
-      return (data || []).map((tx: any) => ({
+      let mapped = (data || []).map((tx: any) => ({
         ...tx,
         amount: Number(tx.amount),
         // Derive status from amount/type if no status column exists
         status: tx.status || 'completed',
       })) as Transaction[];
+
+      mapped = mapped.filter(tx => {
+        if (role === 'user') {
+          if (tx.tx_type === 'scan2pay' && tx.amount > 0) return false; // SP receiving payment
+          if (tx.tx_type === 'cashback') return false;
+          if (tx.tx_type === 'deposit') return false;
+          if (tx.tx_type === 'fee') return false;
+          return true;
+        } else if (role === 'sp') {
+          if (tx.tx_type === 'reward') return false;
+          if (tx.tx_type === 'p2p') return false;
+          if (tx.tx_type === 'referral_bonus') return false;
+          if (tx.tx_type === 'scan2pay' && tx.amount < 0) return false; // User making payment
+          if (tx.tx_type === 'cashback' && tx.description.toLowerCase().includes('isp')) return false;
+          return true;
+        } else if (role === 'isp') {
+          if (tx.tx_type === 'reward') return false;
+          if (tx.tx_type === 'p2p') return false;
+          if (tx.tx_type === 'referral_bonus') return false;
+          if (tx.tx_type === 'scan2pay') return false;
+          if (tx.tx_type === 'cashback' && !tx.description.toLowerCase().includes('isp')) return false;
+          return true;
+        }
+        return true;
+      });
+
+      return mapped;
     },
     enabled: !!wallet?.id,
   });
