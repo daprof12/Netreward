@@ -141,7 +141,7 @@ async function flushTelemetry() {
 }
 
 // ── Offline Queue ───────────────────────────────────────────────────────────
-async function queueTelemetry(payload: any) {
+async function queueTelemetry(payload) {
   const result = await chrome.storage.local.get('nrt_offline_queue');
   const queue = result.nrt_offline_queue || [];
   queue.push(payload);
