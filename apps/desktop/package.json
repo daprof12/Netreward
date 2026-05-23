@@ -30,7 +30,7 @@
         "nsis",
         "portable"
       ],
-      "icon": "assets/icons/icon.ico"
+      "icon": "assets/icons/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -44,7 +44,7 @@
         "dmg",
         "zip"
       ],
-      "icon": "assets/icons/icon.icns",
+      "icon": "assets/icons/icon.png",
       "category": "public.app-category.finance"
     },
     "linux": {
