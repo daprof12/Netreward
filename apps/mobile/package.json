@@ -3,10 +3,16 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.1",
     "expo": "~56.0.3",
+    "expo-local-authentication": "^56.0.4",
+    "expo-notifications": "^56.0.12",
+    "expo-secure-store": "^56.0.4",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",
-    "react-native": "0.85.3"
+    "react-native": "0.85.3",
+    "react-native-safe-area-context": "^5.8.0",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
