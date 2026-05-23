@@ -41,8 +41,8 @@ export function formatNrt(
 
   // ── Compact subscript range (< 0.0001) ─────────────────────────────────────
   if (abs > 0 && abs < 0.0001) {
-    // Use toFixed(6) to adhere to platform-wide max 6 decimal place rule
-    const raw         = abs.toFixed(6).replace(/0+$/, ''); 
+    // Show full precision for micro amounts without rounding to 0
+    const raw         = abs.toFixed(18).replace(/0+$/, ''); 
     if (raw === '0' || raw === '0.') return { type: 'plain', text: sign + '0' };
 
     const afterDot    = raw.split('.')[1] ?? '';

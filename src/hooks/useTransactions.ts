@@ -46,22 +46,23 @@ export function useTransactions() {
         if (role === 'user') {
           if (tx.tx_type === 'scan2pay' && tx.amount > 0) return false; // SP receiving payment
           if (tx.tx_type === 'cashback') return false;
+          if (tx.tx_type === 'reward' && tx.description?.toLowerCase().includes('cashback')) return false; // Hide SP/ISP cashback from user
           if (tx.tx_type === 'deposit') return false;
           if (tx.tx_type === 'fee') return false;
           return true;
         } else if (role === 'sp') {
-          if (tx.tx_type === 'reward') return false;
+          if (tx.tx_type === 'reward' && !tx.description?.toLowerCase().includes('sp 10% cashback')) return false;
           if (tx.tx_type === 'p2p') return false;
           if (tx.tx_type === 'referral_bonus') return false;
           if (tx.tx_type === 'scan2pay' && tx.amount < 0) return false; // User making payment
-          if (tx.tx_type === 'cashback' && tx.description.toLowerCase().includes('isp')) return false;
+          if (tx.tx_type === 'cashback' && tx.description?.toLowerCase().includes('isp')) return false;
           return true;
         } else if (role === 'isp') {
-          if (tx.tx_type === 'reward') return false;
+          if (tx.tx_type === 'reward' && !tx.description?.toLowerCase().includes('isp 5% cashback')) return false;
           if (tx.tx_type === 'p2p') return false;
           if (tx.tx_type === 'referral_bonus') return false;
           if (tx.tx_type === 'scan2pay') return false;
-          if (tx.tx_type === 'cashback' && !tx.description.toLowerCase().includes('isp')) return false;
+          if (tx.tx_type === 'cashback' && !tx.description?.toLowerCase().includes('isp')) return false;
           return true;
         }
         return true;
