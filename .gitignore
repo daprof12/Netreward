@@ -36,3 +36,5 @@ dist-ssr
 .wrangler
 .dev.vars*
 !.dev.vars.example
+landing/
+packages/tracker/
