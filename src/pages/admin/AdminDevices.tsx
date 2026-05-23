@@ -211,9 +211,9 @@ export default function AdminDevices() {
             <h3 className="text-xl font-bold text-text-primary mt-0.5">{value}</h3>
           </div>
         )) : [
-          { icon: Gamepad2, label: 'Total Gaming Accounts', value: gamingAccounts.length.toString(), color: '#8B5CF6', bg: 'bg-purple-500/10' },
-          { icon: Activity, label: 'Verified Accounts', value: gamingAccounts.filter(g => g.verified).length.toString(), color: '#10B981', bg: 'bg-emerald-500/10' },
-          { icon: Clock, label: 'Pending Verification', value: gamingAccounts.filter(g => !g.verified).length.toString(), color: '#F59E0B', bg: 'bg-amber-500/10' },
+          { icon: Gamepad2, label: 'Active Account', value: gamingAccounts.filter(g => g.verified).length.toString(), color: '#8B5CF6', bg: 'bg-purple-500/10' },
+          { icon: Coins, label: 'Total NRT Earned', value: gamingAccounts.reduce((s, g) => s + g.nrtEarned, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 9 }), color: '#10B981', bg: 'bg-emerald-500/10' },
+          { icon: Zap, label: 'Unclaimed NRT', value: gamingAccounts.reduce((s, g) => s + g.unclaimedNrt, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 9 }), color: '#F59E0B', bg: 'bg-amber-500/10' },
         ].map(({ icon: Icon, label, value, color, bg }) => (
           <div key={label} className="glass p-4 rounded-2xl border border-glass-border">
             <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center mb-2`}>
