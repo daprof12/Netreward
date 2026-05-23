@@ -82,8 +82,31 @@ export default function SettingsPage() {
           }}
         >
           <ExternalLink size={16} color="#3b82f6" />
-          <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textAlign: 'left' }}>Open Full Dashboard</p>
+          <div style={{ flex: 1, textAlign: 'left' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Open Full Dashboard</p>
+            <p style={{ fontSize: 9, color: 'var(--text-secondary)' }}>netreward.online</p>
+          </div>
         </button>
+
+        {/* Switch Role */}
+        {(profile?.role === 'sp' || profile?.role === 'isp' || profile?.role === 'admin') && (
+          <button
+            onClick={() => window.open(`https://netreward.online/${profile.role === 'admin' ? 'admin' : `dashboard/${profile.role}`}`, '_blank')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '12px 14px',
+              background: 'transparent', border: 'none',
+              cursor: 'pointer', width: '100%',
+              borderBottom: '1px solid var(--glass-border)',
+            }}
+          >
+            <User size={16} color="var(--accent-primary)" />
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Switch Role Context</p>
+              <p style={{ fontSize: 9, color: 'var(--text-secondary)' }}>Open {roleLabel[profile.role]} Dashboard</p>
+            </div>
+          </button>
+        )}
 
         {/* Sign Out */}
         <button

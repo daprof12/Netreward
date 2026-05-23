@@ -11,6 +11,7 @@ interface UserProfile {
   display_name: string | null;
   avatar_url: string | null;
   country: string | null;
+  nrt_balance?: number;
 }
 
 interface AuthState {
