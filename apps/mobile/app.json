@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "NetReward",
+    "slug": "netreward",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "scheme": "netreward",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0f"
+    },
+    "ios": {
+      "bundleIdentifier": "com.netreward.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "NetReward uses your camera for QR code scanning and KYC document verification",
+        "NSFaceIDUsageDescription": "NetReward uses Face ID to secure your wallet",
+        "UIBackgroundModes": ["fetch", "remote-notification"]
+      },
+      "associatedDomains": [
+        "applinks:netreward.online",
+        "webcredentials:netreward.online"
+      ],
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.netreward.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0f"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "netreward" },
+            { "scheme": "https", "host": "netreward.online", "pathPrefix": "/campaign" },
+            { "scheme": "https", "host": "netreward.online", "pathPrefix": "/referral" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6366f1"
+        }
+      ],
+      "expo-local-authentication"
+    ],
+    "extra": {
+      "SUPABASE_URL": "https://pmpeyfkbqipfnhokfksl.supabase.co",
+      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtcGV5ZmticWlwZm5ob2tma3NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMDc4MDIsImV4cCI6MjA5Mjc4MzgwMn0.H_adIr_LDFTa497OCMWJjYTwKLwDkKMvU6hlwdjp3lY"
+    }
+  }
+}
