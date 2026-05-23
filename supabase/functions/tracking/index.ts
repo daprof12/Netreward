@@ -694,6 +694,11 @@ serve(async (req) => {
                 ? String(rpcData.message ?? '')
                 : '';
 
+          const rpcServiceId = rpcData.service_id as string | null || null;
+          const rpcNetworkId = rpcData.network_id as string | null || null;
+          const rpcCategory = rpcData.category as string | null || null;
+          const rpcGamingAccountId = rpcData.gaming_account_id as string | null || null;
+
           await supabase.from('tracking_sessions').insert({
             session_id: String(session_id),
             user_email: userEmail,
@@ -708,6 +713,10 @@ serve(async (req) => {
             validation_score: validation.isAnomaly ? 0.5 : 1.0,
             status: tsStatus,
             reject_reason: rejectReason,
+            service_id: rpcServiceId,
+            network_id: rpcNetworkId,
+            category: rpcCategory,
+            gaming_account_id: rpcGamingAccountId,
           });
         } catch (tsErr) {
           // Non-fatal: log but don't fail the response
