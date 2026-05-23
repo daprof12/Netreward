@@ -38,3 +38,7 @@ dist-ssr
 !.dev.vars.example
 landing/
 packages/tracker/
+
+# Extension build outputs
+apps/extension-chrome/chrome-dist/
+apps/extension-chrome/edge-dist/
