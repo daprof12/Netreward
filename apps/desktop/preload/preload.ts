@@ -20,6 +20,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('tracking-toggled', (_event, enabled) => callback(enabled));
   },
 
+  // Bandwidth tracking
+  onNetworkStats: (callback: (stats: { rxBytes: number; txBytes: number }) => void) => {
+    ipcRenderer.on('network-stats-update', (_event, stats) => callback(stats));
+  },
+
+  // Auto-Updater
+  onUpdaterEvent: (callback: (event: { type: string; info?: any }) => void) => {
+    ipcRenderer.on('updater-event', (_event, data) => callback(data));
+  },
+  installUpdate: () => ipcRenderer.send('install-update'),
+
   // Check if running in Electron
   isElectron: true,
 });

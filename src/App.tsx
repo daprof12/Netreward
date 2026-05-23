@@ -56,6 +56,7 @@ import { useSystemStore } from '@/stores/useSystemStore';
 import { useSecurityStore } from '@/stores/useSecurityStore';
 import { useWalletAutomation } from '@/hooks/useWalletAutomation';
 import { useDeviceManager } from '@/hooks/useDeviceManager';
+import { useDesktopIntegration } from '@/hooks/useDesktopIntegration';
 import { supabase } from '@/lib/supabase';
 
 import CreateService from './pages/CreateService';
@@ -172,6 +173,9 @@ function App() {
   const hasInitialized = useRef(false);
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
 
+  // Desktop Integration (Electron)
+  const { isElectron, updaterState, installUpdate } = useDesktopIntegration();
+
   // Check maintenance mode from kv_settings
   useEffect(() => {
     const checkMaintenance = async () => {
@@ -278,6 +282,22 @@ function App() {
         <ThemeManager />
         <WalletAutomationManager />
         {role !== 'admin' && <DeviceAutomationManager />}
+
+        {/* Desktop Updater Banner */}
+        {isElectron && updaterState && updaterState.status !== 'error' && (
+          <div className="bg-accent-primary text-white text-xs font-bold px-4 py-2 flex justify-between items-center z-50">
+            <span>
+              {updaterState.status === 'checking' && 'Checking for updates...'}
+              {updaterState.status === 'downloading' && `Downloading update... ${Math.round(updaterState.progress || 0)}%`}
+              {updaterState.status === 'ready' && `Update v${updaterState.version} ready!`}
+            </span>
+            {updaterState.status === 'ready' && (
+              <button onClick={installUpdate} className="bg-white text-accent-primary px-3 py-1 rounded-md active:scale-95 transition-transform">
+                Restart & Install
+              </button>
+            )}
+          </div>
+        )}
         
         {role === 'admin' ? (
           <Routes>

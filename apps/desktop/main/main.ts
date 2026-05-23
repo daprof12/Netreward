@@ -1,5 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification } from 'electron';
 import * as path from 'path';
+import { autoUpdater } from 'electron-updater';
+import * as si from 'systeminformation';
 
 // ── State ───────────────────────────────────────────────────────────────────
 let mainWindow: BrowserWindow | null = null;
@@ -169,6 +171,94 @@ function setupIPC() {
     arch: process.arch,
     version: app.getVersion(),
   }));
+
+  // Auto-updater install
+  ipcMain.on('install-update', () => {
+    autoUpdater.quitAndInstall();
+  });
+}
+
+// ── Auto-Updater ────────────────────────────────────────────────────────────
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    mainWindow?.webContents.send('updater-event', { type: 'checking' });
+  });
+  autoUpdater.on('update-available', (info) => {
+    mainWindow?.webContents.send('updater-event', { type: 'available', info });
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    mainWindow?.webContents.send('updater-event', { type: 'not-available', info });
+  });
+  autoUpdater.on('error', (err) => {
+    mainWindow?.webContents.send('updater-event', { type: 'error', info: err.message });
+  });
+  autoUpdater.on('download-progress', (progressObj) => {
+    mainWindow?.webContents.send('updater-event', { type: 'progress', info: progressObj });
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    mainWindow?.webContents.send('updater-event', { type: 'downloaded', info });
+  });
+
+  // Check on startup
+  autoUpdater.checkForUpdatesAndNotify();
+}
+
+// ── Bandwidth Tracking ──────────────────────────────────────────────────────
+let lastRx = 0;
+let lastTx = 0;
+
+async function startBandwidthTracking() {
+  // Initialize baseline
+  try {
+    const stats = await si.networkStats();
+    if (stats && stats.length > 0) {
+      // Sum all interfaces or take default
+      let sumRx = 0, sumTx = 0;
+      for (const iface of stats) {
+        sumRx += iface.rx_bytes;
+        sumTx += iface.tx_bytes;
+      }
+      lastRx = sumRx;
+      lastTx = sumTx;
+    }
+  } catch (e) {
+    console.error('Failed to init network stats', e);
+  }
+
+  // Poll every 5 seconds
+  setInterval(async () => {
+    if (!trackingStats.isActive) return; // Don't track if paused
+
+    try {
+      const stats = await si.networkStats();
+      if (stats && stats.length > 0) {
+        let sumRx = 0, sumTx = 0;
+        for (const iface of stats) {
+          sumRx += iface.rx_bytes;
+          sumTx += iface.tx_bytes;
+        }
+
+        const diffRx = sumRx - lastRx;
+        const diffTx = sumTx - lastTx;
+        
+        lastRx = sumRx;
+        lastTx = sumTx;
+
+        // Ensure valid diff (handles counter wraps/reboots)
+        if (diffRx > 0 || diffTx > 0) {
+          mainWindow?.webContents.send('network-stats-update', {
+            rxBytes: Math.max(0, diffRx),
+            txBytes: Math.max(0, diffTx)
+          });
+        }
+      }
+    } catch (e) {
+      // Silent error on poll
+    }
+  }, 5000);
 }
 
 // ── App Lifecycle ───────────────────────────────────────────────────────────
@@ -176,6 +266,8 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   setupIPC();
+  setupAutoUpdater();
+  startBandwidthTracking();
 
   // Auto-start on boot (default: enabled)
   if (!app.getLoginItemSettings().openAtLogin) {

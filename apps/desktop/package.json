@@ -26,7 +26,10 @@
       "assets/**/*"
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "assets/icons/icon.ico"
     },
     "nsis": {
@@ -37,12 +40,18 @@
       "shortcutName": "NetReward"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "assets/icons/icon.icns",
       "category": "public.app-category.finance"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "assets/icons/icon.png",
       "category": "Finance"
     },
@@ -54,7 +63,8 @@
   },
   "dependencies": {
     "electron-store": "^10.0.0",
-    "electron-updater": "^6.0.0"
+    "electron-updater": "^6.0.0",
+    "systeminformation": "^5.31.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
