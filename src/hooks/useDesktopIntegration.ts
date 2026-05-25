@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
 import { useCampaigns } from './useCampaigns';
+import { useAuthStore } from '../stores/useAuthStore';
+import { supabase } from '../lib/supabase';
 
 // Extend Window interface for Electron API
 declare global {
@@ -26,10 +28,37 @@ export function useDesktopIntegration() {
   const totalEarned = userEnrollments?.reduce((sum: number, en: any) => sum + (en.nrt_earned || 0) + (en.unclaimed_nrt || 0), 0) ?? 0;
   const totalDataConsumedGb = userEnrollments?.reduce((sum: number, en: any) => sum + (en.data_consumed_gb || 0), 0) ?? 0;
   
-  // Find the most recently active service based on updated_at
-  const activeService = userEnrollments && userEnrollments.length > 0
-    ? [...userEnrollments].sort((a: any, b: any) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())[0]?.campaigns?.title
-    : '';
+  const [activeService, setActiveService] = useState<string>('');
+  const { user } = useAuthStore();
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    const fetchActiveSession = async () => {
+      if (!user?.id) return;
+      
+      const { data } = await supabase.from('device_data_sessions')
+        .select('session_end, campaigns(title)')
+        .order('session_end', { ascending: false })
+        .limit(1);
+        
+      if (data && data.length > 0) {
+        const s = data[0];
+        // Active if session ended within the last 15 minutes
+        const isActive = (new Date().getTime() - new Date(s.session_end).getTime() < 15 * 60 * 1000);
+        if (isActive && (s.campaigns as any)?.title) {
+          setActiveService((s.campaigns as any).title);
+        } else {
+          setActiveService('');
+        }
+      }
+    };
+
+    fetchActiveSession();
+    intervalId = setInterval(fetchActiveSession, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [user?.id]);
   
   useEffect(() => {
     // Only run in Electron environment
