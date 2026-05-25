@@ -133,7 +133,7 @@ function updateTrayMenu() {
       enabled: false,
     },
     {
-      label: trackingStats.activeService ? `🚀 Active Network: ${trackingStats.activeService}` : '📡 Waiting for network...',
+      label: trackingStats.activeService ? `🚀 Active Campaign: ${trackingStats.activeService}` : '📡 Waiting for network...',
       enabled: false,
     },
     { type: 'separator' },
