@@ -9,7 +9,7 @@ let tray: Tray | null = null;
 let isQuitting = false;
 
 // Tracking stats (updated by renderer via IPC)
-let trackingStats = { gbTracked: 0, nrtEarned: 0, isActive: true };
+let trackingStats = { gbTracked: 0, nrtEarned: 0, isActive: true, activeService: '' };
 
 // ── Prevent Multiple Instances & Protocol ─────────────────────────────────────
 // Register custom protocol for netreward:// URIs
@@ -129,7 +129,11 @@ function createTray() {
 function updateTrayMenu() {
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: `📊 ${trackingStats.gbTracked.toFixed(1)} GB tracked — ${trackingStats.nrtEarned.toFixed(2)} NRT`,
+      label: `📊 ${trackingStats.gbTracked.toFixed(6)} GB tracked — ${trackingStats.nrtEarned.toFixed(10)} NRT`,
+      enabled: false,
+    },
+    {
+      label: trackingStats.activeService ? `🚀 Active Network: ${trackingStats.activeService}` : '📡 Waiting for network...',
       enabled: false,
     },
     { type: 'separator' },
@@ -178,7 +182,7 @@ function updateTrayMenu() {
   // Update tooltip
   tray?.setToolTip(
     trackingStats.isActive
-      ? `NetReward — ${trackingStats.gbTracked.toFixed(1)} GB | ${trackingStats.nrtEarned.toFixed(2)} NRT`
+      ? `NetReward — ${trackingStats.gbTracked.toFixed(6)} GB | ${trackingStats.nrtEarned.toFixed(10)} NRT`
       : 'NetReward — Tracking Paused'
   );
 }
@@ -186,8 +190,8 @@ function updateTrayMenu() {
 // ── IPC Handlers ────────────────────────────────────────────────────────────
 function setupIPC() {
   // Update tray stats from renderer
-  ipcMain.on('update-tray-stats', (_event, stats: { gbTracked: number; nrtEarned: number; isActive: boolean }) => {
-    trackingStats = stats;
+  ipcMain.on('update-tray-stats', (_event, stats: { gbTracked: number; nrtEarned: number; isActive: boolean; activeService?: string }) => {
+    trackingStats = { ...trackingStats, ...stats };
     updateTrayMenu();
   });
 

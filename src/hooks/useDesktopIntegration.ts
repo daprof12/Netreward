@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
+import { useCampaigns } from './useCampaigns';
 
 // Extend Window interface for Electron API
 declare global {
@@ -18,8 +19,17 @@ declare global {
 }
 
 export function useDesktopIntegration() {
-  const { isTracking, updateStats, dailyStats, stats } = useTelemetryStore();
+  const { isTracking, updateStats } = useTelemetryStore();
+  const { userEnrollments } = useCampaigns();
   const [updaterState, setUpdaterState] = useState<{ status: string; progress?: number; version?: string } | null>(null);
+  
+  const totalEarned = userEnrollments?.reduce((sum: number, en: any) => sum + (en.nrt_earned || 0), 0) ?? 0;
+  const totalDataConsumedGb = userEnrollments?.reduce((sum: number, en: any) => sum + (en.data_consumed_gb || 0), 0) ?? 0;
+  
+  // Find the most recently active service based on updated_at
+  const activeService = userEnrollments && userEnrollments.length > 0
+    ? [...userEnrollments].sort((a: any, b: any) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())[0]?.campaigns?.title
+    : '';
   
   useEffect(() => {
     // Only run in Electron environment
@@ -27,12 +37,13 @@ export function useDesktopIntegration() {
 
     // 1. Sync React State -> Electron Tray
     window.electronAPI.updateTrayStats({
-      gbTracked: dailyStats.total_bytes / (1024 * 1024 * 1024),
-      nrtEarned: stats.total_nrt_earned,
-      isActive: isTracking
+      gbTracked: totalDataConsumedGb,
+      nrtEarned: totalEarned,
+      isActive: isTracking,
+      activeService: activeService
     });
 
-  }, [dailyStats.total_bytes, stats.total_nrt_earned, isTracking]);
+  }, [totalDataConsumedGb, totalEarned, isTracking, activeService]);
 
   useEffect(() => {
     if (!window.electronAPI) return;
