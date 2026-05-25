@@ -29,9 +29,9 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.netreward.online/*", "*://localhost/*"],
+      "matches": ["*://*.netreward.online/*", "*://*.netlify.app/*", "*://localhost/*"],
       "js": ["inject.js"],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [

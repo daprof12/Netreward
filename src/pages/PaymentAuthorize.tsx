@@ -35,7 +35,6 @@ interface PaySession {
 type FlowStep =
   | 'loading'      // fetching session from DB
   | 'login_required' // user not signed in
-  | 'interception_choice' // let user choose web, desktop, or extension
   | 'waiting_for_app' // waiting for supabase completion from extension/desktop
   | 'review'       // show payment details, await confirmation
   | 'authenticating' // calling RPC
@@ -68,6 +67,7 @@ export default function PaymentAuthorize() {
   const [showBiometric, setShowBiometric] = useState(false);
   const [countdown, setCountdown] = useState('');
   const [hasExtension, setHasExtension] = useState(false);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
   
   // Check for extension on mount
   useEffect(() => {
@@ -136,6 +136,53 @@ export default function PaymentAuthorize() {
 
       if (error || !data) { setStep('not_found'); return; }
 
+      // Fetch merchant name
+      const { data: profile } = await supabase
+        .from('users')
+        .select('display_name')
+        .eq('id', data.merchant_id)
+        .single();
+
+      let fallbackUrl: string | undefined = undefined;
+      try {
+        if (document.referrer && new URL(document.referrer).origin !== window.location.origin) {
+          fallbackUrl = document.referrer;
+        }
+      } catch (e) {
+        // invalid referrer URL
+      }
+
+      const sessionData: PaySession = {
+        id: data.id,
+        merchantId: data.merchant_id,
+        merchantName: profile?.display_name || 'Merchant',
+        amountNrt: data.amount_nrt,
+        description: data.description,
+        status: data.status,
+        expiresAt: data.expires_at,
+        successUrl: returnTo || data.success_url || fallbackUrl,
+        cancelUrl: data.cancel_url || fallbackUrl,
+      };
+
+      setSession(sessionData);
+      setSessionLoaded(true);
+
+      if (data.status === 'completed') {
+        setStep('success');
+        if (sessionData.successUrl) {
+          setTimeout(() => {
+            window.location.href = sessionData.successUrl!;
+          }, 3000);
+        }
+        return;
+      }
+
+      if (data.status === 'failed') {
+        setErrorMsg('Payment failed or was cancelled.');
+        setStep('failed');
+        return;
+      }
+
       if (data.status !== 'pending') {
         setStep(data.status === 'expired' ? 'expired' : 'not_found');
         return;
@@ -146,41 +193,24 @@ export default function PaymentAuthorize() {
         return;
       }
 
-      // Fetch merchant name
-      const { data: profile } = await supabase
-        .from('users')
-        .select('display_name')
-        .eq('id', data.merchant_id)
-        .single();
 
-      setSession({
-        id: data.id,
-        merchantId: data.merchant_id,
-        merchantName: profile?.display_name || 'Merchant',
-        amountNrt: data.amount_nrt,
-        description: data.description,
-        status: data.status,
-        expiresAt: data.expires_at,
-        successUrl: returnTo || data.success_url || undefined,
-        cancelUrl: data.cancel_url || undefined,
-      });
-      setStep('interception_choice');
     } catch {
       setStep('not_found');
     }
   };
 
-  // ── Interception & Waiting ──────────────────────────────────────
-  
-  const openInExtension = () => {
-    window.postMessage({ type: 'NETREWARD_SCAN2PAY_INIT', payload: { sessionId } }, '*');
-    setStep('waiting_for_app');
-  };
+  // ── Interception Routing ──────────────────────────────────────
 
-  const openInDesktop = () => {
-    window.location.href = `netreward://pay?session=${sessionId}`;
-    setStep('waiting_for_app');
-  };
+  useEffect(() => {
+    if (sessionLoaded && session) {
+      if (hasExtension) {
+        window.postMessage({ type: 'NETREWARD_SCAN2PAY_INIT', payload: { sessionId: session.id } }, '*');
+        setStep('waiting_for_app');
+      } else {
+        setStep('review');
+      }
+    }
+  }, [sessionLoaded, session, hasExtension]);
 
   useEffect(() => {
     if (step !== 'waiting_for_app' || !sessionId) return;
@@ -325,52 +355,7 @@ export default function PaymentAuthorize() {
             </motion.div>
           )}
 
-          {/* ── Interception Choice ── */}
-          {step === 'interception_choice' && session && (
-            <motion.div
-              key="choice"
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="glass rounded-3xl border border-glass-border p-6 space-y-6 text-center"
-            >
-              <div className="w-16 h-16 bg-accent-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
-                <ShoppingCart size={32} className="text-accent-primary" />
-              </div>
-              
-              <div>
-                <h2 className="text-xl font-bold mb-1">Complete Payment</h2>
-                <p className="text-sm text-text-secondary">
-                  How would you like to confirm your payment to {session.merchantName}?
-                </p>
-              </div>
 
-              <div className="space-y-3">
-                {hasExtension && (
-                  <button
-                    onClick={openInExtension}
-                    className="w-full py-4 bg-accent-primary text-primary-foreground font-bold rounded-2xl shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-                  >
-                    <Puzzle size={18} /> Open Chrome Extension
-                  </button>
-                )}
-                
-                <button
-                  onClick={openInDesktop}
-                  className={`w-full py-4 bg-bg-secondary text-text-primary font-bold rounded-2xl border border-glass-border flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${!hasExtension ? 'bg-accent-primary/10 text-accent-primary border-accent-primary/30' : ''}`}
-                >
-                  <Monitor size={18} /> Open Desktop App
-                </button>
-
-                <div className="pt-2">
-                  <button
-                    onClick={() => setStep('review')}
-                    className="w-full py-3 text-sm text-text-secondary font-medium flex items-center justify-center gap-2 hover:text-text-primary transition-colors"
-                  >
-                    <Globe size={16} /> Continue in Web Browser
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
 
           {/* ── Waiting for App ── */}
           {step === 'waiting_for_app' && (
@@ -394,10 +379,10 @@ export default function PaymentAuthorize() {
                 <p className="text-text-secondary text-sm">Please confirm the payment in the NetReward app...</p>
               </div>
               <button
-                onClick={() => setStep('interception_choice')}
+                onClick={() => setStep('review')}
                 className="mt-4 py-2 px-4 text-sm text-text-secondary font-medium underline"
               >
-                Go back
+                Go to Web Payment Instead
               </button>
             </motion.div>
           )}
@@ -620,11 +605,19 @@ export default function PaymentAuthorize() {
                 >
                   Try Again
                 </button>
+                {session?.cancelUrl && (
+                  <button
+                    onClick={() => { window.location.href = session.cancelUrl!; }}
+                    className="w-full py-3 bg-bg-secondary text-text-primary font-bold rounded-xl border border-glass-border flex items-center justify-center gap-2"
+                  >
+                    Return to Merchant <ExternalLink size={14} />
+                  </button>
+                )}
                 <button
                   onClick={handleCancel}
-                  className="w-full py-3 bg-bg-secondary text-text-primary font-bold rounded-xl border border-glass-border"
+                  className="w-full py-3 text-sm text-text-secondary font-medium"
                 >
-                  Cancel
+                  Cancel & Go Back
                 </button>
               </div>
             </motion.div>

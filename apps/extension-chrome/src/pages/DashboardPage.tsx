@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const conversionRates: Record<string, number> = { USD: 1.0, EUR: 0.92, GBP: 0.79, NGN: 1500.0 };
   const rate = conversionRates[currency] || 1.0;
   const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '₦';
-  const equivalentBalance = (nrtBalance * 0.1 * rate).toFixed(2);
+  const equivalentBalance = (nrtBalance * 0.1 * rate).toFixed(10);
 
   return (
     <div className="page fade-in">

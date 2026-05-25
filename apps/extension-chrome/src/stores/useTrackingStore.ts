@@ -9,6 +9,7 @@ interface TrackingState {
   activeCampaignCount: number;
   nrtBalance: number;
   campaigns: any[];
+  recentActivity: any[];
   toggleTracking: () => void;
   fetchDashboardData: (userId: string) => Promise<void>;
   fetchCampaigns: (userId: string) => Promise<void>;
@@ -23,6 +24,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   activeCampaignCount: 0,
   nrtBalance: 0,
   campaigns: [],
+  recentActivity: [],
 
   toggleTracking: () => {
     const newState = !get().isTracking;
@@ -117,7 +119,14 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
         };
       });
 
-      set({ campaigns: allCampaigns });
+      // Fetch recent activity
+      const { data: activity } = await supabase
+        .from('device_data_sessions')
+        .select('campaign_id, session_end')
+        .order('session_end', { ascending: false })
+        .limit(20);
+
+      set({ campaigns: allCampaigns, recentActivity: activity || [] });
     } catch (e) {
       console.error('Campaigns error:', e);
     }

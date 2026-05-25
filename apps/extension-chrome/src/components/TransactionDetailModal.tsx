@@ -76,15 +76,15 @@ export default function TransactionDetailModal({ receipt, onClose }: Props) {
             <Icon size={24} color={m.color} />
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 2 }}>
-            <span style={{ fontSize: 28, fontWeight: 900, color: isPositive ? '#10b981' : 'var(--text-primary)' }}>
-              {isPositive ? '+' : ''}{Number(receipt.amount).toFixed(2)}
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 700 }}>NRT</span>
-          </div>
-          <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 8 }}>
-            ≈ {currencySymbol}{Math.abs(receipt.amount * 0.1 * rate).toFixed(2)} {currency}
-          </p>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <h2 style={{ fontSize: 24, fontWeight: 900, color: isPositive ? '#10b981' : 'var(--text-primary)' }}>
+                {isPositive ? '+' : ''}{Number(receipt.amount).toFixed(10)}
+                <span style={{ fontSize: 14, marginLeft: 4 }}>NRT</span>
+              </h2>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', marginTop: -16, marginBottom: 24 }}>
+              ≈ {currencySymbol}{Math.abs(receipt.amount * 0.1 * rate).toFixed(10)} {currency}
+            </p>
 
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 12 }}>
             {receipt.description}

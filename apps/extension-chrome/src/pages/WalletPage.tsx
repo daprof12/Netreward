@@ -104,10 +104,10 @@ export default function WalletPage() {
           <div>
             <span className="stat-label">Total Balance</span>
             <div className="stat-value" style={{ fontSize: 24, display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              {nrtBalance.toFixed(2)} <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>NRT</span>
+              {nrtBalance.toFixed(10)} <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>NRT</span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
-              ≈ {currencySymbol}{(nrtBalance * 0.1 * rate).toFixed(2)} {currency}
+              ≈ {currencySymbol}{(nrtBalance * 0.1 * rate).toFixed(10)} {currency}
             </div>
           </div>
         </div>
@@ -196,7 +196,7 @@ export default function WalletPage() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontSize: 13, fontWeight: 700, color: isPositive ? '#10b981' : 'var(--text-primary)' }}>
-                        {isPositive ? '+' : ''}{Number(tx.amount).toFixed(2)} NRT
+                        {isPositive ? '+' : ''}{Number(tx.amount).toFixed(10)} NRT
                       </p>
                     </div>
                   </div>

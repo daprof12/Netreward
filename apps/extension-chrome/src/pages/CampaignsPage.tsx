@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 
 export default function CampaignsPage() {
   const { profile } = useAuthStore();
-  const { campaigns, fetchCampaigns, isTracking } = useTrackingStore();
+  const { campaigns, fetchCampaigns, isTracking, recentActivity } = useTrackingStore();
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState<string | null>(null);
 
@@ -155,7 +155,14 @@ export default function CampaignsPage() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {campaigns.map((campaign: any) => {
-          const isActiveAndTracking = campaign.enrolled && isTracking;
+          const isRecentlyActive = recentActivity?.some((s: any) => 
+            s.campaign_id === campaign.id && (new Date().getTime() - new Date(s.session_end).getTime() < 5 * 60 * 1000)
+          );
+          const isActiveAndTracking = campaign.enrolled && isTracking && isRecentlyActive;
+          
+          const enrollment = campaign.enrollment;
+          const dataTracked = Number(enrollment?.data_consumed_gb || 0).toFixed(4);
+          const nrtEarned = Number((enrollment?.nrt_earned || 0) + (enrollment?.unclaimed_nrt || 0)).toFixed(10);
           
           return (
             <div
@@ -247,9 +254,15 @@ export default function CampaignsPage() {
                     {campaign.category || 'General'}
                   </span>
                   <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>•</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
-                    {Number(campaign.reward_rate_per_gb || 0).toFixed(2)} NRT/GB
-                  </span>
+                  {campaign.enrolled ? (
+                    <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+                      {dataTracked} GB tracked • {nrtEarned} NRT earned
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+                      {Number(campaign.reward_rate_per_gb || 0).toFixed(10)} NRT/GB
+                    </span>
+                  )}
                 </div>
                 {campaign.end_date && (
                   <p style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>
