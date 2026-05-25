@@ -37,10 +37,11 @@ interface Props {
 }
 
 export default function TransactionDetailModal({ receipt, onClose }: Props) {
-  const { currency } = useSettingsStore();
+  const { currency, nrtPrice } = useSettingsStore();
 
-  const conversionRates: Record<string, number> = { USD: 1.0, EUR: 0.92, GBP: 0.79, NGN: 1500.0 };
-  const rate = conversionRates[currency] || 1.0;
+  const conversionRates: Record<string, number> = { USD: 0.005, EUR: 0.0046, GBP: 0.00395, NGN: 7.5 };
+  const baseRate = conversionRates[currency] || 0.005;
+  const rate = nrtPrice * (baseRate / 0.005);
   const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '₦';
 
   if (!receipt) return null;
@@ -83,7 +84,7 @@ export default function TransactionDetailModal({ receipt, onClose }: Props) {
               </h2>
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', marginTop: -16, marginBottom: 24 }}>
-              ≈ {currencySymbol}{Math.abs(receipt.amount * 0.1 * rate).toFixed(10)} {currency}
+              ≈ {currencySymbol}{(Math.abs(receipt.amount) * rate).toFixed(10)} {currency}
             </p>
 
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 12 }}>

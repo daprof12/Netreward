@@ -14,7 +14,7 @@ function formatBytes(bytes: number): string {
 
 export default function DashboardPage() {
   const { profile } = useAuthStore();
-  const { currency } = useSettingsStore();
+  const { currency, nrtPrice } = useSettingsStore();
   const { isTracking, nrtBalance, todayBytesUp, todayBytesDown, todayNrtEarned, activeCampaignCount, toggleTracking, fetchDashboardData } = useTrackingStore();
 
   useEffect(() => {
@@ -26,10 +26,11 @@ export default function DashboardPage() {
   const totalBytes = todayBytesUp + todayBytesDown;
   
   // Basic mock conversion rate for display purposes only
-  const conversionRates: Record<string, number> = { USD: 1.0, EUR: 0.92, GBP: 0.79, NGN: 1500.0 };
-  const rate = conversionRates[currency] || 1.0;
+  const conversionRates: Record<string, number> = { USD: 0.005, EUR: 0.0046, GBP: 0.00395, NGN: 7.5 };
+  const baseRate = conversionRates[currency] || 0.005;
+  const rate = nrtPrice * (baseRate / 0.005);
   const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '₦';
-  const equivalentBalance = (nrtBalance * 0.1 * rate).toFixed(10);
+  const equivalentBalance = (nrtBalance * rate).toFixed(10);
 
   return (
     <div className="page fade-in">

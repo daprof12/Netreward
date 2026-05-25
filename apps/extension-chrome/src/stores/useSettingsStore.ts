@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '../lib/supabase';
 
 export type Theme = 'dark' | 'light';
 export type Currency = 'USD' | 'EUR' | 'GBP' | 'NGN';
@@ -8,16 +9,19 @@ interface SettingsState {
   theme: Theme;
   currency: Currency;
   language: Language;
+  nrtPrice: number;
   setTheme: (theme: Theme) => Promise<void>;
   setCurrency: (currency: Currency) => Promise<void>;
   setLanguage: (language: Language) => Promise<void>;
   initializeSettings: () => Promise<void>;
+  fetchNrtPrice: () => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   theme: 'dark', // default to dark
   currency: 'USD',
   language: 'en',
+  nrtPrice: 0.005,
 
   initializeSettings: async () => {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
@@ -38,6 +42,25 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         language: (localStorage.getItem('language') || 'en') as Language
       });
       document.documentElement.setAttribute('data-theme', theme);
+    }
+    get().fetchNrtPrice();
+  },
+
+  fetchNrtPrice: async () => {
+    try {
+      const { data } = await supabase
+        .from('kv_settings')
+        .select('value')
+        .eq('key', 'token_config')
+        .maybeSingle();
+      if (data?.value) {
+        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        if (parsed?.currentValue) {
+          set({ nrtPrice: Number(parsed.currentValue) });
+        }
+      }
+    } catch (e) {
+      console.warn('fetchNrtPrice error', e);
     }
   },
 

@@ -8,7 +8,7 @@ import TransactionDetailModal, { getTxMeta } from '../components/TransactionDeta
 
 export default function WalletPage() {
   const { profile } = useAuthStore();
-  const { currency } = useSettingsStore();
+  const { currency, nrtPrice } = useSettingsStore();
   const { nrtBalance, fetchDashboardData } = useTrackingStore();
   
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -90,8 +90,9 @@ export default function WalletPage() {
   }, [transactions, searchQuery, filterType]);
 
   // Basic mock conversion rate for display purposes only
-  const conversionRates: Record<string, number> = { USD: 1.0, EUR: 0.92, GBP: 0.79, NGN: 1500.0 };
-  const rate = conversionRates[currency] || 1.0;
+  const conversionRates: Record<string, number> = { USD: 0.005, EUR: 0.0046, GBP: 0.00395, NGN: 7.5 };
+  const baseRate = conversionRates[currency] || 0.005;
+  const rate = nrtPrice * (baseRate / 0.005);
   const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '₦';
 
   return (
@@ -107,7 +108,7 @@ export default function WalletPage() {
               {nrtBalance.toFixed(10)} <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>NRT</span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
-              ≈ {currencySymbol}{(nrtBalance * 0.1 * rate).toFixed(10)} {currency}
+              ≈ {currencySymbol}{(nrtBalance * rate).toFixed(10)} {currency}
             </div>
           </div>
         </div>
