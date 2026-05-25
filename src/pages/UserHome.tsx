@@ -139,7 +139,7 @@ export default function UserHome() {
 
   const displayBalance = wallet?.nrt_balance ?? 0;
   const enrollmentCount = userEnrollments?.length ?? 0;
-  const totalEarned = userEnrollments?.reduce((sum: number, en: any) => sum + (en.nrt_earned || 0), 0) ?? 0;
+  const totalEarned = userEnrollments?.reduce((sum: number, en: any) => sum + (en.nrt_earned || 0) + (en.unclaimed_nrt || 0), 0) ?? 0;
   const totalUnclaimed = userEnrollments?.reduce((sum: number, en: any) => sum + (en.unclaimed_nrt || 0), 0) ?? 0;
 
   async function handleClaim() {
@@ -452,7 +452,7 @@ export default function UserHome() {
                             />
                           </div>
                           <span className="text-[10px] font-black text-accent-primary">
-                            +<NrtAmount value={en.nrt_earned} hideUnit className="text-[10px] font-black text-accent-primary" /> NRT
+                            +<NrtAmount value={(en.nrt_earned || 0) + (en.unclaimed_nrt || 0)} hideUnit className="text-[10px] font-black text-accent-primary" /> NRT
                           </span>
                         </div>
                       </div>

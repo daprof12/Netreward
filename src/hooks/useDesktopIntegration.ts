@@ -23,7 +23,7 @@ export function useDesktopIntegration() {
   const { userEnrollments } = useCampaigns();
   const [updaterState, setUpdaterState] = useState<{ status: string; progress?: number; version?: string } | null>(null);
   
-  const totalEarned = userEnrollments?.reduce((sum: number, en: any) => sum + (en.nrt_earned || 0), 0) ?? 0;
+  const totalEarned = userEnrollments?.reduce((sum: number, en: any) => sum + (en.nrt_earned || 0) + (en.unclaimed_nrt || 0), 0) ?? 0;
   const totalDataConsumedGb = userEnrollments?.reduce((sum: number, en: any) => sum + (en.data_consumed_gb || 0), 0) ?? 0;
   
   // Find the most recently active service based on updated_at
