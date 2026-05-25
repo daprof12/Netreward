@@ -11,18 +11,49 @@ let isQuitting = false;
 // Tracking stats (updated by renderer via IPC)
 let trackingStats = { gbTracked: 0, nrtEarned: 0, isActive: true };
 
-// ── Prevent Multiple Instances ──────────────────────────────────────────────
+// ── Prevent Multiple Instances & Protocol ─────────────────────────────────────
+// Register custom protocol for netreward:// URIs
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('netreward', process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient('netreward');
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, commandLine, _workingDirectory) => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
     }
+    
+    // Windows/Linux URL handling
+    const url = commandLine.find(arg => arg.startsWith('netreward://'));
+    if (url) {
+      handleProtocolUrl(url);
+    }
   });
+}
+
+function handleProtocolUrl(url: string) {
+  try {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.host === 'pay' && parsedUrl.searchParams.has('session')) {
+      const sessionId = parsedUrl.searchParams.get('session');
+      if (sessionId && mainWindow) {
+        mainWindow.webContents.send('open-scan2pay', sessionId);
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse protocol URL', e);
+  }
 }
 
 // ── Create Main Window ──────────────────────────────────────────────────────
@@ -51,7 +82,7 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     // In production, load the built web app
-    mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
   mainWindow.once('ready-to-show', () => {
@@ -297,4 +328,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     // On Windows/Linux, keep the tray alive
   }
+});
+
+// macOS: Handle protocol URLs when app is already running
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleProtocolUrl(url);
 });

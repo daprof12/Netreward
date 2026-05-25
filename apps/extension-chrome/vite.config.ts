@@ -9,6 +9,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         popup: resolve(__dirname, 'index.html'),
+        inject: resolve(__dirname, 'src/content/inject.ts'),
       },
       output: {
         entryFileNames: '[name].js',

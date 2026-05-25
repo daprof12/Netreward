@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useIspStore } from '@/stores/useIspStore';
 import { useSystemStore } from '@/stores/useSystemStore';
 import { useCurrencyStore } from '@/stores/useCurrencyStore';
+import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import LogoutConfirmModal from '@/components/ui/LogoutConfirmModal';
 import NotificationBell from '@/components/ui/NotificationBell';
@@ -58,15 +59,15 @@ export default function IspDashboard() {
 
   const chartData = networkStats.map(s => ({
     name: new Date(s.date).toLocaleDateString(undefined, { weekday: 'short' }),
-    value: chartView === 'network' ? s.avg_latency_ms : 
-           chartView === 'cashback' ? Number(s.total_traffic_bytes) / 1024 / 1024 / 1024 : 
-           s.active_users,
+    value: chartView === 'network' ? s.avg_latency_ms :
+      chartView === 'cashback' ? Number(s.total_traffic_bytes) / 1024 / 1024 / 1024 :
+        s.active_users,
   }));
 
   const totalDataBytes = networkStats.reduce((sum, stat) => sum + Number(stat.total_traffic_bytes || 0), 0);
   const totalDataGB = totalDataBytes / 1000000000;
   const totalUsersReached = networkStats.reduce((sum, stat) => sum + Number(stat.active_users || 0), 0);
-  
+
   // Using actual earnings from the RPC
   // The RPC dashboard stats should be returning an 'earnings' field
   // Wait, we don't have dashboardStats fetched here natively in IspDashboard. 
@@ -80,15 +81,22 @@ export default function IspDashboard() {
 
   const ispCashbackPercentage = settings.ispCashbackPercentage;
 
+  // Get time-based greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User';
+
+
   return (
     <motion.div
       className="space-y-6 pb-24 p-4 pt-8"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
     >
       <div className="flex justify-between items-center">
         <div>
-          <p className="text-sm text-text-secondary">{profile?.display_name || ispName || 'Operator Portal'} 👋</p>
+          <p className="text-sm text-text-secondary">{greeting}👋</p>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-text-primary capitalize">{profile?.display_name || user?.email?.split('@')[0] || 'Operator'}</h1>
             <span className="px-2 py-0.5 bg-purple-500/10 text-purple-500 text-[10px] font-black rounded-md border border-purple-500/20 tracking-tighter">ISP</span>
@@ -142,7 +150,7 @@ export default function IspDashboard() {
       {/* SDK Integration Status Card */}
       <div className="bg-bg-card border border-glass-border rounded-[20px] p-5 mt-6 relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-accent-primary/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
-        
+
         {profile?.kyc_status !== 'verified' ? (
           <div className="flex flex-col text-center items-center py-4">
             <div className="w-16 h-16 bg-bg-secondary rounded-full flex items-center justify-center mb-4">
@@ -163,11 +171,10 @@ export default function IspDashboard() {
                 <h3 className="font-bold flex items-center gap-2">
                   <Code size={18} className="text-accent-primary" />
                   SDK Integration
-                  <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${
-                    sdkStatus === 'verified' ? 'bg-green-500/10 text-green-500' : 
-                    sdkStatus === 'test_pending' ? 'bg-amber-500/10 text-amber-500' : 
-                    'bg-red-500/10 text-red-500'
-                  }`}>
+                  <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${sdkStatus === 'verified' ? 'bg-green-500/10 text-green-500' :
+                      sdkStatus === 'test_pending' ? 'bg-amber-500/10 text-amber-500' :
+                        'bg-red-500/10 text-red-500'
+                    }`}>
                     {sdkStatus.replace('_', ' ')}
                   </span>
                 </h3>
@@ -175,18 +182,17 @@ export default function IspDashboard() {
                   NetReward Tracker SDK must be active for your campaigns to correctly report data usage. Earn {ispCashbackPercentage}% NRT back.
                 </p>
               </div>
-              
-              <button 
+
+              <button
                 onClick={() => {
                   setIsTestingSdk(true);
                   setTimeout(() => { setIsTestingSdk(false); setSdkStatus('verified'); }, 2000);
                 }}
                 disabled={isTestingSdk || sdkStatus === 'verified'}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
-                  sdkStatus === 'verified' ? 'bg-bg-secondary text-text-secondary cursor-not-allowed' :
-                  isTestingSdk ? 'bg-accent-primary/50 text-white cursor-wait' :
-                  'bg-accent-primary text-white hover:opacity-90 active:scale-95 shadow-lg shadow-accent-primary/20'
-                }`}
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${sdkStatus === 'verified' ? 'bg-bg-secondary text-text-secondary cursor-not-allowed' :
+                    isTestingSdk ? 'bg-accent-primary/50 text-white cursor-wait' :
+                      'bg-accent-primary text-white hover:opacity-90 active:scale-95 shadow-lg shadow-accent-primary/20'
+                  }`}
               >
                 {isTestingSdk ? 'Pinging...' : sdkStatus === 'verified' ? 'Connected' : 'Test Connection'}
               </button>
@@ -210,7 +216,7 @@ export default function IspDashboard() {
                           {networks[activeNetworkIndex]?.name || 'Network'}
                         </p>
                         <code className="text-xs font-mono text-text-primary">
-                          {networks[activeNetworkIndex]?.apiKey 
+                          {networks[activeNetworkIndex]?.apiKey
                             ? `${networks[activeNetworkIndex].apiKey.slice(0, 12)}••••${networks[activeNetworkIndex].apiKey.slice(-4)}`
                             : 'No API key'}
                         </code>
@@ -225,11 +231,10 @@ export default function IspDashboard() {
                         <button
                           key={i}
                           onClick={() => setActiveNetworkIndex(i)}
-                          className={`transition-all duration-200 rounded-full ${
-                            i === activeNetworkIndex 
-                              ? 'w-4 h-1.5 bg-accent-primary' 
+                          className={`transition-all duration-200 rounded-full ${i === activeNetworkIndex
+                              ? 'w-4 h-1.5 bg-accent-primary'
                               : 'w-1.5 h-1.5 bg-text-secondary/30 hover:bg-text-secondary/50'
-                          }`}
+                            }`}
                         />
                       ))}
                     </div>
@@ -248,7 +253,7 @@ export default function IspDashboard() {
                   </div>
                 </div>
               )}
-              
+
               <div className="flex justify-between items-center text-xs">
                 <div className="flex items-center gap-1.5 text-text-secondary">
                   <Activity size={14} />
@@ -272,11 +277,11 @@ export default function IspDashboard() {
             </h3>
             <span className="text-[10px] font-black text-green-500 bg-green-500/10 px-2 py-0.5 rounded uppercase">Live</span>
           </div>
-          
+
           {isIspTelemetryLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="animate-spin text-text-secondary" /></div>
           ) : (!ispTelemetry || ispTelemetry.length === 0) ? (
-            <EmptyState 
+            <EmptyState
               icon={<Server size={24} />}
               title="Insufficient Data"
               message="Ensure your SDK is integrated correctly to start tracking network health."
@@ -310,11 +315,11 @@ export default function IspDashboard() {
                     acc[t.node_name].uptime += Number(t.uptime_pct);
                     acc[t.node_name].count += 1;
                     return acc;
-                  }, {} as Record<string, {users: number, uptime: number, count: number}>)
+                  }, {} as Record<string, { users: number, uptime: number, count: number }>)
                 ).sort((a, b) => b[1].users - a[1].users).slice(0, 3).map(([name, stats], i) => (
                   <div key={name} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${i===0 ? 'bg-green-500' : i===1 ? 'bg-blue-500' : 'bg-amber-500'}`} />
+                      <div className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-green-500' : i === 1 ? 'bg-blue-500' : 'bg-amber-500'}`} />
                       <span className="text-sm font-semibold">{name}</span>
                     </div>
                     <div className="flex items-center gap-4">
@@ -340,7 +345,7 @@ export default function IspDashboard() {
           {isIspTelemetryLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="animate-spin text-text-secondary" /></div>
           ) : (!ispTelemetry || ispTelemetry.length === 0) ? (
-            <EmptyState 
+            <EmptyState
               icon={<DollarSign size={24} />}
               title="Insufficient Data"
               message="Node revenue distributions will be available once traffic starts routing through verified nodes."
@@ -349,34 +354,35 @@ export default function IspDashboard() {
           ) : (
             <div className="space-y-4">
               {Object.entries(
-                  ispTelemetry.reduce((acc, t) => {
-                    if (!acc[t.node_name]) acc[t.node_name] = 0;
-                    acc[t.node_name] += t.active_users; // Proxy for revenue until actual node revenue table is built
-                    return acc;
-                  }, {} as Record<string, number>)
-                ).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, proxyRev], i) => {
+                ispTelemetry.reduce((acc, t) => {
+                  if (!acc[t.node_name]) acc[t.node_name] = 0;
+                  acc[t.node_name] += t.active_users; // Proxy for revenue until actual node revenue table is built
+                  return acc;
+                }, {} as Record<string, number>)
+              ).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, proxyRev], i) => {
                 const total = ispTelemetry.reduce((s, t) => s + t.active_users, 0);
                 const colors = ['bg-accent-primary', 'bg-[#3B82F6]', 'bg-[#8B5CF6]'];
                 return (
-                <div key={name} className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-bold">
-                    <span>{name}</span>
-                    <span className="text-accent-primary">{(proxyRev * 0.1).toFixed(2)} NRT</span>
+                  <div key={name} className="space-y-1.5">
+                    <div className="flex justify-between text-xs font-bold">
+                      <span>{name}</span>
+                      <span className="text-accent-primary">{(proxyRev * 0.1).toFixed(2)} NRT</span>
+                    </div>
+                    <div className="h-2 w-full bg-bg-secondary rounded-full overflow-hidden">
+                      <div className={`h-full ${colors[i % colors.length]}`} style={{ width: `${(proxyRev / total) * 100}%` }} />
+                    </div>
                   </div>
-                  <div className="h-2 w-full bg-bg-secondary rounded-full overflow-hidden">
-                    <div className={`h-full ${colors[i % colors.length]}`} style={{ width: `${(proxyRev / total) * 100}%` }} />
-                  </div>
-                </div>
-              )})}
-              
+                )
+              })}
+
               <div className="pt-4 border-t border-glass-border flex justify-between items-center">
-                 <div>
-                    <p className="text-[10px] text-text-secondary font-black uppercase">Next Payout</p>
-                    <p className="text-sm font-bold">End of Month</p>
-                 </div>
-                 <button className="px-4 py-2 bg-bg-secondary border border-glass-border rounded-xl text-xs font-bold text-text-primary hover:bg-glass-border transition-colors">
-                    View Schedule
-                 </button>
+                <div>
+                  <p className="text-[10px] text-text-secondary font-black uppercase">Next Payout</p>
+                  <p className="text-sm font-bold">End of Month</p>
+                </div>
+                <button className="px-4 py-2 bg-bg-secondary border border-glass-border rounded-xl text-xs font-bold text-text-primary hover:bg-glass-border transition-colors">
+                  View Schedule
+                </button>
               </div>
             </div>
           )}
@@ -404,12 +410,12 @@ export default function IspDashboard() {
         {isIspHeatmapLoading ? (
           <div className="flex justify-center py-6"><Loader2 className="animate-spin text-text-secondary" /></div>
         ) : (!ispHeatmap || ispHeatmap.length === 0 || ispHeatmap.every(d => d.intensity === 0)) ? (
-           <EmptyState 
-             icon={<Activity size={24} />}
-             title="No Network Activity"
-             message="Your network activity will appear here once traffic routes through your node."
-             className="border-none bg-transparent"
-           />
+          <EmptyState
+            icon={<Activity size={24} />}
+            title="No Network Activity"
+            message="Your network activity will appear here once traffic routes through your node."
+            className="border-none bg-transparent"
+          />
         ) : (
           <div className="flex gap-[3px] overflow-x-auto pb-2 scrollbar-hide">
             {/* Day labels */}
@@ -428,7 +434,7 @@ export default function IspDashboard() {
                     const dataIndex = weekIndex * 7 + dayIndex;
                     const dayData = ispHeatmap[dataIndex];
                     if (!dayData) return <div key={dayIndex} className="aspect-square w-full rounded-[2px] bg-bg-secondary/20" />;
-                    
+
                     const intensity = dayData.intensity;
                     return (
                       <div
@@ -437,10 +443,10 @@ export default function IspDashboard() {
                         className="aspect-square w-full rounded-[2px] transition-colors hover:ring-1 hover:ring-text-secondary/30"
                         style={{
                           backgroundColor: intensity === 4 ? 'var(--accent-primary)' :
-                                           intensity === 3 ? 'rgba(var(--accent-primary-rgb), 0.75)' :
-                                           intensity === 2 ? 'rgba(var(--accent-primary-rgb), 0.5)' :
-                                           intensity === 1 ? 'rgba(var(--accent-primary-rgb), 0.25)' :
-                                           'var(--bg-secondary)'
+                            intensity === 3 ? 'rgba(var(--accent-primary-rgb), 0.75)' :
+                              intensity === 2 ? 'rgba(var(--accent-primary-rgb), 0.5)' :
+                                intensity === 1 ? 'rgba(var(--accent-primary-rgb), 0.25)' :
+                                  'var(--bg-secondary)'
                         }}
                       />
                     );
@@ -502,7 +508,7 @@ export default function IspDashboard() {
           )}
           {chartData.length === 0 || chartData.every(d => d.value === 0) ? (
             <div className="absolute inset-0 flex items-center justify-center border border-glass-border rounded-xl">
-              <EmptyState 
+              <EmptyState
                 icon={<BarChart3 size={24} />}
                 title="No Analytics Data"
                 message="Your network timeline data will populate once your nodes are active."
@@ -510,7 +516,7 @@ export default function IspDashboard() {
               />
             </div>
           ) : (
-            <AnalyticsChart 
+            <AnalyticsChart
               data={chartData}
               type={chartType}
               color={chartView === 'campaigns' ? '#3B82F6' : chartView === 'cashback' ? '#10B981' : '#8B5CF6'}
@@ -526,11 +532,10 @@ export default function IspDashboard() {
             <button
               key={f}
               onClick={() => setTimeFilter(f)}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                timeFilter === f 
-                  ? 'bg-accent-primary text-white shadow-sm' 
+              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${timeFilter === f
+                  ? 'bg-accent-primary text-white shadow-sm'
                   : 'text-text-secondary hover:text-text-primary'
-              }`}
+                }`}
             >
               {f}
             </button>
@@ -552,15 +557,15 @@ export default function IspDashboard() {
           </div>
         ) : (
           runningCampaigns.slice(0, 3).map((camp) => (
-            <button 
-              key={camp.id} 
+            <button
+              key={camp.id}
               onClick={() => setViewingCampaignDetails(camp)}
               className="w-full text-left glass p-4 rounded-xl border border-glass-border flex justify-between items-center active:scale-[0.98] transition-transform hover:bg-glass-bg"
             >
               <div>
                 <h4 className="font-semibold text-text-primary text-sm">{camp.name}</h4>
                 <p className="text-xs text-text-secondary mt-1">
-                  <span className="w-2 h-2 inline-block rounded-full bg-accent-primary animate-pulse mr-1"></span> 
+                  <span className="w-2 h-2 inline-block rounded-full bg-accent-primary animate-pulse mr-1"></span>
                   Running
                 </p>
               </div>
@@ -573,18 +578,18 @@ export default function IspDashboard() {
         )}
       </div>
 
-      <LogoutConfirmModal 
-        isOpen={showLogoutConfirm} 
-        onClose={() => setShowLogoutConfirm(false)} 
-        onConfirm={handleLogout} 
+      <LogoutConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={handleLogout}
       />
 
       {/* Analytics Modal Component */}
       <AnimatePresence>
         {viewingCampaignDetails && (
-          <CampaignAnalyticsModal 
-            campaign={viewingCampaignDetails} 
-            onClose={() => setViewingCampaignDetails(null)} 
+          <CampaignAnalyticsModal
+            campaign={viewingCampaignDetails}
+            onClose={() => setViewingCampaignDetails(null)}
           />
         )}
       </AnimatePresence>

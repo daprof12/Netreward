@@ -87,16 +87,35 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
 
       const { data: available } = await supabase
         .from('campaigns')
-        .select('*')
+        .select(`
+          *,
+          sp:sp_profiles (company_name, logo_url, users (display_name)),
+          isp:isp_profiles (isp_name, logo_url, users (display_name)),
+          svc:services (name, logo_url, category),
+          net:networks (name, logo_url, category)
+        `)
         .eq('status', 'active')
         .limit(50);
 
+      const getSingle = (val: any) => Array.isArray(val) ? val[0] : val;
+
       const enrolledIds = new Set((enrollments || []).map((e: any) => e.campaign_id));
-      const allCampaigns = (available || []).map((c: any) => ({
-        ...c,
-        enrolled: enrolledIds.has(c.id),
-        enrollment: (enrollments || []).find((e: any) => e.campaign_id === c.id),
-      }));
+      const allCampaigns = (available || []).map((c: any) => {
+        const sp = getSingle(c.sp);
+        const isp = getSingle(c.isp);
+        const svc = getSingle(c.svc);
+        const net = getSingle(c.net);
+
+        return {
+          ...c,
+          target_app: svc?.name || net?.name || c.title || 'App Service',
+          logo_url: svc?.logo_url || net?.logo_url || sp?.logo_url || isp?.logo_url || null,
+          provider_name: sp?.company_name || isp?.isp_name || svc?.name || net?.name || 'NetReward Partner',
+          category: svc?.category || net?.category || (sp ? 'Service' : isp ? 'Network' : 'General'),
+          enrolled: enrolledIds.has(c.id),
+          enrollment: (enrollments || []).find((e: any) => e.campaign_id === c.id),
+        };
+      });
 
       set({ campaigns: allCampaigns });
     } catch (e) {

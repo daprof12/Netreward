@@ -4,12 +4,13 @@
   "description": "NetReward Desktop — Earn NRT rewards from your network data",
   "main": "main/main.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:renderer\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "concurrently \"npm run dev:renderer\" \"wait-on http://localhost:5173 && electron . --dev\"",
     "dev:renderer": "cd ../../ && npm run dev",
+    "prebuild": "cd ../../ && npm run build && cd apps/desktop && rm -rf dist && cp -R ../../dist ./dist",
     "build": "tsc -p tsconfig.json && electron-builder",
-    "build:win": "tsc -p tsconfig.json && electron-builder --win",
-    "build:mac": "tsc -p tsconfig.json && electron-builder --mac",
-    "build:linux": "tsc -p tsconfig.json && electron-builder --linux",
+    "build:win": "npm run prebuild && tsc -p tsconfig.json && electron-builder --win",
+    "build:mac": "npm run prebuild && tsc -p tsconfig.json && electron-builder --mac",
+    "build:linux": "npm run prebuild && tsc -p tsconfig.json && electron-builder --linux",
     "pack": "electron-builder --dir"
   },
   "build": {
@@ -23,7 +24,8 @@
     "files": [
       "main/**/*.js",
       "preload/**/*.js",
-      "assets/**/*"
+      "assets/**/*",
+      "dist/**/*"
     ],
     "win": {
       "target": [

@@ -1,4 +1,5 @@
 import React from 'react';
+import nrtLogo from '@/assets/nrt-logo.png';
 
 interface NrtLoaderProps {
   message?: string;
@@ -98,7 +99,7 @@ const NrtLoader: React.FC<NrtLoaderProps> = ({
 
         {/* Logo image */}
         <img
-          src="/nrt-logo.svg"
+          src={nrtLogo}
           alt="NetReward"
           width={dim}
           height={dim}

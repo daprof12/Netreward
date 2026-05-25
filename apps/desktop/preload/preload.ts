@@ -31,6 +31,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   installUpdate: () => ipcRenderer.send('install-update'),
 
+  // Scan2Pay Deep Link
+  onScan2Pay: (callback: (sessionId: string) => void) => {
+    ipcRenderer.on('open-scan2pay', (_event, sessionId) => callback(sessionId));
+  },
+
   // Check if running in Electron
   isElectron: true,
 });

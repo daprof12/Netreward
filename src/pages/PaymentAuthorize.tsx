@@ -4,8 +4,9 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, XCircle, Loader2, AlertCircle,
   ShoppingCart, ArrowRight, Fingerprint, ChevronLeft,
-  ExternalLink, Shield,
+  ExternalLink, Shield, Monitor, Puzzle, Globe, Smartphone
 } from 'lucide-react';
+import nrtLogo from '@/assets/nrt-logo.png';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useWalletStore } from '@/stores/useWalletStore';
@@ -34,6 +35,8 @@ interface PaySession {
 type FlowStep =
   | 'loading'      // fetching session from DB
   | 'login_required' // user not signed in
+  | 'interception_choice' // let user choose web, desktop, or extension
+  | 'waiting_for_app' // waiting for supabase completion from extension/desktop
   | 'review'       // show payment details, await confirmation
   | 'authenticating' // calling RPC
   | 'success'
@@ -64,6 +67,24 @@ export default function PaymentAuthorize() {
   const [showPin, setShowPin] = useState(false);
   const [showBiometric, setShowBiometric] = useState(false);
   const [countdown, setCountdown] = useState('');
+  const [hasExtension, setHasExtension] = useState(false);
+  
+  // Check for extension on mount
+  useEffect(() => {
+    // The content script injects this data attribute
+    const extInstalled = document.documentElement.getAttribute('data-nrt-extension') === 'true';
+    if (extInstalled) setHasExtension(true);
+    
+    // Also listen for postMessage just in case
+    const handleMsg = (e: MessageEvent) => {
+      if (e.source !== window) return;
+      if (e.data?.type === 'NETREWARD_EXTENSION_READY') {
+        setHasExtension(true);
+      }
+    };
+    window.addEventListener('message', handleMsg);
+    return () => window.removeEventListener('message', handleMsg);
+  }, []);
 
   // ── Load session ────────────────────────────────────────────────
 
@@ -143,11 +164,47 @@ export default function PaymentAuthorize() {
         successUrl: returnTo || data.success_url || undefined,
         cancelUrl: data.cancel_url || undefined,
       });
-      setStep('review');
+      setStep('interception_choice');
     } catch {
       setStep('not_found');
     }
   };
+
+  // ── Interception & Waiting ──────────────────────────────────────
+  
+  const openInExtension = () => {
+    window.postMessage({ type: 'NETREWARD_SCAN2PAY_INIT', payload: { sessionId } }, '*');
+    setStep('waiting_for_app');
+  };
+
+  const openInDesktop = () => {
+    window.location.href = `netreward://pay?session=${sessionId}`;
+    setStep('waiting_for_app');
+  };
+
+  useEffect(() => {
+    if (step !== 'waiting_for_app' || !sessionId) return;
+    const channel = supabase.channel(`scan2pay_${sessionId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'scan2pay_sessions', filter: `id=eq.${sessionId}` },
+        (payload) => {
+          if (payload.new.status === 'completed') {
+            setStep('success');
+            if (session?.successUrl) {
+              setTimeout(() => {
+                window.location.href = session.successUrl!;
+              }, 3000);
+            }
+          } else if (payload.new.status === 'failed') {
+            setErrorMsg('Payment failed or was cancelled in the app.');
+            setStep('failed');
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [step, sessionId, session?.successUrl]);
 
   // ── Payment flow ────────────────────────────────────────────────
 
@@ -222,7 +279,7 @@ export default function PaymentAuthorize() {
 
         {/* Brand header */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <img src="/nrt-logo.svg" alt="NetReward" className="w-8 h-8 rounded-lg" />
+          <img src={nrtLogo} alt="NetReward" className="w-8 h-8 rounded-lg" />
           <span className="font-black text-lg text-text-primary">NetReward</span>
           <span className="text-[10px] font-bold bg-accent-primary/10 text-accent-primary px-2 py-0.5 rounded-full ml-1">
             Secure Pay
@@ -264,6 +321,83 @@ export default function PaymentAuthorize() {
                 className="w-full py-4 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2"
               >
                 Sign In <ArrowRight size={18} />
+              </button>
+            </motion.div>
+          )}
+
+          {/* ── Interception Choice ── */}
+          {step === 'interception_choice' && session && (
+            <motion.div
+              key="choice"
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="glass rounded-3xl border border-glass-border p-6 space-y-6 text-center"
+            >
+              <div className="w-16 h-16 bg-accent-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
+                <ShoppingCart size={32} className="text-accent-primary" />
+              </div>
+              
+              <div>
+                <h2 className="text-xl font-bold mb-1">Complete Payment</h2>
+                <p className="text-sm text-text-secondary">
+                  How would you like to confirm your payment to {session.merchantName}?
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {hasExtension && (
+                  <button
+                    onClick={openInExtension}
+                    className="w-full py-4 bg-accent-primary text-primary-foreground font-bold rounded-2xl shadow-lg shadow-accent-primary/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                  >
+                    <Puzzle size={18} /> Open Chrome Extension
+                  </button>
+                )}
+                
+                <button
+                  onClick={openInDesktop}
+                  className={`w-full py-4 bg-bg-secondary text-text-primary font-bold rounded-2xl border border-glass-border flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${!hasExtension ? 'bg-accent-primary/10 text-accent-primary border-accent-primary/30' : ''}`}
+                >
+                  <Monitor size={18} /> Open Desktop App
+                </button>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => setStep('review')}
+                    className="w-full py-3 text-sm text-text-secondary font-medium flex items-center justify-center gap-2 hover:text-text-primary transition-colors"
+                  >
+                    <Globe size={16} /> Continue in Web Browser
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── Waiting for App ── */}
+          {step === 'waiting_for_app' && (
+            <motion.div
+              key="waiting"
+              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center gap-6 py-16 text-center"
+            >
+              <div className="relative w-24 h-24">
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+                  transition={{ repeat: Infinity, duration: 1.4 }}
+                  className="absolute inset-0 rounded-full bg-accent-primary/20"
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-accent-primary">
+                  <Smartphone size={48} className="animate-pulse" />
+                </div>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold mb-1">Check your App</h2>
+                <p className="text-text-secondary text-sm">Please confirm the payment in the NetReward app...</p>
+              </div>
+              <button
+                onClick={() => setStep('interception_choice')}
+                className="mt-4 py-2 px-4 text-sm text-text-secondary font-medium underline"
+              >
+                Go back
               </button>
             </motion.div>
           )}

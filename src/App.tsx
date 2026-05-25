@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { Home, Target, Settings as SettingsIcon, Smartphone, Wallet } from 'lucide-react';
 import Campaigns from '@/pages/Campaigns';
 import Devices from '@/pages/Devices';
@@ -188,6 +188,17 @@ function App() {
     const id = setInterval(checkMaintenance, 30000); // Re-check every 30s
     return () => clearInterval(id);
   }, []);
+  
+  const navigate = useNavigate();
+
+  // Handle Desktop Scan2Pay Deep Linking
+  useEffect(() => {
+    if (window.electronAPI?.onScan2Pay) {
+      window.electronAPI.onScan2Pay((sessionId) => {
+        navigate(`/pay?session=${sessionId}`);
+      });
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (!hasInitialized.current) {

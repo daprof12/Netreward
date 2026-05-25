@@ -195,5 +195,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ success: true });
   }
 
+  if (message.type === 'OPEN_SCAN2PAY') {
+    // Store pending transaction payload in storage so popup can retrieve it
+    chrome.storage.local.set({ pendingScan2Pay: message.payload }, () => {
+      // Open the extension popup in a new window/popup
+      chrome.windows.create({
+        url: 'index.html?scan2pay=true',
+        type: 'popup',
+        width: 380,
+        height: 520,
+        focused: true
+      });
+      sendResponse({ success: true });
+    });
+    return true; // async
+  }
+
   return true; // Keep message channel open for async response
 });

@@ -1,0 +1,371 @@
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { Search, Smartphone, Laptop, Tablet, MapPin, Wifi, CheckCircle2, AlertCircle, X } from 'lucide-react-native';
+import { useIspDevices } from '@/hooks/useAdminDevices';
+import { useIspStore } from '@/stores/useIspStore';
+import { useThemeColors } from '@/theme';
+
+function SignalBars({ strength, colors }: { strength: number, colors: any }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 12 }}>
+      {[1, 2, 3, 4].map(i => (
+        <View
+          key={i}
+          style={{
+            width: 3,
+            borderRadius: 1.5,
+            backgroundColor: i <= strength ? colors.accentPrimary : colors.bgSecondary,
+            height: `${25 + i * 20}%`
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+export default function IspDevicesView() {
+  const colors = useThemeColors();
+  const styles = createStyles(colors);
+
+  const { devices, isLoading } = useIspDevices();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'network' | 'campaign' | 'sp_campaign'>('all');
+  const [filterValue, setFilterValue] = useState<string>('');
+
+  const { networks, campaigns } = useIspStore();
+  const availableNetworks = networks.map(n => n.name).filter(Boolean);
+  const availableCampaigns = campaigns.map(c => c.name).filter(Boolean);
+
+  const availableSpCampaigns = useMemo(() => {
+    if (!devices) return [];
+    const spCamps = new Set<string>();
+    devices.forEach((d: any) => {
+      const sessions = Array.isArray(d.device_data_sessions) ? d.device_data_sessions : [d.device_data_sessions].filter(Boolean);
+      sessions.forEach((s: any) => {
+        const campTitle = Array.isArray(s.campaign) ? s.campaign[0]?.title : s.campaign?.title;
+        if (campTitle && !availableCampaigns.includes(campTitle)) {
+          spCamps.add(campTitle);
+        }
+      });
+    });
+    return Array.from(spCamps).sort();
+  }, [devices, availableCampaigns]);
+
+  const filteredDevices = useMemo(() => {
+    if (!devices) return [];
+    return devices.filter((device: any) => {
+      const matchesSearch = 
+        device.device_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        device.country?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        device.users?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        device.users?.display_name?.toLowerCase().includes(searchQuery.toLowerCase());
+        
+      if (!matchesSearch) return false;
+
+      if (filterType === 'network' && filterValue) {
+        if (device.isp_name !== filterValue) return false;
+      } else if (filterType === 'campaign' && filterValue) {
+        const hasCampaign = device.device_data_sessions?.some((s: any) => {
+          const t = Array.isArray(s.campaign) ? s.campaign[0]?.title : s.campaign?.title;
+          return t === filterValue;
+        });
+        if (!hasCampaign && (device as any)._enrolled_campaign_title !== filterValue) return false;
+      } else if (filterType === 'sp_campaign' && filterValue) {
+        const hasSpCampaign = device.device_data_sessions?.some((s: any) => {
+          const t = Array.isArray(s.campaign) ? s.campaign[0]?.title : s.campaign?.title;
+          return t === filterValue;
+        });
+        if (!hasSpCampaign) return false;
+      }
+
+      return true;
+    });
+  }, [devices, searchQuery, filterType, filterValue]);
+
+  const analyticsSummary = useMemo(() => {
+    let totalData = 0;
+    let totalNrt = 0;
+    filteredDevices.forEach((d: any) => {
+      const sessions = Array.isArray(d.device_data_sessions) ? d.device_data_sessions : [d.device_data_sessions].filter(Boolean);
+      sessions.forEach((s: any) => {
+        totalData += (s.bytes_up || 0) + (s.bytes_down || 0);
+        totalNrt += (s.nrt_awarded || 0);
+      });
+    });
+    const totalDataGB = totalData / 1e9;
+    return {
+      devices: filteredDevices.length,
+      dataGB: totalDataGB.toFixed(6),
+      nrt: totalNrt,
+      cashback: (totalNrt * 0.05).toFixed(6) // 5% of user earnings roughly
+    };
+  }, [filteredDevices]);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Device Monitoring</Text>
+      </View>
+
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Search size={18} color={colors.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by email, device, or location..."
+            placeholderTextColor={colors.textTertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+
+        {/* Filters */}
+        <View style={styles.filterSection}>
+          <View style={styles.filterHeaderRow}>
+            <Text style={styles.filterLabel}>FILTER BY:</Text>
+            <View style={styles.filterTypeGroup}>
+              {(['all', 'network', 'campaign', 'sp_campaign'] as const).map(type => (
+                <Pressable
+                  key={type}
+                  onPress={() => {
+                    setFilterType(type);
+                    setFilterValue('');
+                  }}
+                  style={[styles.filterTypeBtn, filterType === type && styles.filterTypeBtnActive]}
+                >
+                  <Text style={[styles.filterTypeText, filterType === type && styles.filterTypeTextActive]}>
+                    {type === 'sp_campaign' ? 'SP Campaign' : type.charAt(0).toUpperCase() + type.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {filterType !== 'all' && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterValuesScroll}>
+              {(filterType === 'network' ? availableNetworks : filterType === 'campaign' ? availableCampaigns : availableSpCampaigns).map(val => (
+                <Pressable
+                  key={val}
+                  onPress={() => setFilterValue(val === filterValue ? '' : val)}
+                  style={[styles.filterValueBtn, filterValue === val && styles.filterValueBtnActive]}
+                >
+                  <Text style={[styles.filterValueText, filterValue === val && styles.filterValueTextActive]}>{val}</Text>
+                  {filterValue === val && <X size={12} color="#fff" style={{ marginLeft: 4 }} />}
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+
+        {/* Analytics Summary */}
+        {(searchQuery || (filterType !== 'all' && filterValue)) && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.analyticsScroll} contentContainerStyle={{ gap: 12 }}>
+            <View style={styles.analyticsCard}>
+              <Text style={styles.analyticsLabel}>MATCHED DEVICES</Text>
+              <Text style={styles.analyticsValue}>{analyticsSummary.devices}</Text>
+            </View>
+            <View style={styles.analyticsCard}>
+              <Text style={styles.analyticsLabel}>DATA CONSUMED (GB)</Text>
+              <Text style={styles.analyticsValue}>{analyticsSummary.dataGB}</Text>
+            </View>
+            <View style={styles.analyticsCard}>
+              <Text style={styles.analyticsLabel}>NRT EARNED (USERS)</Text>
+              <Text style={[styles.analyticsValue, { color: colors.accentPrimary }]}>{analyticsSummary.nrt.toFixed(6)}</Text>
+            </View>
+            <View style={[styles.analyticsCard, styles.analyticsCardSpecial]}>
+              <Text style={styles.analyticsLabel}>ISP CASHBACK (5%)</Text>
+              <Text style={[styles.analyticsValue, { color: '#10B981' }]}>{analyticsSummary.cashback}</Text>
+            </View>
+          </ScrollView>
+        )}
+
+        {/* Device List */}
+        <View style={styles.deviceList}>
+          {isLoading ? (
+            <ActivityIndicator size="large" color={colors.accentPrimary} style={{ marginTop: 40 }} />
+          ) : filteredDevices.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No devices found matching your criteria.</Text>
+              <Pressable onPress={() => { setSearchQuery(''); setFilterType('all'); setFilterValue(''); }}>
+                <Text style={styles.clearFiltersText}>Clear all filters</Text>
+              </Pressable>
+            </View>
+          ) : (
+            filteredDevices.map((device: any) => {
+              // Calculate device totals
+              let devDataBytes = 0;
+              let devNrt = 0;
+              const sessions = Array.isArray(device.device_data_sessions) ? device.device_data_sessions : [device.device_data_sessions].filter(Boolean);
+              sessions.forEach((s: any) => {
+                devDataBytes += (s.bytes_up || 0) + (s.bytes_down || 0);
+                devNrt += (s.nrt_awarded || 0);
+              });
+              const devDataGB = (devDataBytes / 1e9).toFixed(6);
+
+              const sessionObj = sessions[0];
+              const campaignObjFromSession = sessionObj ? (Array.isArray(sessionObj.campaign) ? sessionObj.campaign[0] : sessionObj.campaign) : null;
+              
+              // Fall back to enrolled campaign title if no session-level campaign exists
+              const campaignTitle = campaignObjFromSession?.title || (device as any)._enrolled_campaign_title || 'None';
+              const isClaimed = devNrt > 0;
+              
+              let lastActiveText = 'Offline';
+              if (device.status === 'active') lastActiveText = 'Active Now';
+              else if (device.updated_at) {
+                const diffM = Math.floor((Date.now() - new Date(device.updated_at).getTime()) / 60000);
+                if (diffM < 60) lastActiveText = `Last active ${diffM}m ago`;
+                else if (diffM < 1440) lastActiveText = `Last active ${Math.floor(diffM/60)}h ago`;
+                else lastActiveText = `Last active ${Math.floor(diffM/1440)}d ago`;
+              }
+
+              return (
+                <View key={device.id} style={[styles.sessionCard, device.status === 'active' && styles.sessionCardActive]}>
+                  {/* Header */}
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardHeaderLeft}>
+                      <View style={[styles.deviceIconWrapper, device.status === 'active' ? styles.iconActive : styles.iconInactive]}>
+                        {device.device_type === 'laptop' ? <Laptop size={20} color={device.status === 'active' ? colors.accentPrimary : colors.textSecondary} /> : 
+                         device.device_type === 'tablet' ? <Tablet size={20} color={device.status === 'active' ? colors.accentPrimary : colors.textSecondary} /> : 
+                         <Smartphone size={20} color={device.status === 'active' ? colors.accentPrimary : colors.textSecondary} />}
+                      </View>
+                      <View>
+                        <Text style={styles.userName}>{(device.users as any)?.display_name || (device.users as any)?.email || 'Unknown User'}</Text>
+                        <View style={styles.deviceMetaRow}>
+                          <Text style={styles.deviceMetaText}>{device.device_name}</Text>
+                          <Text style={styles.deviceMetaDot}>•</Text>
+                          <View style={styles.statusRow}>
+                            <View style={[styles.statusDot, device.status === 'active' ? { backgroundColor: '#10b981' } : { backgroundColor: colors.textSecondary }]} />
+                            <Text style={[styles.statusText, device.status === 'active' && { color: '#10b981' }]}>{lastActiveText}</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                    <View style={[styles.claimBadge, isClaimed ? styles.claimBadgeClaimed : styles.claimBadgeUnclaimed]}>
+                      {isClaimed ? <CheckCircle2 size={10} color="#10b981" /> : <AlertCircle size={10} color="#f59e0b" />}
+                      <Text style={[styles.claimBadgeText, isClaimed ? { color: '#10b981' } : { color: '#f59e0b' }]}>
+                        {isClaimed ? 'CLAIMED' : 'UNCLAIMED'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Middle Info */}
+                  <View style={styles.middleSection}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.middleLabel}>Network</Text>
+                      <Text style={styles.middleValue}>{device.isp_name || 'Unknown'}</Text>
+                    </View>
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <Text style={styles.middleLabel}>Campaign</Text>
+                      <Text style={styles.middleValue} numberOfLines={1}>{campaignTitle}</Text>
+                    </View>
+                  </View>
+
+                  {/* Footer Stats */}
+                  <View style={styles.footerSection}>
+                    <View style={styles.footerStats}>
+                      <View style={{ marginRight: 24 }}>
+                        <Text style={styles.statLabel}>DATA USED</Text>
+                        <Text style={styles.statValue}>{devDataGB} GB</Text>
+                      </View>
+                      <View>
+                        <Text style={styles.statLabel}>NRT EARNED</Text>
+                        <Text style={[styles.statValue, { color: colors.accentPrimary }]}>{devNrt.toFixed(6)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.footerMeta}>
+                      <View style={styles.footerMetaItem}>
+                        <MapPin size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                        <Text style={styles.footerMetaText}>{device.country || 'Unknown'}</Text>
+                      </View>
+                      <View style={[styles.footerMetaItem, styles.ispBadge]}>
+                        <Wifi size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                        <Text style={styles.footerMetaText}>{device.isp_name || 'Unknown ISP'}</Text>
+                        <View style={{ marginLeft: 6 }}>
+                          <SignalBars strength={device.signal_strength ? Math.ceil(device.signal_strength / 25) : 4} colors={colors} />
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+      </ScrollView>
+    </View>
+  );
+}
+
+const createStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, padding: 20 },
+  header: { marginBottom: 20 },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: colors.textPrimary },
+
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgSecondary, borderRadius: 12, paddingHorizontal: 16, height: 48, marginBottom: 20, borderWidth: 1, borderColor: colors.glassBorder },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, color: colors.textPrimary, fontSize: 14 },
+
+  filterSection: { marginBottom: 20 },
+  filterHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  filterLabel: { fontSize: 11, fontWeight: '900', color: colors.textSecondary, letterSpacing: 1 },
+  filterTypeGroup: { flexDirection: 'row', backgroundColor: colors.bgSecondary, borderRadius: 8, padding: 4 },
+  filterTypeBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  filterTypeBtnActive: { backgroundColor: colors.accentPrimary },
+  filterTypeText: { fontSize: 12, fontWeight: 'bold', color: colors.textSecondary },
+  filterTypeTextActive: { color: '#fff' },
+  
+  filterValuesScroll: { marginBottom: 8 },
+  filterValueBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.bgSecondary, borderWidth: 1, borderColor: colors.glassBorder, marginRight: 8 },
+  filterValueBtnActive: { backgroundColor: colors.accentPrimary, borderColor: colors.accentPrimary },
+  filterValueText: { fontSize: 12, fontWeight: 'bold', color: colors.textSecondary },
+  filterValueTextActive: { color: '#fff' },
+
+  analyticsScroll: { marginBottom: 20 },
+  analyticsCard: { backgroundColor: colors.bgSecondary, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.glassBorder, minWidth: 140 },
+  analyticsCardSpecial: { overflow: 'hidden' },
+  analyticsLabel: { fontSize: 10, fontWeight: '900', color: colors.textSecondary, marginBottom: 4, letterSpacing: 0.5 },
+  analyticsValue: { fontSize: 20, fontWeight: 'bold', color: colors.textPrimary },
+
+  deviceList: { flex: 1 },
+  emptyContainer: { alignItems: 'center', paddingVertical: 40 },
+  emptyText: { fontSize: 14, color: colors.textSecondary, marginBottom: 12 },
+  clearFiltersText: { fontSize: 14, fontWeight: 'bold', color: colors.accentPrimary },
+
+  sessionCard: { backgroundColor: colors.bgSecondary, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.glassBorder },
+  sessionCardActive: { borderColor: 'rgba(16, 185, 129, 0.3)' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  deviceIconWrapper: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  iconActive: { backgroundColor: 'rgba(16, 185, 129, 0.1)' },
+  iconInactive: { backgroundColor: colors.bgPrimary },
+  userName: { fontSize: 14, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 2 },
+  deviceMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  deviceMetaText: { fontSize: 11, color: colors.textSecondary },
+  deviceMetaDot: { fontSize: 11, color: colors.glassBorder },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 11, color: colors.textSecondary },
+  
+  claimBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6 },
+  claimBadgeClaimed: { backgroundColor: 'rgba(16, 185, 129, 0.1)' },
+  claimBadgeUnclaimed: { backgroundColor: 'rgba(245, 158, 11, 0.1)' },
+  claimBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+
+  middleSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bgPrimary, borderRadius: 8, padding: 12, marginBottom: 16 },
+  middleLabel: { fontSize: 11, color: colors.textSecondary, fontWeight: 'bold', marginBottom: 2 },
+  middleValue: { fontSize: 13, fontWeight: 'bold', color: colors.textPrimary },
+
+  footerSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: 4 },
+  footerStats: { flexDirection: 'row' },
+  statLabel: { fontSize: 9, fontWeight: '900', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: 4 },
+  statValue: { fontSize: 14, fontWeight: 'bold', color: colors.textPrimary },
+  
+  footerMeta: { alignItems: 'flex-end', gap: 6 },
+  footerMetaItem: { flexDirection: 'row', alignItems: 'center' },
+  footerMetaText: { fontSize: 11, color: colors.textSecondary },
+  ispBadge: { backgroundColor: colors.bgPrimary, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4 },
+});

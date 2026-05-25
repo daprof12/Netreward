@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Wallet, Activity, Zap, ArrowUpDown, TrendingUp, Wifi } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useTrackingStore } from '../stores/useTrackingStore';
+import { useSettingsStore } from '../stores/useSettingsStore';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -13,6 +14,7 @@ function formatBytes(bytes: number): string {
 
 export default function DashboardPage() {
   const { profile } = useAuthStore();
+  const { currency } = useSettingsStore();
   const { isTracking, nrtBalance, todayBytesUp, todayBytesDown, todayNrtEarned, activeCampaignCount, toggleTracking, fetchDashboardData } = useTrackingStore();
 
   useEffect(() => {
@@ -22,6 +24,12 @@ export default function DashboardPage() {
   }, [profile?.id]);
 
   const totalBytes = todayBytesUp + todayBytesDown;
+  
+  // Basic mock conversion rate for display purposes only
+  const conversionRates: Record<string, number> = { USD: 1.0, EUR: 0.92, GBP: 0.79, NGN: 1500.0 };
+  const rate = conversionRates[currency] || 1.0;
+  const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '₦';
+  const equivalentBalance = (nrtBalance * 0.1 * rate).toFixed(2);
 
   return (
     <div className="page fade-in">
@@ -48,9 +56,12 @@ export default function DashboardPage() {
           </div>
           <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>NRT Balance</span>
         </div>
-        <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em' }}>
+        <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', display: 'flex', alignItems: 'baseline' }}>
           {nrtBalance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
           <span style={{ fontSize: 14, color: 'var(--text-secondary)', fontWeight: 700, marginLeft: 6 }}>NRT</span>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4, fontWeight: 500 }}>
+          ≈ {currencySymbol}{equivalentBalance} {currency}
         </div>
       </div>
 

@@ -1,12 +1,19 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
 import * as SecureStore from 'expo-secure-store';
+import type { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+import { useWalletStore } from './useWalletStore';
+import { useP2PStore } from './useP2PStore';
+import { useNotificationStore } from './useNotificationStore';
+import { useSpStore } from './useSpStore';
+import { useIspStore } from './useIspStore';
 
 export type UserRole = 'user' | 'sp' | 'isp' | 'admin';
 
 interface UserProfile {
   id: string;
   email: string;
+  phone: string | null;
   role: UserRole;
   active_role: UserRole;
   display_name: string | null;
@@ -17,111 +24,147 @@ interface UserProfile {
 }
 
 interface AuthState {
+  user: User | null;
   profile: UserProfile | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
+  role: UserRole;
+  active_role: UserRole;
+  session: Session | null;
   isOnboarded: boolean;
-  initialize: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>;
-  signOut: () => Promise<void>;
+  isLoading: boolean;
+  setUser: (user: User | null, role?: UserRole) => void;
+  setSession: (session: Session | null) => void;
+  setHasOnboarded: (status: boolean) => void;
+  setLoading: (status: boolean) => void;
+  initialize: () => void;
   refreshProfile: () => Promise<void>;
-  setOnboarded: () => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
+  user: null,
   profile: null,
-  isLoading: true,
-  isAuthenticated: false,
+  role: 'user',
+  active_role: 'user',
+  session: null,
   isOnboarded: false,
+  isLoading: true,
+  setUser: (user, role) => set((state) => ({ 
+    user, 
+    role: role || (user?.user_metadata?.role as UserRole) || 'user',
+    active_role: (user?.user_metadata?.active_role as UserRole) || role || (user?.user_metadata?.role as UserRole) || 'user'
+  })),
+  setSession: (session) => set({ session }),
+  setHasOnboarded: (status) => {
+    SecureStore.setItemAsync('hasOnboarded', String(status));
+    set({ isOnboarded: status });
+  },
+  setLoading: (status) => set({ isLoading: status }),
+  initialize: () => {
+    SecureStore.getItemAsync('hasOnboarded').then((val) => {
+      if (val === 'true') set({ isOnboarded: true });
+    });
+    let walletCleanup: (() => void) | null = null;
 
-  initialize: async () => {
-    set({ isLoading: true });
-    try {
-      // Check onboarding state
-      const onboarded = await SecureStore.getItemAsync('hasOnboarded');
-      set({ isOnboarded: onboarded === 'true' });
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        if (data) {
-          set({ profile: data as UserProfile, isAuthenticated: true });
-        }
+    const fetchProfile = async (session: Session | null) => {
+      if (walletCleanup) {
+        walletCleanup();
+        walletCleanup = null;
       }
-    } catch (e) {
-      console.error('Auth init error:', e);
-    } finally {
-      set({ isLoading: false });
-    }
 
-    // Listen for auth state changes
-    supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        set({ profile: data as UserProfile || null, isAuthenticated: !!data });
+      if (!session?.user) {
+        set({ session: null, user: null, profile: null, role: 'user', active_role: 'user', isLoading: false });
+        return;
+      }
+      
+      const { profile, role: currentRole, active_role: currentActiveRole } = get();
+      
+      // If we already have a profile in state, preserve the current role to prevent UI flashing
+      // Otherwise, try to get it from JWT metadata, fallback to 'user'
+      const role = profile ? currentRole : ((session.user.user_metadata?.role as UserRole) || 'user');
+      const active_role = profile ? currentActiveRole : ((session.user.user_metadata?.active_role as UserRole) || role);
+      
+      // ONLY set isLoading to true if we don't have a profile yet.
+      // This prevents the global "spinner" from clearing the UI during navigations.
+      if (!profile) {
+        set({ session, user: session.user, role, active_role, isLoading: true });
       } else {
-        set({ profile: null, isAuthenticated: false });
+        set({ session, user: session.user, role, active_role });
       }
+      
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+          
+        if (!error && data) {
+          set({ profile: data, role: data.role as UserRole, active_role: (data.active_role || data.role) as UserRole });
+          
+          // Fetch and subscribe to wallet
+          await useWalletStore.getState().fetchBalance(session.user.id);
+          walletCleanup = useWalletStore.getState().subscribeToWallet(session.user.id);
+
+          // Fetch and subscribe to P2P
+          await useP2PStore.getState().fetchOffers();
+          await useP2PStore.getState().fetchOrders(session.user.id);
+          await useP2PStore.getState().fetchPaymentAccounts(session.user.id);
+          const p2pCleanup = useP2PStore.getState().subscribeToOrders(session.user.id);
+          await useNotificationStore.getState().fetchNotifications(session.user.id);
+          const notifCleanup = useNotificationStore.getState().subscribeToNotifications(session.user.id);
+          
+          const originalCleanup = walletCleanup;
+          walletCleanup = () => {
+            originalCleanup?.();
+            p2pCleanup();
+            notifCleanup();
+          };
+
+          // Initialize Role-specific stores
+          if (role === 'sp') {
+            await useSpStore.getState().initialize(session.user.id);
+          } else if (role === 'isp') {
+            await useIspStore.getState().initialize(session.user.id);
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching profile', e);
+      } finally {
+        set({ isLoading: false });
+      }
+    };
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetchProfile(session);
+    });
+
+    // Listen for auth changes
+    supabase.auth.onAuthStateChange((_event, session) => {
+      fetchProfile(session);
     });
   },
-
-  signIn: async (email, password) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return { error: error.message };
-      return { error: null };
-    } catch (e: any) {
-      return { error: e.message || 'Sign in failed' };
-    }
-  },
-
-  signUp: async (email, password, displayName) => {
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { display_name: displayName, role: 'user' } },
-      });
-      if (error) return { error: error.message };
-      return { error: null };
-    } catch (e: any) {
-      return { error: e.message || 'Sign up failed' };
-    }
-  },
-
-  signOut: async () => {
-    await supabase.auth.signOut();
-    set({ profile: null, isAuthenticated: false });
-  },
-
   refreshProfile: async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { session } = get();
     if (!session?.user) return;
-
-    const { data } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', session.user.id)
-      .maybeSingle();
-
-    if (data) {
-      set({ profile: data as UserProfile });
+    
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+        
+      if (!error && data) {
+        set({ profile: data, role: data.role as UserRole, active_role: (data.active_role || data.role) as UserRole });
+      }
+    } catch (e) {
+      console.error('Error refreshing profile', e);
     }
   },
-
-  setOnboarded: async () => {
-    await SecureStore.setItemAsync('hasOnboarded', 'true');
-    set({ isOnboarded: true });
-  },
+  signOut: async () => {
+    set({ isLoading: true });
+    await supabase.auth.signOut();
+    set({ user: null, profile: null, session: null, role: 'user', active_role: 'user', isLoading: false });
+  }
 }));

@@ -1,12 +1,12 @@
-import { User, ExternalLink, LogOut, Shield, Bell } from 'lucide-react';
+import { User, ExternalLink, LogOut, Shield, Bell, Moon, Sun, Globe, DollarSign, Gamepad2 } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useTrackingStore } from '../stores/useTrackingStore';
+import { useSettingsStore } from '../stores/useSettingsStore';
 
 export default function SettingsPage() {
   const { profile, signOut } = useAuthStore();
   const { isTracking, toggleTracking } = useTrackingStore();
-
-  const roleLabel = { user: 'Standard User', sp: 'Service Provider', isp: 'ISP Network', admin: 'Administrator' };
+  const { theme, setTheme, language, setLanguage, currency, setCurrency } = useSettingsStore();
 
   return (
     <div className="page fade-in">
@@ -35,13 +35,12 @@ export default function SettingsPage() {
           </p>
           <p style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{profile?.email}</p>
         </div>
-        <span className="badge badge-role" style={{ flexShrink: 0 }}>
-          {roleLabel[profile?.active_role || profile?.role || 'user']}
-        </span>
+        <span className="badge badge-role" style={{ flexShrink: 0 }}>Standard User</span>
       </div>
 
       {/* Settings List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--glass-border)', overflow: 'hidden' }}>
+        
         {/* Tracking Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--glass-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -54,6 +53,73 @@ export default function SettingsPage() {
           <div className={`toggle ${isTracking ? 'active' : ''}`} onClick={toggleTracking}>
             <div className="toggle-dot" />
           </div>
+        </div>
+
+        {/* Theme Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--glass-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {theme === 'dark' ? <Moon size={16} color="#8b5cf6" /> : <Sun size={16} color="#f59e0b" />}
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 700 }}>Theme</p>
+              <p style={{ fontSize: 9, color: 'var(--text-secondary)' }}>Light or Dark mode</p>
+            </div>
+          </div>
+          <div className={`toggle ${theme === 'light' ? 'active' : ''}`} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            <div className="toggle-dot" />
+          </div>
+        </div>
+
+        {/* Language */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--glass-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Globe size={16} color="#3b82f6" />
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 700 }}>Language</p>
+            </div>
+          </div>
+          <select 
+            value={language} 
+            onChange={(e) => setLanguage(e.target.value as any)}
+            style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', borderRadius: 6, padding: '4px 8px', fontSize: 11, outline: 'none' }}
+          >
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+          </select>
+        </div>
+
+        {/* Currency */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--glass-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <DollarSign size={16} color="#10b981" />
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 700 }}>Currency</p>
+            </div>
+          </div>
+          <select 
+            value={currency} 
+            onChange={(e) => setCurrency(e.target.value as any)}
+            style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', borderRadius: 6, padding: '4px 8px', fontSize: 11, outline: 'none' }}
+          >
+            <option value="USD">USD ($)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="NGN">NGN (₦)</option>
+          </select>
+        </div>
+
+        {/* Gaming Accounts */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--glass-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Gamepad2 size={16} color="#ec4899" />
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 700 }}>Gaming Accounts</p>
+              <p style={{ fontSize: 9, color: 'var(--text-secondary)' }}>Manage linked game profiles</p>
+            </div>
+          </div>
+          <button style={{ background: 'transparent', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', borderRadius: 6, padding: '4px 8px', fontSize: 10, cursor: 'pointer' }}>
+            Manage
+          </button>
         </div>
 
         {/* Notifications */}
@@ -87,26 +153,6 @@ export default function SettingsPage() {
             <p style={{ fontSize: 9, color: 'var(--text-secondary)' }}>netreward.online</p>
           </div>
         </button>
-
-        {/* Switch Role */}
-        {(profile?.role === 'sp' || profile?.role === 'isp' || profile?.role === 'admin') && (
-          <button
-            onClick={() => window.open(`https://netreward.online/${profile.role === 'admin' ? 'admin' : `dashboard/${profile.role}`}`, '_blank')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '12px 14px',
-              background: 'transparent', border: 'none',
-              cursor: 'pointer', width: '100%',
-              borderBottom: '1px solid var(--glass-border)',
-            }}
-          >
-            <User size={16} color="var(--accent-primary)" />
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Switch Role Context</p>
-              <p style={{ fontSize: 9, color: 'var(--text-secondary)' }}>Open {roleLabel[profile.role]} Dashboard</p>
-            </div>
-          </button>
-        )}
 
         {/* Sign Out */}
         <button

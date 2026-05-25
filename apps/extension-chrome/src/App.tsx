@@ -1,20 +1,27 @@
 import { useState, useEffect } from 'react';
-import { Home, Zap, Settings, Loader2, Wallet } from 'lucide-react';
+import { Home, Target, Settings, Loader2, Wallet } from 'lucide-react';
 import { useAuthStore } from './stores/useAuthStore';
+import { useSettingsStore } from './stores/useSettingsStore';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import CampaignsPage from './pages/CampaignsPage';
 import WalletPage from './pages/WalletPage';
 import SettingsPage from './pages/SettingsPage';
+import OnboardingPage from './pages/OnboardingPage';
+import Scan2PayConfirmation from './pages/Scan2PayConfirmation';
 
 type Tab = 'dashboard' | 'campaigns' | 'wallet' | 'settings';
 
 export default function App() {
-  const { profile, isLoading, isAuthenticated, initialize } = useAuthStore();
+  const { profile, isLoading, isAuthenticated, initialize, hasCompletedOnboarding } = useAuthStore();
+  const { initializeSettings } = useSettingsStore();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  
+  const isScan2Pay = window.location.search.includes('scan2pay=true');
 
   useEffect(() => {
     initialize();
+    initializeSettings();
   }, []);
 
   // Loading state
@@ -34,9 +41,19 @@ export default function App() {
     return <LoginPage />;
   }
 
+  // Scan2Pay Flow overrides everything else
+  if (isScan2Pay) {
+    return <Scan2PayConfirmation />;
+  }
+
+  // Not completed onboarding
+  if (!hasCompletedOnboarding) {
+    return <OnboardingPage />;
+  }
+
   // Authenticated — show tabbed interface
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 520 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
       <div className="header">
         <div className="header-logo">
@@ -49,7 +66,7 @@ export default function App() {
       </div>
 
       {/* Page Content */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {activeTab === 'dashboard' && <DashboardPage />}
         {activeTab === 'campaigns' && <CampaignsPage />}
         {activeTab === 'wallet' && <WalletPage />}
@@ -60,7 +77,7 @@ export default function App() {
       <div className="nav">
         {([
           { id: 'dashboard' as Tab, icon: Home, label: 'Dashboard' },
-          { id: 'campaigns' as Tab, icon: Zap, label: 'Campaigns' },
+          { id: 'campaigns' as Tab, icon: Target, label: 'Campaigns' },
           { id: 'wallet' as Tab, icon: Wallet, label: 'Wallet' },
           { id: 'settings' as Tab, icon: Settings, label: 'Settings' },
         ]).map(tab => (

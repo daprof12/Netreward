@@ -57,9 +57,9 @@ export default function SpDashboard() {
 
   const chartData = campaignStats.map(s => ({
     name: new Date(s.date).toLocaleDateString(undefined, { weekday: 'short' }),
-    value: chartView === 'campaigns' ? s.total_users_reached : 
-           chartView === 'cashback' ? Number(s.total_nrt_distributed) * 0.1 : 
-           Number(s.total_nrt_distributed),
+    value: chartView === 'campaigns' ? s.total_users_reached :
+      chartView === 'cashback' ? Number(s.total_nrt_distributed) * 0.1 :
+        Number(s.total_nrt_distributed),
   }));
 
   // Aggregated totals
@@ -67,15 +67,22 @@ export default function SpDashboard() {
   const totalUsersReached = campaignStats.reduce((sum, stat) => sum + Number(stat.total_users_reached || 0), 0);
   const revenueNrt = totalNrtDistributed * 0.10;
 
+  // Get time-based greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User';
+
+
   return (
     <motion.div
       className="space-y-6 pb-24 p-4 pt-8"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
     >
       <div className="flex justify-between items-center">
         <div>
-          <p className="text-sm text-text-secondary">{profile?.display_name || 'Partner Portal'} 👋</p>
+          <p className="text-sm text-text-secondary">{greeting} 👋</p>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-text-primary capitalize">{profile?.display_name || user?.email?.split('@')[0] || 'Partner'}</h1>
             <span className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-[10px] font-black rounded-md border border-blue-500/20 tracking-tighter">SP</span>
@@ -129,7 +136,7 @@ export default function SpDashboard() {
       {/* SDK Integration Status Card */}
       <div className="bg-bg-card border border-glass-border rounded-[20px] p-5 mt-6 relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-accent-primary/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
-        
+
         {profile?.kyc_status !== 'verified' ? (
           <div className="flex flex-col text-center items-center py-4">
             <div className="w-16 h-16 bg-bg-secondary rounded-full flex items-center justify-center mb-4">
@@ -156,13 +163,12 @@ export default function SpDashboard() {
                   NetReward Tracker SDK must be active for your campaigns to correctly report data usage. Earn {useSystemStore.getState().settings.spCashbackPercentage}% NRT back.
                 </p>
               </div>
-              
+
               <div className="flex items-center gap-2">
-                <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${
-                  sdkStatus === 'verified' ? 'bg-green-500/10 text-green-500' : 
-                  sdkStatus === 'test_pending' ? 'bg-amber-500/10 text-amber-500' : 
-                  'bg-red-500/10 text-red-500'
-                }`}>
+                <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${sdkStatus === 'verified' ? 'bg-green-500/10 text-green-500' :
+                    sdkStatus === 'test_pending' ? 'bg-amber-500/10 text-amber-500' :
+                      'bg-red-500/10 text-red-500'
+                  }`}>
                   {sdkStatus.replace('_', ' ')}
                 </span>
                 {sdkStatus === 'verified' && (
@@ -192,7 +198,7 @@ export default function SpDashboard() {
                           {services[activeServiceIndex]?.name || 'Service'}
                         </p>
                         <code className="text-xs font-mono text-text-primary">
-                          {services[activeServiceIndex]?.apiKey 
+                          {services[activeServiceIndex]?.apiKey
                             ? `${services[activeServiceIndex].apiKey.slice(0, 12)}••••${services[activeServiceIndex].apiKey.slice(-4)}`
                             : 'No API key'}
                         </code>
@@ -207,11 +213,10 @@ export default function SpDashboard() {
                         <button
                           key={i}
                           onClick={() => setActiveServiceIndex(i)}
-                          className={`transition-all duration-200 rounded-full ${
-                            i === activeServiceIndex 
-                              ? 'w-4 h-1.5 bg-accent-primary' 
+                          className={`transition-all duration-200 rounded-full ${i === activeServiceIndex
+                              ? 'w-4 h-1.5 bg-accent-primary'
                               : 'w-1.5 h-1.5 bg-text-secondary/30 hover:bg-text-secondary/50'
-                          }`}
+                            }`}
                         />
                       ))}
                     </div>
@@ -230,7 +235,7 @@ export default function SpDashboard() {
                   </div>
                 </div>
               )}
-              
+
               <div className="flex justify-between items-center text-xs">
                 <div className="flex items-center gap-1.5 text-text-secondary">
                   <Activity size={14} />
@@ -254,11 +259,11 @@ export default function SpDashboard() {
             </h3>
             <button className="p-2 hover:bg-bg-secondary rounded-full transition-colors text-text-secondary"><Info size={16} /></button>
           </div>
-          
+
           {isSpTelemetryLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="animate-spin text-text-secondary" /></div>
           ) : (!spTelemetry || spTelemetry.length === 0) ? (
-            <EmptyState 
+            <EmptyState
               icon={<TrendingUpIcon size={24} />}
               title="Insufficient Data"
               message="Ensure your SDK is integrated correctly to start tracking campaign ROI."
@@ -270,14 +275,14 @@ export default function SpDashboard() {
                 <div className="bg-bg-secondary/30 p-4 rounded-2xl border border-glass-border">
                   <p className="text-[10px] text-text-secondary font-black uppercase mb-1">Avg. Conversion</p>
                   <h4 className="text-xl font-black text-text-primary">
-                    {(spTelemetry.reduce((sum, t) => sum + (t.views > 0 ? (t.conversions/t.views)*100 : 0), 0) / spTelemetry.length).toFixed(1)}%
+                    {(spTelemetry.reduce((sum, t) => sum + (t.views > 0 ? (t.conversions / t.views) * 100 : 0), 0) / spTelemetry.length).toFixed(1)}%
                   </h4>
                   <p className="text-[10px] text-green-500 font-bold mt-1">Live tracking active</p>
                 </div>
                 <div className="bg-bg-secondary/30 p-4 rounded-2xl border border-glass-border">
                   <p className="text-[10px] text-text-secondary font-black uppercase mb-1">Cost per Reward</p>
                   <h4 className="text-xl font-black text-text-primary">
-                    {(spTelemetry.reduce((sum, t) => sum + (t.conversions > 0 ? t.total_cost_nrt/t.conversions : 0), 0) / spTelemetry.length).toFixed(3)} NRT
+                    {(spTelemetry.reduce((sum, t) => sum + (t.conversions > 0 ? t.total_cost_nrt / t.conversions : 0), 0) / spTelemetry.length).toFixed(3)} NRT
                   </h4>
                   <p className="text-[10px] text-blue-500 font-bold mt-1">Efficient Range</p>
                 </div>
@@ -293,7 +298,7 @@ export default function SpDashboard() {
                 ).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([country, views], i) => (
                   <div key={country} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${i===0 ? 'bg-green-500' : i===1 ? 'bg-blue-500' : 'bg-purple-500'}`} />
+                      <div className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-green-500' : i === 1 ? 'bg-blue-500' : 'bg-purple-500'}`} />
                       <span className="text-sm font-semibold">{country}</span>
                     </div>
                     <div className="flex items-center gap-4">
@@ -318,7 +323,7 @@ export default function SpDashboard() {
           {isSpTelemetryLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="animate-spin text-text-secondary" /></div>
           ) : (!spTelemetry || spTelemetry.length === 0) ? (
-            <EmptyState 
+            <EmptyState
               icon={<Users size={24} />}
               title="Insufficient Data"
               message="Demographic breakdowns will appear here once campaigns begin receiving tracking payloads."
@@ -326,14 +331,14 @@ export default function SpDashboard() {
             />
           ) : (() => {
             const totalViews = spTelemetry.reduce((s, t) => s + t.views, 0);
-            if (totalViews === 0) return <EmptyState icon={<Users size={24}/>} title="No views yet" message="Your campaigns have not generated tracking events." className="border-none bg-transparent" />;
-            
+            if (totalViews === 0) return <EmptyState icon={<Users size={24} />} title="No views yet" message="Your campaigns have not generated tracking events." className="border-none bg-transparent" />;
+
             const mobile = spTelemetry.filter(t => t.device_type === 'Mobile App').reduce((s, t) => s + t.views, 0);
             const ext = spTelemetry.filter(t => t.device_type === 'Chrome Extension').reduce((s, t) => s + t.views, 0);
             const desktop = spTelemetry.filter(t => t.device_type === 'Desktop App').reduce((s, t) => s + t.views, 0);
-            
+
             const categories = Array.from(new Set(spTelemetry.map(t => t.interest_category).filter(Boolean)));
-            
+
             return (
               <div className="space-y-5">
                 <div>
@@ -343,9 +348,9 @@ export default function SpDashboard() {
                   </div>
                   <div className="space-y-2">
                     {[
-                      { label: 'Mobile App', value: ((mobile/totalViews)*100).toFixed(1), color: 'bg-accent-primary' },
-                      { label: 'Chrome Extension', value: ((ext/totalViews)*100).toFixed(1), color: 'bg-[#3B82F6]' },
-                      { label: 'Desktop App', value: ((desktop/totalViews)*100).toFixed(1), color: 'bg-[#8B5CF6]' },
+                      { label: 'Mobile App', value: ((mobile / totalViews) * 100).toFixed(1), color: 'bg-accent-primary' },
+                      { label: 'Chrome Extension', value: ((ext / totalViews) * 100).toFixed(1), color: 'bg-[#3B82F6]' },
+                      { label: 'Desktop App', value: ((desktop / totalViews) * 100).toFixed(1), color: 'bg-[#8B5CF6]' },
                     ].map(item => (
                       <div key={item.label} className="space-y-1">
                         <div className="flex justify-between text-xs">
@@ -361,17 +366,17 @@ export default function SpDashboard() {
                 </div>
 
                 <div className="pt-4 border-t border-glass-border">
-                   <div className="flex items-center gap-2 text-xs text-text-secondary mb-3">
-                      <MapPin size={14} />
-                      <span className="font-bold uppercase">Top Interest Categories</span>
-                   </div>
-                   <div className="flex flex-wrap gap-2">
-                      {categories.map(tag => (
-                        <span key={tag} className="px-3 py-1 bg-bg-secondary border border-glass-border rounded-full text-[10px] font-bold text-text-primary">
-                          {tag}
-                        </span>
-                      ))}
-                   </div>
+                  <div className="flex items-center gap-2 text-xs text-text-secondary mb-3">
+                    <MapPin size={14} />
+                    <span className="font-bold uppercase">Top Interest Categories</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map(tag => (
+                      <span key={tag} className="px-3 py-1 bg-bg-secondary border border-glass-border rounded-full text-[10px] font-bold text-text-primary">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             );
@@ -400,12 +405,12 @@ export default function SpDashboard() {
         {isSpHeatmapLoading ? (
           <div className="flex justify-center py-6"><Loader2 className="animate-spin text-text-secondary" /></div>
         ) : (!spHeatmap || spHeatmap.length === 0 || spHeatmap.every(d => d.intensity === 0)) ? (
-           <EmptyState 
-             icon={<Activity size={24} />}
-             title="No Platform Activity"
-             message="Your platform activity will appear here once users start engaging with your campaigns."
-             className="border-none bg-transparent"
-           />
+          <EmptyState
+            icon={<Activity size={24} />}
+            title="No Platform Activity"
+            message="Your platform activity will appear here once users start engaging with your campaigns."
+            className="border-none bg-transparent"
+          />
         ) : (
           <div className="flex gap-[3px] overflow-x-auto pb-2 scrollbar-hide">
             {/* Day labels */}
@@ -424,7 +429,7 @@ export default function SpDashboard() {
                     const dataIndex = weekIndex * 7 + dayIndex;
                     const dayData = spHeatmap[dataIndex];
                     if (!dayData) return <div key={dayIndex} className="aspect-square w-full rounded-[2px] bg-bg-secondary/20" />;
-                    
+
                     const intensity = dayData.intensity;
                     return (
                       <div
@@ -433,10 +438,10 @@ export default function SpDashboard() {
                         className="aspect-square w-full rounded-[2px] transition-colors hover:ring-1 hover:ring-text-secondary/30"
                         style={{
                           backgroundColor: intensity === 4 ? 'var(--accent-primary)' :
-                                           intensity === 3 ? 'rgba(var(--accent-primary-rgb), 0.75)' :
-                                           intensity === 2 ? 'rgba(var(--accent-primary-rgb), 0.5)' :
-                                           intensity === 1 ? 'rgba(var(--accent-primary-rgb), 0.25)' :
-                                           'var(--bg-secondary)'
+                            intensity === 3 ? 'rgba(var(--accent-primary-rgb), 0.75)' :
+                              intensity === 2 ? 'rgba(var(--accent-primary-rgb), 0.5)' :
+                                intensity === 1 ? 'rgba(var(--accent-primary-rgb), 0.25)' :
+                                  'var(--bg-secondary)'
                         }}
                       />
                     );
@@ -498,7 +503,7 @@ export default function SpDashboard() {
           )}
           {chartData.length === 0 || chartData.every(d => d.value === 0) ? (
             <div className="absolute inset-0 flex items-center justify-center border border-glass-border rounded-xl">
-              <EmptyState 
+              <EmptyState
                 icon={<BarChart3 size={24} />}
                 title="No Analytics Data"
                 message="Your timeline data will populate once your campaigns are active."
@@ -506,7 +511,7 @@ export default function SpDashboard() {
               />
             </div>
           ) : (
-            <AnalyticsChart 
+            <AnalyticsChart
               data={chartData}
               type={chartType}
               color={chartView === 'campaigns' ? '#3B82F6' : chartView === 'checkout' ? '#10B981' : '#8B5CF6'}
@@ -522,11 +527,10 @@ export default function SpDashboard() {
             <button
               key={f}
               onClick={() => setTimeFilter(f)}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                timeFilter === f 
-                  ? 'bg-accent-primary text-white shadow-sm' 
+              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${timeFilter === f
+                  ? 'bg-accent-primary text-white shadow-sm'
                   : 'text-text-secondary hover:text-text-primary'
-              }`}
+                }`}
             >
               {f}
             </button>
@@ -548,15 +552,15 @@ export default function SpDashboard() {
           </div>
         ) : (
           runningCampaigns.slice(0, 3).map((camp) => (
-            <button 
-              key={camp.id} 
+            <button
+              key={camp.id}
               onClick={() => setViewingCampaignDetails(camp)}
               className="w-full text-left glass p-4 rounded-xl border border-glass-border flex justify-between items-center active:scale-[0.98] transition-transform hover:bg-glass-bg"
             >
               <div>
                 <h4 className="font-semibold text-text-primary text-sm">{camp.name}</h4>
                 <p className="text-xs text-text-secondary mt-1">
-                  <span className="w-2 h-2 inline-block rounded-full bg-accent-primary animate-pulse mr-1"></span> 
+                  <span className="w-2 h-2 inline-block rounded-full bg-accent-primary animate-pulse mr-1"></span>
                   Running
                 </p>
               </div>
@@ -569,18 +573,18 @@ export default function SpDashboard() {
         )}
       </div>
 
-      <LogoutConfirmModal 
-        isOpen={showLogoutConfirm} 
-        onClose={() => setShowLogoutConfirm(false)} 
-        onConfirm={handleLogout} 
+      <LogoutConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={handleLogout}
       />
 
       {/* Analytics Modal Component */}
       <AnimatePresence>
         {viewingCampaignDetails && (
-          <CampaignAnalyticsModal 
-            campaign={viewingCampaignDetails} 
-            onClose={() => setViewingCampaignDetails(null)} 
+          <CampaignAnalyticsModal
+            campaign={viewingCampaignDetails}
+            onClose={() => setViewingCampaignDetails(null)}
           />
         )}
       </AnimatePresence>
