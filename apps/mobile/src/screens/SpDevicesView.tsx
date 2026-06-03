@@ -288,14 +288,14 @@ export default function SpDevicesView() {
                         <Text style={[styles.footerMetaText, { flexShrink: 1 }]} numberOfLines={1}>{device.country || 'Unknown'}</Text>
                       </View>
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: 'rgba(255,255,255,0.03)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, width: '100%' }}>
-                      <Wifi size={12} color={colors.textSecondary} style={{ marginRight: 6, flexShrink: 0 }} />
-                      <View style={{ flex: 1, overflow: 'hidden' }}>
-                        <MarqueeText style={[styles.footerMetaText, { fontSize: 11 }]}>{device.isp_name || 'Unknown ISP'}</MarqueeText>
-                      </View>
-                      <View style={{ marginLeft: 8, flexShrink: 0 }}>
-                         <SignalBars strength={dynamicStatus === 'active' ? 4 : dynamicStatus === 'idle' ? 2 : 1} colors={colors} />
-                      </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: colors.bgPrimary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, width: '100%' }}>
+                    <Wifi size={12} color={colors.textSecondary} style={{ marginRight: 6, flexShrink: 0 }} />
+                    <View style={{ flex: 1, overflow: 'hidden' }}>
+                      <MarqueeText style={[styles.footerMetaText, { fontSize: 11 }]}>{device.isp_name || 'Unknown ISP'}</MarqueeText>
+                    </View>
+                    <View style={{ marginLeft: 8, flexShrink: 0 }}>
+                       <SignalBars strength={dynamicStatus === 'active' ? 4 : dynamicStatus === 'idle' ? 2 : 1} colors={colors} />
                     </View>
                   </View>
                 </View>
