@@ -7,6 +7,7 @@ import { useIspStore, type IspCampaign } from '@/stores/useIspStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToastStore } from '@/stores/useToastStore';
 import NrtAmount from '@/components/ui/NrtAmount';
+import CampaignAnalyticsModal from '@/components/CampaignAnalyticsModal';
 
 export default function IspCampaignsView() {
   const colors = useThemeColors();
@@ -221,7 +222,11 @@ export default function IspCampaignsView() {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                         <View style={styles.cardIconWrapper}>
-                          <Text style={styles.cardIconText}>{network?.name[0] || '?'}</Text>
+                          {campaign.logo_url ? (
+                            <Image source={{ uri: campaign.logo_url }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+                          ) : (
+                            <Text style={styles.cardIconText}>{network?.name[0] || '?'}</Text>
+                          )}
                         </View>
                         <View style={{ flex: 1, paddingRight: 8 }}>
                           <Text style={styles.cardTitle}>{campaign.name}</Text>
@@ -366,22 +371,13 @@ export default function IspCampaignsView() {
         </View>
       </Modal>
 
-      {/* Analytics Placeholder Modal */}
-      <Modal visible={!!viewingCampaignDetails} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: '60%' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Analytics</Text>
-              <Pressable onPress={() => setViewingCampaignDetails(null)} style={{ padding: 4 }}><X size={20} color={colors.textPrimary} /></Pressable>
-            </View>
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-              <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
-                Analytics view for {viewingCampaignDetails?.name} will be rendered here.
-              </Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Analytics Modal */}
+      {viewingCampaignDetails && (
+        <CampaignAnalyticsModal
+          campaign={viewingCampaignDetails}
+          onClose={() => setViewingCampaignDetails(null)}
+        />
+      )}
     </View>
   );
 }
