@@ -35,7 +35,7 @@ export default function WebViewChart({
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:${colors.bgSecondary};overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+body{background:transparent;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 #chart{width:100%;height:${height}px;position:relative}
 svg{width:100%;height:100%}
 .tick-label{fill:${colors.textSecondary};font-size:10px}

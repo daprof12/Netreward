@@ -8,7 +8,7 @@ import { useThemeColors } from '@/theme';
 import { useCampaignAnalytics } from '@/hooks/useCampaignAnalytics';
 import { formatNrtText } from '@/lib/formatNrt';
 import NrtAmount from '@/components/ui/NrtAmount';
-import WebViewChart from '@/components/WebViewChart';
+import NativeAreaChart from '@/components/ui/NativeAreaChart';
 import { Dimensions } from 'react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -32,7 +32,7 @@ export default function CampaignAnalyticsModal({
   );
 
   const chartData = analytics?.chartData || [];
-  const hasChart = chartData.length > 0 && chartData.some((d) => d.nrt > 0);
+  const hasChart = chartData.length > 0 && chartData.some((d) => Number(d.nrt) > 0);
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -107,12 +107,12 @@ export default function CampaignAnalyticsModal({
               </View>
             ) : hasChart ? (
               <View style={{ marginTop: 8 }}>
-                <WebViewChart 
+                <NativeAreaChart 
                   data={chartData} 
                   xKey="date" 
                   series={[{ key: 'nrt', color: colors.accentPrimary, name: 'NRT' }]} 
                   height={180} 
-                  type="area" 
+                  width={SCREEN_WIDTH - 80}
                 />
               </View>
             ) : (
