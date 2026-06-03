@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator, Modal, Dimensions, Image } from 'react-native';
 import { useThemeColors } from '@/theme';
 import { Search, Filter, Play, CheckCircle2, X, Globe, MapPin, TrendingUp, Info, ChevronRight, Wifi, ArrowDownToLine, Clock, Gamepad2 } from 'lucide-react-native';
 import { useCampaigns } from '@/hooks/useCampaigns';
@@ -255,7 +255,11 @@ export default function UserCampaignsView() {
               <View key={campaign.id} style={styles.card}>
                 <View style={styles.cardHeader}>
                   <View style={styles.cardIconWrapper}>
-                    <Text style={styles.cardIconText}>{campaign.title?.[0] || '?'}</Text>
+                    {campaign.logo_url ? (
+                      <Image source={{ uri: campaign.logo_url }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+                    ) : (
+                      <Text style={styles.cardIconText}>{campaign.title?.[0] || '?'}</Text>
+                    )}
                   </View>
                   <View style={{ flex: 1, marginRight: 10 }}>
                     <Text style={styles.cardTitle} numberOfLines={1}>{campaign.title}</Text>
