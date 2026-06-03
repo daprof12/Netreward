@@ -287,10 +287,10 @@ export default function SpDevicesView() {
                         <MapPin size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
                         <Text style={styles.footerMetaText}>{device.country || 'Unknown'}</Text>
                       </View>
-                      <View style={[styles.footerMetaItem, styles.ispBadge]}>
-                        <Wifi size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
-                        <Text style={styles.footerMetaText}>{device.isp_name || 'Unknown ISP'}</Text>
-                        <View style={{ marginLeft: 6 }}>
+                      <View style={[styles.footerMetaItem, styles.ispBadge, { maxWidth: '60%' }]}>
+                        <Wifi size={10} color={colors.textSecondary} style={{ marginRight: 4, flexShrink: 0 }} />
+                        <Text style={[styles.footerMetaText, { flexShrink: 1 }]} numberOfLines={1}>{device.isp_name || 'Unknown ISP'}</Text>
+                        <View style={{ marginLeft: 6, flexShrink: 0 }}>
                            <SignalBars strength={dynamicStatus === 'active' ? 4 : dynamicStatus === 'idle' ? 2 : 1} colors={colors} />
                         </View>
                       </View>

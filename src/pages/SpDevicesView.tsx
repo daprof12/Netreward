@@ -295,9 +295,9 @@ export default function SpDevicesView() {
                   <MapPin size={12} />
                   <span>{device.country || 'Unknown'}</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-text-secondary font-medium bg-bg-secondary px-2 py-0.5 rounded">
-                  <Wifi size={10} />
-                  <span>{device.isp_name || 'Unknown ISP'}</span>
+                <div className="flex items-center gap-1.5 text-[10px] text-text-secondary font-medium bg-bg-secondary px-2 py-0.5 rounded max-w-[140px]">
+                  <Wifi size={10} className="shrink-0" />
+                  <span className="truncate">{device.isp_name || 'Unknown ISP'}</span>
                   <SignalBars strength={
                     getDynamicStatus(device.updated_at, device.status, device.created_at) === 'active'
                       ? 4

@@ -48,7 +48,7 @@ export default function MarqueeText({ style, children }: MarqueeTextProps) {
       style={{ overflow: 'hidden', flex: 1 }} 
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
     >
-      <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: animatedValue }] }}>
+      <Animated.View style={{ flexDirection: 'row', alignSelf: 'flex-start', transform: [{ translateX: animatedValue }] }}>
         <Text
           style={[style, { flexShrink: 0 }]}
           onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)}
