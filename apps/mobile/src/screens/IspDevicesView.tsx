@@ -315,11 +315,11 @@ export default function IspDevicesView() {
                     </View>
 
                     <View style={styles.footerMeta}>
-                      <View style={styles.footerMetaItem}>
-                        <MapPin size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
-                        <Text style={styles.footerMetaText}>{device.country || 'Unknown'}</Text>
+                      <View style={[styles.footerMetaItem, { maxWidth: '100%' }]}>
+                        <MapPin size={10} color={colors.textSecondary} style={{ marginRight: 4, flexShrink: 0 }} />
+                        <Text style={[styles.footerMetaText, { flexShrink: 1 }]} numberOfLines={1}>{device.country || 'Unknown'}</Text>
                       </View>
-                      <View style={[styles.footerMetaItem, styles.ispBadge, { maxWidth: '60%' }]}>
+                      <View style={[styles.footerMetaItem, styles.ispBadge, { maxWidth: 140 }]}>
                         <Wifi size={10} color={colors.textSecondary} style={{ marginRight: 4, flexShrink: 0 }} />
                         <Text style={[styles.footerMetaText, { flexShrink: 1 }]} numberOfLines={1}>{device.isp_name || 'Unknown ISP'}</Text>
                         <View style={{ marginLeft: 6, flexShrink: 0 }}>
@@ -409,8 +409,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   statLabel: { fontSize: 9, fontWeight: '900', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: 4 },
   statValue: { fontSize: 14, fontWeight: 'bold', color: colors.textPrimary },
   
-  footerMeta: { alignItems: 'flex-end', gap: 6 },
-  footerMetaItem: { flexDirection: 'row', alignItems: 'center' },
+  footerMeta: { alignItems: 'flex-end', gap: 6, flexShrink: 1 },
+  footerMetaItem: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
   footerMetaText: { fontSize: 11, color: colors.textSecondary },
   ispBadge: { backgroundColor: colors.bgPrimary, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4 },
 });

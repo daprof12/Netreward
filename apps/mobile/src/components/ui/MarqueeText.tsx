@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Text, View, StyleSheet } from 'react-native';
+import { Animated, Easing, Text, View, ScrollView } from 'react-native';
 
 interface MarqueeTextProps {
   style?: any;
@@ -48,15 +48,17 @@ export default function MarqueeText({ style, children }: MarqueeTextProps) {
       style={{ overflow: 'hidden', flex: 1 }} 
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
     >
-      <Animated.View style={{ flexDirection: 'row', alignSelf: 'flex-start', transform: [{ translateX: animatedValue }] }}>
-        <Text
-          style={[style, { flexShrink: 0 }]}
-          onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)}
-          numberOfLines={1}
-        >
-          {children}
-        </Text>
-      </Animated.View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} scrollEnabled={false} contentContainerStyle={{ flexGrow: 1 }}>
+        <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: animatedValue }] }}>
+          <Text
+            style={[style, { flexShrink: 0 }]}
+            onLayout={(e) => setTextWidth(e.nativeEvent.layout.width)}
+            numberOfLines={1}
+          >
+            {children}
+          </Text>
+        </Animated.View>
+      </ScrollView>
     </View>
   );
 }
