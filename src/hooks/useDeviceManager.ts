@@ -263,5 +263,29 @@ export function useDeviceManager() {
     detectAndRegisterDevice();
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!currentDevice?.deviceId || !currentDevice?.isLinkedToCurrentUser) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        supabase.from('devices').update({ status: 'offline' }).eq('id', currentDevice.deviceId).then();
+      } else {
+        supabase.from('devices').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', currentDevice.deviceId).then();
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      supabase.from('devices').update({ status: 'offline' }).eq('id', currentDevice.deviceId).then();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [currentDevice?.deviceId, currentDevice?.isLinkedToCurrentUser]);
+
   return { currentDevice, isLoading };
 }

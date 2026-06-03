@@ -66,12 +66,12 @@ export default function SpDevicesView() {
       if (!device) return false;
 
       // 1. Search Filter
-      const matchesSearch = 
+      const matchesSearch =
         device.device_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         device.country?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         device.users?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         device.users?.display_name?.toLowerCase().includes(searchQuery.toLowerCase());
-        
+
       if (!matchesSearch) return false;
 
       // 2. Type/Value Filter
@@ -108,7 +108,7 @@ export default function SpDevicesView() {
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-        
+
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <Search size={18} color={colors.textSecondary} style={styles.searchIcon} />
@@ -196,12 +196,12 @@ export default function SpDevicesView() {
             filteredDevices.map(session => {
               const device = session.device;
               if (!device) return null;
-              
+
               const dataUsedGB = ((session.bytes_up + session.bytes_down) / 1e9).toFixed(6);
               const isClaimed = session.nrt_awarded > 0;
               const campaignObj = Array.isArray(session.campaign) ? session.campaign[0] : session.campaign;
               const serviceObj = campaignObj ? (Array.isArray(campaignObj.service) ? campaignObj.service[0] : campaignObj.service) : null;
-              
+
               const dynamicStatus = getDynamicStatus(device.updated_at, device.status, device.created_at);
               let lastActiveText = 'Offline';
               if (dynamicStatus === 'active') lastActiveText = 'Active Now';
@@ -209,13 +209,13 @@ export default function SpDevicesView() {
               else if (device.updated_at) {
                 const diffM = Math.floor((Date.now() - new Date(device.updated_at).getTime()) / 60000);
                 if (diffM < 60) lastActiveText = `Last active ${diffM}m ago`;
-                else if (diffM < 1440) lastActiveText = `Last active ${Math.floor(diffM/60)}h ago`;
-                else lastActiveText = `Last active ${Math.floor(diffM/1440)}d ago`;
+                else if (diffM < 1440) lastActiveText = `Last active ${Math.floor(diffM / 60)}h ago`;
+                else lastActiveText = `Last active ${Math.floor(diffM / 1440)}d ago`;
               }
 
               return (
                 <View key={session.id} style={[
-                  styles.sessionCard, 
+                  styles.sessionCard,
                   dynamicStatus === 'active' && styles.sessionCardActive,
                   dynamicStatus === 'idle' && { borderColor: 'rgba(245, 158, 11, 0.3)' }
                 ]}>
@@ -223,12 +223,12 @@ export default function SpDevicesView() {
                   <View style={styles.cardHeader}>
                     <View style={styles.cardHeaderLeft}>
                       <View style={[
-                        styles.deviceIconWrapper, 
+                        styles.deviceIconWrapper,
                         dynamicStatus === 'active' ? styles.iconActive : dynamicStatus === 'idle' ? { backgroundColor: 'rgba(245, 158, 11, 0.1)' } : styles.iconInactive
                       ]}>
-                        {device.device_type === 'laptop' ? <Laptop size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} /> : 
-                         device.device_type === 'tablet' ? <Tablet size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} /> : 
-                         <Smartphone size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} />}
+                        {device.device_type === 'laptop' ? <Laptop size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} /> :
+                          device.device_type === 'tablet' ? <Tablet size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} /> :
+                            <Smartphone size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} />}
                       </View>
                       <View style={{ flex: 1 }}>
                         <MarqueeText style={styles.userName}>{(device.users as any)?.display_name || (device.users as any)?.email || 'Unknown User'}</MarqueeText>
@@ -237,11 +237,11 @@ export default function SpDevicesView() {
                           <Text style={styles.deviceMetaDot}>•</Text>
                           <View style={styles.statusRow}>
                             <View style={[
-                              styles.statusDot, 
+                              styles.statusDot,
                               dynamicStatus === 'active' ? { backgroundColor: '#10b981' } : dynamicStatus === 'idle' ? { backgroundColor: '#f59e0b' } : { backgroundColor: colors.textSecondary }
                             ]} />
                             <Text style={[
-                              styles.statusText, 
+                              styles.statusText,
                               dynamicStatus === 'active' && { color: '#10b981' },
                               dynamicStatus === 'idle' && { color: '#f59e0b' }
                             ]}>{lastActiveText}</Text>
@@ -295,7 +295,7 @@ export default function SpDevicesView() {
                       <MarqueeText style={[styles.footerMetaText, { fontSize: 11 }]}>{device.isp_name || 'Unknown ISP'}</MarqueeText>
                     </View>
                     <View style={{ marginLeft: 8, flexShrink: 0 }}>
-                       <SignalBars strength={dynamicStatus === 'active' ? 4 : dynamicStatus === 'idle' ? 2 : 1} colors={colors} />
+                      <SignalBars strength={dynamicStatus === 'active' ? 4 : dynamicStatus === 'idle' ? 2 : 1} colors={colors} />
                     </View>
                   </View>
                 </View>
@@ -326,7 +326,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   filterTypeBtnActive: { backgroundColor: colors.accentPrimary },
   filterTypeText: { fontSize: 12, fontWeight: 'bold', color: colors.textSecondary },
   filterTypeTextActive: { color: '#fff' },
-  
+
   filterValuesScroll: { marginBottom: 8 },
   filterValueBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.bgSecondary, borderWidth: 1, borderColor: colors.glassBorder, marginRight: 8 },
   filterValueBtnActive: { backgroundColor: colors.accentPrimary, borderColor: colors.accentPrimary },
@@ -358,7 +358,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 11, color: colors.textSecondary },
-  
+
   claimBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6 },
   claimBadgeClaimed: { backgroundColor: 'rgba(16, 185, 129, 0.1)' },
   claimBadgeUnclaimed: { backgroundColor: 'rgba(245, 158, 11, 0.1)' },
@@ -372,7 +372,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   footerStats: { flexDirection: 'row' },
   statLabel: { fontSize: 9, fontWeight: '900', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: 4 },
   statValue: { fontSize: 14, fontWeight: 'bold', color: colors.textPrimary },
-  
+
   footerMeta: { alignItems: 'flex-end', gap: 6, flexShrink: 1 },
   footerMetaItem: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
   footerMetaText: { fontSize: 11, color: colors.textSecondary },

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { AppState, AppStateStatus } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
@@ -229,6 +230,21 @@ export function useDeviceManager() {
 
     detectAndRegisterDevice();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!currentDevice?.deviceId || !currentDevice?.isLinkedToCurrentUser) return;
+
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        supabase.from('devices').update({ status: 'offline' }).eq('id', currentDevice.deviceId).then();
+      } else if (nextState === 'active') {
+        supabase.from('devices').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', currentDevice.deviceId).then();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppState);
+    return () => subscription.remove();
+  }, [currentDevice?.deviceId, currentDevice?.isLinkedToCurrentUser]);
 
   return { currentDevice, isLoading };
 }
