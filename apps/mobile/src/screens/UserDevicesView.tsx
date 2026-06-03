@@ -10,6 +10,7 @@ import { useDeviceManager } from '@/hooks/useDeviceManager';
 import { useUserDeviceStats, useDeviceSummaries, TimeFilter } from '@/hooks/useDeviceAnalytics';
 import { formatNrtText } from '@/lib/formatNrt';
 import NrtAmount from '@/components/ui/NrtAmount';
+import MarqueeText from '@/components/ui/MarqueeText';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -247,9 +248,9 @@ export default function UserDevicesView() {
                         <Text style={styles.metaText} numberOfLines={1}>{device.country || 'Unknown'}</Text>
                       </View>
                       <Text style={styles.metaDot}>•</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexShrink: 1, maxWidth: 150 }}>
-                        <Text style={styles.metaText} numberOfLines={1}>{device.isp_name || 'Unknown ISP'}</Text>
-                      </ScrollView>
+                      <View style={{ flex: 1, overflow: 'hidden' }}>
+                        <MarqueeText style={styles.metaText}>{device.isp_name || 'Unknown ISP'}</MarqueeText>
+                      </View>
                     </View>
                     <Text style={[styles.metaText, { marginTop: 4 }]}>
                       {devSummary ? devSummary.total_data_gb.toFixed(6) : '0.00'} GB
@@ -436,12 +437,12 @@ const createStyles = (colors: any) => StyleSheet.create({
   deviceName: { fontSize: 15, fontWeight: 'bold', color: colors.textPrimary, flexShrink: 1 },
   thisDeviceBadge: { backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexShrink: 0 },
   thisDeviceText: { fontSize: 9, fontWeight: 'bold', color: colors.accentPrimary },
-  deviceMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap', gap: 6 },
+  deviceMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap', gap: 6, flexShrink: 1, width: '100%' },
   metaBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexShrink: 0 },
   metaBadgeActive: { backgroundColor: 'rgba(16, 185, 129, 0.1)' },
   metaBadgeInactive: { backgroundColor: colors.bgPrimary },
   metaBadgeText: { fontSize: 10, fontWeight: 'bold' },
-  metaRowItem: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  metaRowItem: { flexDirection: 'row', alignItems: 'center', flexShrink: 0, maxWidth: 70 },
   metaText: { fontSize: 10, color: colors.textSecondary },
   metaDot: { fontSize: 10, color: colors.textSecondary },
   
