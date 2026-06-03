@@ -18,6 +18,14 @@ export interface Campaign {
   category?: string;
   target_locations?: any[];
   country?: string;
+  web_url?: string | null;
+  android_url?: string | null;
+  ios_url?: string | null;
+  steam_url?: string | null;
+  playstation_url?: string | null;
+  xbox_url?: string | null;
+  oculus_url?: string | null;
+  nintendo_url?: string | null;
 }
 
 export interface UserCampaign {
@@ -62,7 +70,7 @@ export function useCampaigns() {
           *,
           sp:sp_profiles (company_name, logo_url, users (display_name)),
           isp:isp_profiles (isp_name, logo_url, users (display_name)),
-          svc:services (name, logo_url, category),
+          svc:services (name, logo_url, category, web_url, android_url, ios_url, steam_url, playstation_url, xbox_url, oculus_url, nintendo_url),
           net:networks (name, logo_url, category)
         `)
         .eq('status', 'active');
@@ -89,7 +97,15 @@ export function useCampaigns() {
           creator_name: resolveCreatorName(sp, isp, svc, net),
           creator_logo: sp?.logo_url || isp?.logo_url || null,
           category: svc?.category || net?.category || (sp ? 'Service' : isp ? 'Network' : 'General'),
-          target_locations: camp.target_locations || []
+          target_locations: camp.target_locations || [],
+          web_url: svc?.web_url || null,
+          android_url: svc?.android_url || null,
+          ios_url: svc?.ios_url || null,
+          steam_url: svc?.steam_url || null,
+          playstation_url: svc?.playstation_url || null,
+          xbox_url: svc?.xbox_url || null,
+          oculus_url: svc?.oculus_url || null,
+          nintendo_url: svc?.nintendo_url || null
         };
       });
 
@@ -112,7 +128,7 @@ export function useCampaigns() {
             *,
             sp:sp_profiles (company_name, logo_url, users (display_name)),
             isp:isp_profiles (isp_name, logo_url, users (display_name)),
-            svc:services (name, logo_url, category),
+            svc:services (name, logo_url, category, web_url, android_url, ios_url, steam_url, playstation_url, xbox_url, oculus_url, nintendo_url),
             net:networks (name, logo_url, category)
           )
         `)
@@ -143,13 +159,22 @@ export function useCampaigns() {
             creator_name: resolveCreatorName(sp, isp, svc, net),
             creator_logo: sp?.logo_url || isp?.logo_url || null,
             category: svc?.category || net?.category || (sp ? 'Service' : isp ? 'Network' : 'General'),
-            target_locations: camp.target_locations || []
+            target_locations: camp.target_locations || [],
+            web_url: svc?.web_url || null,
+            android_url: svc?.android_url || null,
+            ios_url: svc?.ios_url || null,
+            steam_url: svc?.steam_url || null,
+            playstation_url: svc?.playstation_url || null,
+            xbox_url: svc?.xbox_url || null,
+            oculus_url: svc?.oculus_url || null,
+            nintendo_url: svc?.nintendo_url || null
           }
         };
       });
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 5,
+    refetchInterval: 10000, // Poll every 10s to dynamically update stats
   });
 
   // Mutation to join a campaign

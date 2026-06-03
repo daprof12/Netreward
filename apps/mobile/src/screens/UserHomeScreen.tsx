@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, ActivityIndicator, Image, Modal } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, ActivityIndicator, Image, Modal, Animated } from 'react-native';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useWallet } from '@/hooks/useWallet';
 import { useCampaigns } from '@/hooks/useCampaigns';
@@ -21,7 +21,19 @@ import { useQuery } from '@tanstack/react-query';
 import { formatNrtText } from '@/lib/formatNrt';
 import EarningsDetailModal from '@/components/EarningsDetailModal';
 import NrtAmount from '@/components/ui/NrtAmount';
+import PulseDot from '@/components/ui/PulseDot';
+import ActiveCampaignCard from '@/components/ui/ActiveCampaignCard';
 import NotificationBell from '@/components/ui/NotificationBell';
+
+// Helper to add alpha to hex safely
+const getRgba = (hex: string, alpha: number) => {
+  if (!hex) return 'transparent';
+  if (hex.startsWith('rgba')) return hex;
+  const r = parseInt(hex.slice(1, 3), 16) || 0;
+  const g = parseInt(hex.slice(3, 5), 16) || 0;
+  const b = parseInt(hex.slice(5, 7), 16) || 0;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 const { width } = Dimensions.get('window');
 
@@ -87,27 +99,75 @@ export default function UserHomeScreen() {
 
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval>;
-    const fetchSessions = () => {
+    const fetchActivities = async () => {
       if (!user?.id) return;
-      supabase.from('device_data_sessions')
-        .select('*, campaigns(title)')
-        .order('session_end', { ascending: false })
-        .limit(20)
-        .then(({ data }) => {
-          if (data) {
-            setRecentActivityRaw(data);
-            setRecentActivity(data.slice(0, 4).map(d => ({
-              id: d.id,
-              text: `Earned ${formatNrtText(Number(d.nrt_awarded))} NRT from ${d.campaigns?.title || 'Unknown'}`,
-              time: new Date(d.session_end).toLocaleDateString(),
-            })));
+      
+      const [sessionsRes, txRes] = await Promise.all([
+        supabase.from('device_data_sessions')
+          .select('campaign_id, session_end')
+          .order('session_end', { ascending: false })
+          .limit(20),
+        supabase.from('transactions')
+          .select('*')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .order('created_at', { ascending: false })
+          .limit(20)
+      ]);
+
+      if (sessionsRes.data) {
+        setRecentActivityRaw(sessionsRes.data);
+      }
+      
+      const activities: any[] = [];
+      
+      if (userEnrollments) {
+        userEnrollments.forEach((en: any) => {
+          const earned = (en.nrt_earned || 0) + (en.unclaimed_nrt || 0);
+          if (earned > 0) {
+            activities.push({
+              id: `en_${en.id}`,
+              icon: Zap,
+              type: 'earn',
+              amount: earned,
+              title: en.campaigns?.title || 'Unknown',
+              time: new Date(en.updated_at || en.created_at || 0).getTime(),
+              timeStr: new Date(en.updated_at || en.created_at || 0).toLocaleDateString(),
+              color: '#10b981'
+            });
           }
         });
+      }
+      
+      if (txRes.data) {
+        txRes.data.forEach((t: any) => {
+          const isSender = t.sender_id === user.id;
+          const action = isSender ? 'Sent' : 'Received';
+          const icon = isSender ? ArrowRightLeft : QrCode;
+          const color = isSender ? '#ef4444' : '#10b981';
+          const title = t.tx_type === 'scan2pay' ? 'Scan2Pay' : 'Transfer';
+          
+          activities.push({
+            id: `tx_${t.id}`,
+            icon,
+            type: 'tx',
+            action,
+            amount: Number(t.amount),
+            title,
+            time: new Date(t.created_at).getTime(),
+            timeStr: new Date(t.created_at).toLocaleDateString(),
+            color
+          });
+        });
+      }
+      
+      activities.sort((a, b) => b.time - a.time);
+      setRecentActivity(activities.slice(0, 4));
     };
-    fetchSessions();
-    intervalId = setInterval(fetchSessions, 10000);
+
+    fetchActivities();
+    intervalId = setInterval(fetchActivities, 10000);
     return () => clearInterval(intervalId);
-  }, [user?.id]);
+  }, [user?.id, userEnrollments]);
 
   const isLoading = isWalletLoading || isCampaignsLoading;
 
@@ -118,9 +178,14 @@ export default function UserHomeScreen() {
   const balance = wallet?.nrt_balance || 0;
   const balanceUsd = convertNrt(balance);
 
-  const deviceCount = devices ? devices.length : 0;
-  const enrollmentCount = userEnrollments?.length || 0;
-  const totalEarned = userEnrollments?.reduce((sum: number, en: any) => sum + (en.nrt_earned || 0), 0) || 0;
+  const activeDevices = devices?.filter((d: any) => d.status === 'active') || [];
+  const uniqueDeviceIds = new Set(activeDevices.map((d: any) => d.id));
+  const deviceCount = uniqueDeviceIds.size;
+  
+  const activeEnrollments = userEnrollments?.filter((en: any) => en.status === 'active') || [];
+  const uniqueCampaignIds = new Set(activeEnrollments.map((en: any) => en.campaign_id));
+  const enrollmentCount = uniqueCampaignIds.size;
+  const totalEarned = userEnrollments?.reduce((sum: number, en: any) => sum + (en.nrt_earned || 0) + (en.unclaimed_nrt || 0), 0) || 0;
   const totalUnclaimed = userEnrollments?.reduce((sum: number, en: any) => sum + (en.unclaimed_nrt || 0), 0) || 0;
 
   async function handleClaim() {
@@ -223,10 +288,13 @@ export default function UserHomeScreen() {
             >
               {isClaiming ? (
                 <ActivityIndicator size="small" color="#6366f1" />
+              ) : totalUnclaimed > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={[styles.claimText, styles.claimTextActive]}>Claim</Text>
+                  <NrtAmount value={totalUnclaimed} style={[styles.claimText, styles.claimTextActive]} hideUnit />
+                </View>
               ) : (
-                <Text style={[styles.claimText, totalUnclaimed > 0 ? styles.claimTextActive : {}]}>
-                  {totalUnclaimed > 0 ? `Claim ${formatNrtText(totalUnclaimed)}` : 'Claim Rewards'}
-                </Text>
+                <Text style={styles.claimText}>Claim Rewards</Text>
               )}
             </Pressable>
           </View>
@@ -240,7 +308,7 @@ export default function UserHomeScreen() {
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statBoxLabel}>Earned</Text>
-            <Text style={[styles.statBoxValue, { color: colors.accentPrimary }]}>{totalEarned.toFixed(2)}</Text>
+            <NrtAmount value={totalEarned} hideUnit style={[styles.statBoxValue, { color: colors.accentPrimary }]} />
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statBoxLabel}>Devices</Text>
@@ -275,10 +343,10 @@ export default function UserHomeScreen() {
             </View>
             <View style={styles.heatmapLegend}>
               <Text style={styles.heatmapLegendText}>Less</Text>
-              <View style={[styles.heatmapDot, { backgroundColor: colors.bgSecondary }]} />
-              <View style={[styles.heatmapDot, { backgroundColor: 'rgba(5, 150, 105, 0.25)' }]} />
-              <View style={[styles.heatmapDot, { backgroundColor: 'rgba(5, 150, 105, 0.5)' }]} />
-              <View style={[styles.heatmapDot, { backgroundColor: 'rgba(5, 150, 105, 0.75)' }]} />
+              <View style={[styles.heatmapDot, { backgroundColor: 'rgba(128,128,128,0.15)' }]} />
+              <View style={[styles.heatmapDot, { backgroundColor: getRgba(colors.accentPrimary, 0.25) }]} />
+              <View style={[styles.heatmapDot, { backgroundColor: getRgba(colors.accentPrimary, 0.5) }]} />
+              <View style={[styles.heatmapDot, { backgroundColor: getRgba(colors.accentPrimary, 0.75) }]} />
               <View style={[styles.heatmapDot, { backgroundColor: colors.accentPrimary }]} />
               <Text style={styles.heatmapLegendText}>More</Text>
             </View>
@@ -287,12 +355,14 @@ export default function UserHomeScreen() {
           <View style={styles.heatmapGrid}>
             <View style={styles.heatmapDays}>
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                <Text key={d} style={styles.heatmapDayText}>{d}</Text>
+                <View key={d} style={styles.heatmapDayWrapper}>
+                  <Text style={styles.heatmapDayText}>{d}</Text>
+                </View>
               ))}
             </View>
             {isUserHeatmapLoading ? (
               <ActivityIndicator size="small" color={colors.accentPrimary} style={{ flex: 1 }} />
-            ) : (!userHeatmap || userHeatmap.length === 0 || userHeatmap.every((d: any) => d.intensity === 0)) ? (
+            ) : (!userHeatmap || userHeatmap.length === 0) ? (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <ActivityIcon size={24} color={colors.textSecondary} style={{ marginBottom: 8 }} />
                 <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center' }}>No Activity Yet</Text>
@@ -305,13 +375,25 @@ export default function UserHomeScreen() {
                       const dataIndex = weekIdx * 7 + dayIdx;
                       const dayData = userHeatmap[dataIndex];
                       const intensity = dayData?.intensity || 0;
+
                       const bgColor =
                         intensity === 4 ? colors.accentPrimary :
-                        intensity === 3 ? 'rgba(5, 150, 105, 0.75)' :
-                        intensity === 2 ? 'rgba(5, 150, 105, 0.5)' :
-                        intensity === 1 ? 'rgba(5, 150, 105, 0.25)' :
-                        'rgba(255,255,255,0.05)';
-                      return <View key={dayIdx} style={[styles.heatmapCell, { backgroundColor: bgColor }]} />;
+                        intensity === 3 ? getRgba(colors.accentPrimary, 0.75) :
+                        intensity === 2 ? getRgba(colors.accentPrimary, 0.5) :
+                        intensity === 1 ? getRgba(colors.accentPrimary, 0.25) :
+                        'rgba(128,128,128,0.15)';
+
+                      return (
+                        <Pressable 
+                          key={dayIdx} 
+                          style={[styles.heatmapCell, { backgroundColor: bgColor }]} 
+                          onPress={() => {
+                            if (dayData && dayData.activity_date) {
+                              showToast(`${dayData.activity_date}: ${dayData.value} NRT`, 'success');
+                            }
+                          }}
+                        />
+                      );
                     })}
                   </View>
                 ))}
@@ -346,58 +428,13 @@ export default function UserHomeScreen() {
               const camp = en.campaigns;
               const isRecent = camp?.id ? isSessionRecent(camp.id) : false;
               return (
-                <Pressable
+                <ActiveCampaignCard
                   key={en.id}
-                  style={styles.campaignCard}
+                  campaign={camp}
+                  enrollment={en}
+                  isRecent={isRecent}
                   onPress={() => setEarningCampaign(camp)}
-                >
-                  <View style={{ flexDirection: 'row', gap: 12 }}>
-                    {/* Logo */}
-                    <View style={{ position: 'relative' }}>
-                      <View style={styles.campLogo}>
-                        {camp?.logo_url ? (
-                          <Image
-                            source={{ uri: camp.logo_url }}
-                            style={{ width: '100%', height: '100%', borderRadius: 10 }}
-                          />
-                        ) : (
-                          <Text style={{ color: colors.textPrimary, fontWeight: 'bold', fontSize: 20 }}>
-                            {camp?.title?.[0] || '?'}
-                          </Text>
-                        )}
-                      </View>
-                      {isRecent && (
-                        <View style={styles.activePulse} />
-                      )}
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <View style={{ flex: 1, marginRight: 8 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={styles.campTitle} numberOfLines={1}>{camp?.title || 'Campaign'}</Text>
-                            {isRecent && (
-                              <View style={styles.liveDot} />
-                            )}
-                          </View>
-                          <Text style={styles.campDesc} numberOfLines={1}>
-                            {camp?.creator_name || 'NetReward'} • {camp?.category || 'General'}
-                          </Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={styles.campConsumed}>{Number(en.data_consumed_gb).toFixed(6)} GB</Text>
-                          <Text style={styles.campConsumedLabel}>CONSUMED</Text>
-                        </View>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-                        <View style={styles.campProgressBar}>
-                          <View style={[styles.campProgressFill, { width: `${(camp?.budget_spent / camp?.total_budget) * 100 || 0}%` }]} />
-                        </View>
-                        <Text style={styles.campNrt}>+{formatNrtText(en.nrt_earned || 0)} NRT</Text>
-                      </View>
-                    </View>
-                  </View>
-                </Pressable>
+                />
               );
             })
           )}
@@ -416,18 +453,35 @@ export default function UserHomeScreen() {
                 <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center' }}>No Recent Activity</Text>
               </View>
             ) : (
-              recentActivity.map((activity) => (
-                <View key={activity.id} style={styles.recentItem}>
-                  <View style={styles.recentIconBox}>
-                    <Zap size={16} color={colors.accentPrimary} />
+              recentActivity.map((activity) => {
+                const Icon = activity.icon;
+                return (
+                  <View key={activity.id} style={styles.recentItem}>
+                    <View style={[styles.recentIconBox, { backgroundColor: activity.color + '1A', borderColor: activity.color + '33' }]}>
+                      <Icon size={16} color={activity.color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.recentText, { color: colors.textPrimary }]} numberOfLines={1}>
+                        {activity.title}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                        <Text style={{ fontSize: 12, color: colors.textSecondary, textTransform: 'capitalize' }}>
+                          {activity.type === 'earn' ? 'Earned' : activity.action}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: colors.textSecondary }}>•</Text>
+                        <Text style={{ fontSize: 12, color: colors.textSecondary }}>{activity.timeStr}</Text>
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <NrtAmount 
+                        value={activity.type === 'tx' && activity.action === 'Sent' ? -activity.amount : activity.amount} 
+                        showSign 
+                        style={{ fontSize: 14, color: activity.color, fontWeight: '700' }} 
+                      />
+                    </View>
                   </View>
-                  <Text style={styles.recentText} numberOfLines={1}>{activity.text}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={styles.recentDate}>{activity.time}</Text>
-                    <ChevronRight size={14} color={colors.textSecondary} />
-                  </View>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
         </View>
@@ -499,11 +553,12 @@ const createStyles = (colors: any) => StyleSheet.create({
   heatmapLegend: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   heatmapLegendText: { fontSize: 9, color: colors.textSecondary },
   heatmapDot: { width: 10, height: 10, borderRadius: 2 },
-  heatmapGrid: { flexDirection: 'row', gap: 8 },
-  heatmapDays: { justifyContent: 'space-between', paddingVertical: 2 },
-  heatmapDayText: { fontSize: 9, color: colors.textSecondary, height: 14 },
-  heatmapCol: { gap: 4 },
-  heatmapCell: { width: 14, height: 14, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3 },
+  heatmapGrid: { flexDirection: 'row', gap: 4 },
+  heatmapDays: { justifyContent: 'space-between', paddingVertical: 2, marginRight: 8 },
+  heatmapDayWrapper: { height: 12, justifyContent: 'center' },
+  heatmapDayText: { fontSize: 10, color: colors.textSecondary },
+  heatmapCol: { justifyContent: 'space-between', gap: 4 },
+  heatmapCell: { width: 12, height: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3 },
 
   campaignCard: { backgroundColor: colors.bgSecondary, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: colors.glassBorder, marginBottom: 12 },
   campLogo: { width: 48, height: 48, borderRadius: 12, backgroundColor: colors.bgPrimary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.glassBorder },

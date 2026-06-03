@@ -8,6 +8,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useReferrals } from '@/hooks/useReferrals';
 import { useThemeColors } from '@/theme';
 import { formatNrtText } from '@/lib/formatNrt';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 export default function ReferralScreen() {
   const router = useRouter();
@@ -101,12 +102,12 @@ export default function ReferralScreen() {
           <View style={styles.statCard}>
             <TrendingUp size={20} color={colors.accentPrimary} style={styles.statIcon} />
             <Text style={styles.statLabel}>Earned</Text>
-            <Text style={styles.statValue}>{formatNrtText(totalEarned)} <Text style={styles.statUnit}>NRT</Text></Text>
+            <NrtAmount value={totalEarned} style={styles.statValue} unitStyle={styles.statUnit} />
           </View>
           <View style={styles.statCard}>
             <Gift size={20} color="#f59e0b" style={styles.statIcon} />
             <Text style={styles.statLabel}>Pending</Text>
-            <Text style={styles.statValue}>{formatNrtText(pendingRewards)} <Text style={styles.statUnit}>NRT</Text></Text>
+            <NrtAmount value={pendingRewards} style={styles.statValue} unitStyle={styles.statUnit} />
           </View>
         </View>
 
@@ -193,7 +194,7 @@ export default function ReferralScreen() {
                       </Text>
                     </View>
                     <View style={styles.referredUserRight}>
-                      <Text style={styles.referredUserAmount}>+{formatNrtText(ref.reward_nrt)} NRT</Text>
+                      <NrtAmount value={ref.reward_nrt} showSign style={styles.referredUserAmount} />
                       <View style={[styles.statusBadge, { backgroundColor: ref.status === 'active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)' }]}>
                         <Text style={[styles.statusText, { color: ref.status === 'active' ? colors.success : colors.warning }]}>
                           {ref.status}

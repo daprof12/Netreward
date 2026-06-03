@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, TextInput, Modal, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   User, ShieldCheck, Lock, UserCog, Gamepad2, History, FileText, Gift,
   Banknote, Globe, Moon, Bell, CreditCard, Code, Info, HelpCircle,
-  LogOut, ChevronRight, Check, AlertCircle, X, Loader2
+  LogOut, ChevronRight, Check, AlertCircle, X, Loader2, Copy, QrCode, ArrowRight
 } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
 
 import { useThemeColors, shadows } from '@/theme';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -28,7 +29,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user, role, setUser, signOut } = useAuthStore();
   const { profile, switchRole, isSwitchingRole } = useProfile();
-  const { services, profileLogo: spLogo } = useSpStore();
+  const { services, profileLogo: spLogo, checkoutSessions, createCheckoutSession } = useSpStore();
   const { networks, profileLogo: ispLogo } = useIspStore();
   const { gamingAccounts } = useGamingAccounts();
   const { showToast } = useToastStore();
@@ -44,6 +45,19 @@ export default function SettingsScreen() {
   const [showCurrencySheet, setShowCurrencySheet] = useState(false);
   const [showLanguageSheet, setShowLanguageSheet] = useState(false);
   const [showThemeSheet, setShowThemeSheet] = useState(false);
+  const [showServiceDetail, setShowServiceDetail] = useState(false);
+  const [showNetworkDetail, setShowNetworkDetail] = useState(false);
+  const [showPaymentHub, setShowPaymentHub] = useState(false);
+  const [selectedPaymentServiceIdx, setSelectedPaymentServiceIdx] = useState(0);
+  const [activeQrSession, setActiveQrSession] = useState<any | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCloseQr = () => {
+    setActiveQrSession(null);
+    setShowPaymentHub(true);
+  };
+  const [testAmount, setTestAmount] = useState('');
+  const [testDesc, setTestDesc] = useState('');
 
   // Switch Account States
   const [showUpgradeSheet, setShowUpgradeSheet] = useState(false);
@@ -72,6 +86,25 @@ export default function SettingsScreen() {
       showToast('Error logging out', 'danger');
     }
   };
+
+  const handleCopy = (text: string, id: string) => {
+    Clipboard.setStringAsync(text);
+    setCopiedId(id);
+    showToast('Copied to clipboard', 'success');
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const CopyButton = ({ text, id }: { text: string, id: string }) => (
+    <Pressable onPress={() => handleCopy(text, id)} style={{ padding: 4 }}>
+      {copiedId === id ? (
+        <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 }}>
+          <Text style={{ color: '#10b981', fontSize: 10, fontWeight: 'bold' }}>Copied</Text>
+        </View>
+      ) : (
+        <Copy size={16} color={colors.accentPrimary} />
+      )}
+    </Pressable>
+  );
 
   const kycLabel = kycStatus === 'verified' ? '✓ Verified' : kycStatus === 'pending' ? 'Pending Review' : kycStatus === 'rejected' ? 'Rejected' : 'Unverified';
   const displayRole = role === 'admin' ? 'Super Admin' : role === 'isp' ? 'ISP Account' : role === 'sp' ? 'Service Provider' : 'Standard User';
@@ -137,7 +170,7 @@ export default function SettingsScreen() {
         {/* Menu Groups */}
         {renderGroup('Account', [
           { icon: User, label: 'Profile', value: user?.email || 'demo@netreward.online', href: '/settings/profile' },
-          { icon: ShieldCheck, label: 'KYC Verification', value: kycLabel, highlight: kycStatus !== 'verified', href: '/settings/kyc' },
+          { icon: ShieldCheck, label: 'KYC Verification', value: kycLabel, highlight: kycStatus !== 'verified', onPress: () => router.push({ pathname: '/settings/kyc', params: { targetRole: role === 'sp' ? 'sp' : role === 'isp' ? 'isp' : 'user' } } as any) },
           { icon: Lock, label: 'Security & 2FA', href: '/settings/security' },
           { icon: UserCog, label: 'Switch Account Type', onPress: () => { setUpgradeStep('select'); setShowUpgradeSheet(true); } },
           { icon: Gamepad2, label: 'Gaming Accounts', value: gamingAccounts.length > 0 ? `${gamingAccounts.length} Linked` : 'None', highlight: gamingAccounts.length === 0, href: '/settings/gaming' },
@@ -157,12 +190,12 @@ export default function SettingsScreen() {
         ])}
 
         {role === 'sp' && renderGroup('API & Integrations', [
-          { icon: CreditCard, label: 'Payment API', value: services.length > 0 ? `${services.length} Ready` : 'No Services', highlight: services.length === 0, onPress: () => showToast('Payment UI coming soon', 'warning') },
-          { icon: Code, label: 'Service API', value: `${services.length} Integrated`, onPress: () => showToast('Service UI coming soon', 'warning') },
+          { icon: CreditCard, label: 'Payment API', value: services.length > 0 ? `${services.length} Ready` : 'No Services', highlight: services.length === 0, onPress: () => { setSelectedPaymentServiceIdx(0); setShowPaymentHub(true); } },
+          { icon: Code, label: 'Service API', value: `${services.length} Integrated`, onPress: () => setShowServiceDetail(true) },
         ])}
 
         {role === 'isp' && renderGroup('API & Integrations', [
-          { icon: Code, label: 'Network API', value: `${networks.length} Integrated`, onPress: () => showToast('Network UI coming soon', 'warning') },
+          { icon: Code, label: 'Network API', value: `${networks.length} Integrated`, onPress: () => setShowNetworkDetail(true) },
         ])}
 
         {renderGroup('Support & About', [
@@ -327,6 +360,308 @@ export default function SettingsScreen() {
         )}
       </BottomSheet>
 
+      <BottomSheet visible={showServiceDetail} onClose={() => setShowServiceDetail(false)} title="Integrated Services">
+        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+          {services.length === 0 ? (
+            <Text style={{ textAlign: 'center', marginVertical: 20, color: colors.textSecondary }}>No services registered yet.</Text>
+          ) : (
+            services.map(svc => (
+              <View key={svc.id} style={styles.detailCard}>
+                <View style={styles.detailHeader}>
+                  {svc.logoUrl ? (
+                    <Image source={{ uri: svc.logoUrl }} style={styles.detailLogo} />
+                  ) : (
+                    <View style={[styles.detailLogo, { backgroundColor: 'rgba(139, 92, 246, 0.1)', alignItems: 'center', justifyContent: 'center' }]}>
+                      <Code size={20} color={colors.accentPrimary} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.detailTitle}>{svc.name}</Text>
+                    <Text style={styles.detailSubtitle}>{svc.category} • {svc.status}</Text>
+                  </View>
+                  <View style={[styles.verifiedBadge, svc.verified ? styles.verifiedBadgeActive : styles.verifiedBadgePending]}>
+                    <Text style={[styles.verifiedBadgeText, svc.verified ? { color: '#10B981' } : { color: '#F59E0B' }]}>
+                      {svc.verified ? 'Verified' : 'Pending'}
+                    </Text>
+                  </View>
+                </View>
+                {svc.webUrl ? <Text style={styles.urlText}><Text style={{ fontWeight: 'bold', color: colors.textPrimary }}>Web:</Text> {svc.webUrl}</Text> : null}
+                {svc.androidUrl ? <Text style={styles.urlText}><Text style={{ fontWeight: 'bold', color: colors.textPrimary }}>Android:</Text> {svc.androidUrl}</Text> : null}
+                {svc.iosUrl ? <Text style={styles.urlText}><Text style={{ fontWeight: 'bold', color: colors.textPrimary }}>iOS:</Text> {svc.iosUrl}</Text> : null}
+                {svc.apiKey ? (
+                  <View style={styles.apiKeyCopyContainer}>
+                    <Text style={styles.apiKeyText} numberOfLines={1}>{svc.apiKey}</Text>
+                    <CopyButton text={svc.apiKey} id={`svc-${svc.id}`} />
+                  </View>
+                ) : null}
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </BottomSheet>
+
+      {/* ISP Network Details BottomSheet */}
+      <BottomSheet visible={showNetworkDetail} onClose={() => setShowNetworkDetail(false)} title="Integrated Networks">
+        <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+          {networks.length === 0 ? (
+            <Text style={{ textAlign: 'center', marginVertical: 20, color: colors.textSecondary }}>No networks registered yet.</Text>
+          ) : (
+            networks.map(net => (
+              <View key={net.id} style={styles.detailCard}>
+                <View style={styles.detailHeader}>
+                  {net.logoUrl ? (
+                    <Image source={{ uri: net.logoUrl }} style={styles.detailLogo} />
+                  ) : (
+                    <View style={[styles.detailLogo, { backgroundColor: 'rgba(59, 130, 246, 0.1)', alignItems: 'center', justifyContent: 'center' }]}>
+                      <Code size={20} color="#3b82f6" />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.detailTitle}>{net.name}</Text>
+                    <Text style={styles.detailSubtitle}>{net.category} • {net.country || 'N/A'}</Text>
+                  </View>
+                  <View style={[styles.verifiedBadge, net.verified ? styles.verifiedBadgeActive : styles.verifiedBadgePending]}>
+                    <Text style={[styles.verifiedBadgeText, net.verified ? { color: '#10B981' } : { color: '#F59E0B' }]}>
+                      {net.verified ? 'Verified' : 'Pending'}
+                    </Text>
+                  </View>
+                </View>
+                {net.signalStrength !== undefined && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginRight: 8 }}>Signal:</Text>
+                    <View style={{ flex: 1, height: 6, backgroundColor: colors.bgPrimary, borderRadius: 3, overflow: 'hidden' }}>
+                      <View style={{ height: '100%', backgroundColor: net.signalStrength >= 75 ? '#10B981' : net.signalStrength >= 40 ? '#F59E0B' : '#EF4444', width: `${net.signalStrength}%` }} />
+                    </View>
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary, marginLeft: 8 }}>{net.signalStrength}%</Text>
+                  </View>
+                )}
+                {net.coverage ? <Text style={styles.urlText}><Text style={{ fontWeight: 'bold', color: colors.textPrimary }}>Coverage:</Text> {net.coverage}</Text> : null}
+                {net.asn ? <Text style={styles.urlText}><Text style={{ fontWeight: 'bold', color: colors.textPrimary }}>ASN:</Text> {net.asn}</Text> : null}
+                {net.apiKey ? (
+                  <View style={styles.apiKeyCopyContainer}>
+                    <Text style={styles.apiKeyText} numberOfLines={1}>{net.apiKey}</Text>
+                    <CopyButton text={net.apiKey} id={`net-${net.id}`} />
+                  </View>
+                ) : null}
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </BottomSheet>
+
+      {/* SP Payment API Hub BottomSheet */}
+      <BottomSheet visible={showPaymentHub} onClose={() => setShowPaymentHub(false)} title="Payment API">
+        <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {services.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.bgSecondary, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <CreditCard size={28} color={colors.textSecondary} style={{ opacity: 0.5 }} />
+              </View>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 8 }}>No Services Yet</Text>
+              <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 20, marginBottom: 24 }}>
+                Create a service first to enable Payment API. Each service gets its own API key for both SDK tracking and payments.
+              </Text>
+              <Pressable
+                style={[styles.primaryBtn, { width: '100%', marginTop: 0 }]}
+                onPress={() => {
+                  setShowPaymentHub(false);
+                  router.push('/campaigns/create-service');
+                }}
+              >
+                <Text style={styles.primaryBtnText}>Create Service</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={{ gap: 16 }}>
+              {/* Service Selector (Horizontal Scroll if > 1) */}
+              {services.length > 1 && (
+                <View>
+                  <Text style={styles.sectionLabel}>Select Service</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                    {services.map((svc, idx) => (
+                      <Pressable
+                        key={svc.id}
+                        onPress={() => setSelectedPaymentServiceIdx(idx)}
+                        style={[
+                          styles.selectorBtn,
+                          idx === selectedPaymentServiceIdx && styles.selectorBtnActive
+                        ]}
+                      >
+                        {svc.logoUrl ? (
+                          <Image source={{ uri: svc.logoUrl }} style={{ width: 20, height: 20, borderRadius: 10 }} />
+                        ) : (
+                          <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(139, 92, 246, 0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.accentPrimary }}>{svc.name[0]}</Text>
+                          </View>
+                        )}
+                        <Text style={[styles.selectorBtnText, idx === selectedPaymentServiceIdx && { color: colors.accentPrimary }]}>{svc.name}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Selected Service Status */}
+              {(() => {
+                const svc = services[selectedPaymentServiceIdx] || services[0];
+                if (!svc) return null;
+                return (
+                  <View style={{ gap: 16 }}>
+                    <View style={[styles.statusBanner, svc.verified ? styles.statusBannerActive : styles.statusBannerPending]}>
+                      <AlertCircle size={18} color={svc.verified ? '#10B981' : '#F59E0B'} />
+                      <View style={{ flex: 1, marginLeft: 8 }}>
+                        <Text style={[styles.statusBannerTitle, svc.verified ? { color: '#10B981' } : { color: '#F59E0B' }]}>
+                          {svc.verified ? 'Payment Ready' : 'Pending Verification'}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: colors.textSecondary }}>{svc.name} • {svc.category}</Text>
+                      </View>
+                    </View>
+
+                    {/* API Key */}
+                    {svc.apiKey && (
+                      <View style={styles.apiBox}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.apiBoxLabel}>Service API Key</Text>
+                          <Text style={styles.apiBoxValue} numberOfLines={1}>{svc.apiKey}</Text>
+                        </View>
+                        <CopyButton text={svc.apiKey} id={`pay-svc-key-${svc.id}`} />
+                      </View>
+                    )}
+
+                    {/* Test Scan2Pay (Only verified) */}
+                    {svc.verified && (
+                      <View style={styles.testCard}>
+                        <Text style={styles.testCardTitle}>Test Scan2Pay</Text>
+                        
+                        <View style={{ gap: 12 }}>
+                          <View>
+                            <Text style={styles.inputLabel}>Amount (NRT)</Text>
+                            <TextInput
+                              keyboardType="numeric"
+                              placeholder="15.00"
+                              placeholderTextColor={colors.textTertiary}
+                              value={testAmount}
+                              onChangeText={setTestAmount}
+                              style={styles.textInput}
+                            />
+                          </View>
+
+                          <View>
+                            <Text style={styles.inputLabel}>Description</Text>
+                            <TextInput
+                              placeholder="Netflix Subscription"
+                              placeholderTextColor={colors.textTertiary}
+                              value={testDesc}
+                              onChangeText={setTestDesc}
+                              style={styles.textInput}
+                            />
+                          </View>
+
+                          <Pressable
+                            style={styles.testBtn}
+                            onPress={async () => {
+                              if (!testAmount || parseFloat(testAmount) <= 0) { showToast('Enter a valid amount', 'warning'); return; }
+                              if (!testDesc.trim()) { showToast('Enter a description', 'warning'); return; }
+                              try {
+                                const session = await createCheckoutSession(parseFloat(testAmount), testDesc.trim());
+                                showToast('Test checkout session created!', 'success');
+                                setTestAmount('');
+                                setTestDesc('');
+                                setShowPaymentHub(false);
+                                setActiveQrSession(session);
+                              } catch (err: any) {
+                                showToast(err.message || 'Failed', 'danger');
+                              }
+                            }}
+                          >
+                            <Text style={styles.testBtnText}>Generate Test QR Code</Text>
+                          </Pressable>
+                        </View>
+ 
+                        {/* Active Sessions */}
+                        {checkoutSessions.length > 0 && (
+                          <View style={{ marginTop: 16, borderTopWidth: 1, borderTopColor: colors.glassBorder, paddingTop: 16 }}>
+                            <Text style={styles.activeSessionsLabel}>Active Sessions</Text>
+                            <View style={{ gap: 8, marginTop: 8 }}>
+                              {checkoutSessions.map(session => (
+                                <View key={session.id} style={styles.activeSessionRow}>
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.activeSessionDesc} numberOfLines={1}>{session.description}</Text>
+                                    <Text style={styles.activeSessionAmount}>{session.amountNrt} NRT</Text>
+                                  </View>
+                                  <Pressable onPress={() => { setShowPaymentHub(false); setActiveQrSession(session); }} style={styles.qrIconBtn}>
+                                    <QrCode size={14} color={colors.accentPrimary} />
+                                  </Pressable>
+                                </View>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    {/* View Documentation Link */}
+                    <Pressable
+                      style={styles.docsLinkBtn}
+                      onPress={() => {
+                        setShowPaymentHub(false);
+                        router.push('/documentation/sdk');
+                      }}
+                    >
+                      <Text style={styles.docsLinkBtnText}>View Documentation</Text>
+                    </Pressable>
+                  </View>
+                );
+              })()}
+            </View>
+          )}
+        </ScrollView>
+      </BottomSheet>
+
+      {/* QR Code Display Modal */}
+      <Modal visible={activeQrSession !== null} transparent animationType="fade" onRequestClose={handleCloseQr}>
+        <TouchableWithoutFeedback onPress={handleCloseQr}>
+          <View style={styles.qrModalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.qrModalContent}>
+                <View style={styles.qrModalHeader}>
+                  <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                    <Text style={styles.qrModalTitle}>Test Scan2Pay</Text>
+                    <Text style={styles.qrModalSubtitle} numberOfLines={1}>{activeQrSession?.description}</Text>
+                  </View>
+                  <Pressable onPress={handleCloseQr} style={styles.closeBtn}>
+                    <X size={18} color={colors.textPrimary} />
+                  </Pressable>
+                </View>
+
+                {activeQrSession && (
+                  <View style={{ alignItems: 'center', gap: 16 }}>
+                    <View style={styles.qrCodeWrapper}>
+                      <Image
+                        source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(activeQrSession.qrPayload)}` }}
+                        style={{ width: 180, height: 180 }}
+                      />
+                    </View>
+
+                    <View style={{ alignItems: 'center' }}>
+                      <Text style={{ fontSize: 24, fontWeight: '900', color: colors.accentPrimary }}>{activeQrSession.amountNrt} NRT</Text>
+                      <Text style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginTop: 4 }}>Pay with NetReward App</Text>
+                    </View>
+
+                    <View style={styles.qrInfoBox}>
+                      <Info size={16} color={colors.accentPrimary} style={{ marginTop: 2 }} />
+                      <Text style={styles.qrInfoText}>
+                        Open your <Text style={{ fontWeight: 'bold', color: colors.accentPrimary }}>NetReward Mobile App</Text> and scan this QR code to complete the test payment transaction.
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       <LogoutConfirmModal
         isOpen={showLogoutConfirm}
         onClose={() => setShowLogoutConfirm(false)}
@@ -398,4 +733,49 @@ const createStyles = (colors: any) => StyleSheet.create({
 
   backBtn: { flex: 1, padding: 16, borderRadius: 16, backgroundColor: colors.bgSecondary, alignItems: 'center' },
   backBtnText: { color: colors.textPrimary, fontSize: 16, fontWeight: 'bold' },
+  detailCard: { backgroundColor: colors.bgSecondary, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.glassBorder },
+  detailHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  detailLogo: { width: 40, height: 40, borderRadius: 12 },
+  detailTitle: { fontSize: 15, fontWeight: 'bold', color: colors.textPrimary },
+  detailSubtitle: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  verifiedBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  verifiedBadgeActive: { backgroundColor: 'rgba(16, 185, 129, 0.1)' },
+  verifiedBadgePending: { backgroundColor: 'rgba(245, 158, 11, 0.1)' },
+  verifiedBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5, textTransform: 'uppercase' },
+  urlText: { fontSize: 12, color: colors.textSecondary, marginTop: 6 },
+  apiKeyCopyContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.bgPrimary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 8 },
+  apiKeyText: { fontSize: 10, fontFamily: 'monospace', color: colors.textSecondary, flex: 1, marginRight: 8 },
+  sectionLabel: { fontSize: 11, fontWeight: 'bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  selectorBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, borderColor: colors.glassBorder, backgroundColor: colors.bgSecondary, paddingHorizontal: 12, paddingVertical: 8 },
+  selectorBtnActive: { backgroundColor: 'rgba(139, 92, 246, 0.1)', borderColor: colors.accentPrimary },
+  selectorBtnText: { fontSize: 13, fontWeight: 'bold', color: colors.textSecondary },
+  statusBanner: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1 },
+  statusBannerActive: { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.2)' },
+  statusBannerPending: { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.2)' },
+  statusBannerTitle: { fontSize: 13, fontWeight: 'bold' },
+  apiBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.bgSecondary, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: colors.glassBorder },
+  apiBoxLabel: { fontSize: 9, fontWeight: 'bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  apiBoxValue: { fontSize: 11, fontFamily: 'monospace', color: colors.textPrimary },
+  testCard: { backgroundColor: colors.bgSecondary, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.glassBorder },
+  testCardTitle: { fontSize: 14, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 12 },
+  inputLabel: { fontSize: 10, fontWeight: 'bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  textInput: { backgroundColor: colors.bgPrimary, borderColor: colors.glassBorder, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: colors.textPrimary, borderWidth: 1 },
+  testBtn: { backgroundColor: colors.accentPrimary, paddingVertical: 10, borderRadius: 10, alignItems: 'center', marginTop: 4 },
+  testBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  activeSessionsLabel: { fontSize: 10, fontWeight: 'bold', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  activeSessionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.bgPrimary, borderRadius: 8, padding: 10 },
+  activeSessionDesc: { fontSize: 12, fontWeight: 'bold', color: colors.textPrimary },
+  activeSessionAmount: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  qrIconBtn: { padding: 6, backgroundColor: colors.bgSecondary, borderRadius: 6, borderWidth: 1, borderColor: colors.glassBorder },
+  docsLinkBtn: { paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', backgroundColor: colors.bgSecondary },
+  docsLinkBtnText: { fontSize: 13, fontWeight: 'bold', color: colors.textPrimary },
+  qrModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  qrModalContent: { backgroundColor: colors.bgPrimary, borderRadius: 24, padding: 20, width: '100%', maxWidth: 340, borderWidth: 1, borderColor: colors.glassBorder },
+  qrModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  qrModalTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary },
+  qrModalSubtitle: { fontSize: 12, color: colors.textSecondary },
+  closeBtn: { padding: 4 },
+  qrCodeWrapper: { backgroundColor: '#fff', padding: 16, borderRadius: 16, alignSelf: 'center', marginBottom: 16 },
+  qrInfoBox: { flexDirection: 'row', gap: 8, backgroundColor: 'rgba(139, 92, 246, 0.05)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(139, 92, 246, 0.1)' },
+  qrInfoText: { flex: 1, fontSize: 11, color: colors.textSecondary, lineHeight: 16 }
 });

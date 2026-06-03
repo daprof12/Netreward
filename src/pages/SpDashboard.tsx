@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { LogOut, Activity, Users, Zap, DollarSign, BarChart3, TrendingUp as TrendingUpIcon, Key, CheckCircle2, Code, MapPin, PieChart as PieIcon, Info, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -38,6 +38,67 @@ export default function SpDashboard() {
   const [sdkStatus, setSdkStatus] = useState<'verified' | 'test_pending' | 'not_integrated'>('verified');
   const [activeServiceIndex, setActiveServiceIndex] = useState(0);
   const [viewingCampaignDetails, setViewingCampaignDetails] = useState<any | null>(null);
+
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!carouselRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - carouselRef.current.offsetLeft);
+    setScrollLeft(carouselRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    snapToNearest();
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !carouselRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - carouselRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    carouselRef.current.scrollLeft = scrollLeft - walk;
+  };
+
+  const snapToNearest = () => {
+    if (!carouselRef.current) return;
+    const scrollLeftVal = carouselRef.current.scrollLeft;
+    const width = carouselRef.current.clientWidth;
+    const index = Math.round(scrollLeftVal / width);
+    setActiveServiceIndex(index);
+    carouselRef.current.scrollTo({
+      left: index * width,
+      behavior: 'smooth'
+    });
+  };
+
+  const handleScroll = () => {
+    if (!carouselRef.current || isDragging) return;
+    const scrollLeftVal = carouselRef.current.scrollLeft;
+    const width = carouselRef.current.clientWidth;
+    if (width > 0) {
+      const index = Math.round(scrollLeftVal / width);
+      if (index !== activeServiceIndex && index >= 0 && index < services.length) {
+        setActiveServiceIndex(index);
+      }
+    }
+  };
+
+  const handleDotClick = (index: number) => {
+    setActiveServiceIndex(index);
+    carouselRef.current?.scrollTo({
+      left: index * (carouselRef.current.clientWidth || 0),
+      behavior: 'smooth'
+    });
+  };
 
   useEffect(() => {
     refreshProfile();
@@ -166,8 +227,8 @@ export default function SpDashboard() {
 
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${sdkStatus === 'verified' ? 'bg-green-500/10 text-green-500' :
-                    sdkStatus === 'test_pending' ? 'bg-amber-500/10 text-amber-500' :
-                      'bg-red-500/10 text-red-500'
+                  sdkStatus === 'test_pending' ? 'bg-amber-500/10 text-amber-500' :
+                    'bg-red-500/10 text-red-500'
                   }`}>
                   {sdkStatus.replace('_', ' ')}
                 </span>
@@ -184,25 +245,41 @@ export default function SpDashboard() {
             <div className="flex flex-col gap-3">
               {services.length > 0 ? (
                 <>
-                  <div className="flex items-center justify-between bg-bg-secondary/50 rounded-xl p-3 border border-glass-border">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center shrink-0">
-                        {services[activeServiceIndex]?.logoUrl ? (
-                          <img src={services[activeServiceIndex].logoUrl} alt="" className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                          <Key size={14} className="text-accent-primary" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5 truncate">
-                          {services[activeServiceIndex]?.name || 'Service'}
-                        </p>
-                        <code className="text-xs font-mono text-text-primary">
-                          {services[activeServiceIndex]?.apiKey
-                            ? `${services[activeServiceIndex].apiKey.slice(0, 12)}••••${services[activeServiceIndex].apiKey.slice(-4)}`
-                            : 'No API key'}
-                        </code>
-                      </div>
+                  <div className="w-full overflow-hidden">
+                    <div
+                      ref={carouselRef}
+                      onScroll={handleScroll}
+                      onMouseDown={handleMouseDown}
+                      onMouseLeave={handleMouseLeave}
+                      onMouseUp={handleMouseUp}
+                      onMouseMove={handleMouseMove}
+                      className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none cursor-grab active:cursor-grabbing select-none"
+                    >
+                      {services.map((item, i) => (
+                        <div key={item.id || i} className="w-full shrink-0 snap-start snap-always pr-1">
+                          <div className="flex items-center justify-between bg-bg-secondary/50 rounded-xl p-3 border border-glass-border">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center shrink-0">
+                                {item?.logoUrl ? (
+                                  <img src={item.logoUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                                ) : (
+                                  <Key size={14} className="text-accent-primary" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5 truncate">
+                                  {item?.name || 'Service'}
+                                </p>
+                                <code className="text-xs font-mono text-text-primary">
+                                  {item?.apiKey
+                                    ? `${item.apiKey.slice(0, 12)}••••${item.apiKey.slice(-4)}`
+                                    : 'No API key'}
+                                </code>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -212,10 +289,10 @@ export default function SpDashboard() {
                       {services.map((_, i) => (
                         <button
                           key={i}
-                          onClick={() => setActiveServiceIndex(i)}
+                          onClick={() => handleDotClick(i)}
                           className={`transition-all duration-200 rounded-full ${i === activeServiceIndex
-                              ? 'w-4 h-1.5 bg-accent-primary'
-                              : 'w-1.5 h-1.5 bg-text-secondary/30 hover:bg-text-secondary/50'
+                            ? 'w-4 h-1.5 bg-accent-primary'
+                            : 'w-1.5 h-1.5 bg-text-secondary/30 hover:bg-text-secondary/50'
                             }`}
                         />
                       ))}
@@ -404,7 +481,7 @@ export default function SpDashboard() {
 
         {isSpHeatmapLoading ? (
           <div className="flex justify-center py-6"><Loader2 className="animate-spin text-text-secondary" /></div>
-        ) : (!spHeatmap || spHeatmap.length === 0 || spHeatmap.every(d => d.intensity === 0)) ? (
+        ) : (!spHeatmap || spHeatmap.length === 0) ? (
           <EmptyState
             icon={<Activity size={24} />}
             title="No Platform Activity"
@@ -441,7 +518,7 @@ export default function SpDashboard() {
                             intensity === 3 ? 'rgba(var(--accent-primary-rgb), 0.75)' :
                               intensity === 2 ? 'rgba(var(--accent-primary-rgb), 0.5)' :
                                 intensity === 1 ? 'rgba(var(--accent-primary-rgb), 0.25)' :
-                                  'var(--bg-secondary)'
+                                  'rgba(128, 128, 128, 0.15)'
                         }}
                       />
                     );
@@ -528,8 +605,8 @@ export default function SpDashboard() {
               key={f}
               onClick={() => setTimeFilter(f)}
               className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${timeFilter === f
-                  ? 'bg-accent-primary text-white shadow-sm'
-                  : 'text-text-secondary hover:text-text-primary'
+                ? 'bg-accent-primary text-white shadow-sm'
+                : 'text-text-secondary hover:text-text-primary'
                 }`}
             >
               {f}
@@ -557,12 +634,21 @@ export default function SpDashboard() {
               onClick={() => setViewingCampaignDetails(camp)}
               className="w-full text-left glass p-4 rounded-xl border border-glass-border flex justify-between items-center active:scale-[0.98] transition-transform hover:bg-glass-bg"
             >
-              <div>
-                <h4 className="font-semibold text-text-primary text-sm">{camp.name}</h4>
-                <p className="text-xs text-text-secondary mt-1">
-                  <span className="w-2 h-2 inline-block rounded-full bg-accent-primary animate-pulse mr-1"></span>
-                  Running
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-bg-primary border border-glass-border flex items-center justify-center overflow-hidden shrink-0">
+                  {camp.logo_url ? (
+                    <img src={camp.logo_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-bold text-accent-primary uppercase">{camp.name?.[0]}</span>
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-semibold text-text-primary text-sm">{camp.name}</h4>
+                  <p className="text-xs text-text-secondary mt-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-pulse"></span>
+                    Running
+                  </p>
+                </div>
               </div>
               <div className="text-right">
                 <p className="font-semibold text-accent-primary text-sm">{camp.spentNrt} NRT</p>

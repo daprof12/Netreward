@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, Zap } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/theme';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 export default function InstantPurchaseScreen() {
   const router = useRouter();
@@ -63,8 +64,7 @@ export default function InstantPurchaseScreen() {
             <View style={[styles.calcRow, styles.calcRowNoBorder]}>
               <Text style={styles.calcLabel}>You receive (NRT)</Text>
               <View style={styles.receiveWrapper}>
-                <Text style={styles.receiveValue}>{nrtReceived}</Text>
-                <Text style={styles.receiveSymbol}>NRT</Text>
+                <NrtAmount value={nrtReceived} style={styles.receiveValue} unitStyle={styles.receiveSymbol} />
               </View>
             </View>
           </View>

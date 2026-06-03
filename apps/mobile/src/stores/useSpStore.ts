@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { customStorage } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { useWalletStore } from './useWalletStore';
 
@@ -142,13 +142,17 @@ export const useSpStore = create<SpStore>()(
             oculusUrl: d.oculus_url, nintendoUrl: d.nintendo_url,
           }));
 
-          const campaignsData: SpCampaign[] = campaignsRes.data.map(d => ({
-            id: d.id, serviceId: d.service_id, name: d.title,
-            targetLocation: d.target_locations || [], budgetNrt: d.total_budget,
-            rewardRate: d.reward_rate_per_gb, startDate: d.start_date, endDate: d.end_date,
-            isRecurring: d.is_recurring, status: d.status, createdAt: d.created_at,
-            country: d.country, spentNrt: d.budget_spent
-          }));
+          const campaignsData: SpCampaign[] = campaignsRes.data.map(d => {
+            const service = servicesData.find(s => s.id === d.service_id);
+            return {
+              id: d.id, serviceId: d.service_id, name: d.title,
+              targetLocation: d.target_locations || [], budgetNrt: d.total_budget,
+              rewardRate: d.reward_rate_per_gb, startDate: d.start_date, endDate: d.end_date,
+              isRecurring: d.is_recurring, status: d.status, createdAt: d.created_at,
+              country: d.country, spentNrt: d.budget_spent,
+              logo_url: service?.logoUrl
+            };
+          });
 
           set({ services: servicesData, campaigns: campaignsData, isLoading: false });
         } catch (err: any) {
@@ -277,9 +281,11 @@ export const useSpStore = create<SpStore>()(
           const { data: newCampaignData, error: fetchError } = await supabase.from('campaigns').select('*').eq('id', data.campaign_id).single();
           if (fetchError) throw fetchError;
           
+          const service = get().services.find(s => s.id === campaign.serviceId);
           const newCampaign: SpCampaign = {
             ...campaign,
-            id: newCampaignData.id, status: newCampaignData.status, spentNrt: newCampaignData.budget_spent, createdAt: newCampaignData.created_at
+            id: newCampaignData.id, status: newCampaignData.status, spentNrt: newCampaignData.budget_spent, createdAt: newCampaignData.created_at,
+            logo_url: service?.logoUrl
           };
           
           set((state) => ({ campaigns: [...state.campaigns, newCampaign], isLoading: false }));
@@ -444,7 +450,7 @@ export const useSpStore = create<SpStore>()(
     }),
     {
       name: 'sp-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => customStorage),
     }
   )
 );

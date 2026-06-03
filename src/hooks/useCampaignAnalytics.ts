@@ -32,6 +32,7 @@ export function useCampaignAnalytics(campaignId: string) {
           user_id,
           data_consumed_gb,
           nrt_earned,
+          unclaimed_nrt,
           status,
           users (
             email,
@@ -57,7 +58,7 @@ export function useCampaignAnalytics(campaignId: string) {
           device_type: 'phone',
           country: 'Unknown',
           data_consumed_gb: Number(en.data_consumed_gb || 0),
-          nrt_earned: Number(en.nrt_earned || 0),
+          nrt_earned: Number(en.nrt_earned || 0) + Number(en.unclaimed_nrt || 0),
           status: en.status
         })), chartData: [], totalUsers: simpleEnrollments.length };
       }
@@ -65,17 +66,23 @@ export function useCampaignAnalytics(campaignId: string) {
       const participants = await Promise.all((enrollments || []).map(async (en: any) => {
         const { data: devices } = await supabase
           .from('devices')
-          .select('device_name, device_type, country, status, updated_at')
+          .select('device_name, device_type, country, status, updated_at, created_at')
           .eq('user_id', en.user_id)
           .limit(1);
 
-        const device = devices?.[0] || { device_name: 'Unknown Device', device_type: 'phone', country: 'Unknown', status: 'offline' };
+        const device = devices?.[0] || { device_name: 'Unknown Device', device_type: 'phone', country: 'Unknown', status: 'offline', updated_at: null, created_at: null };
 
         let deviceStatus = 'offline';
-        if (device.status === 'active') {
-          deviceStatus = 'active';
-        } else if (device.updated_at && (Date.now() - new Date(device.updated_at).getTime() < 15 * 60 * 1000)) {
-          deviceStatus = 'active';
+        if (device.status !== 'offline' && device.status !== 'disconnected') {
+          const timeStr = device.updated_at || device.created_at;
+          if (timeStr) {
+            const diffMin = (Date.now() - new Date(timeStr).getTime()) / 60000;
+            if (diffMin < 5) {
+              deviceStatus = 'active';
+            } else if (diffMin < 15) {
+              deviceStatus = 'idle';
+            }
+          }
         }
 
         return {
@@ -85,7 +92,7 @@ export function useCampaignAnalytics(campaignId: string) {
           device_type: device.device_type,
           country: device.country,
           data_consumed_gb: Number(en.data_consumed_gb || 0),
-          nrt_earned: Number(en.nrt_earned || 0),
+          nrt_earned: Number(en.nrt_earned || 0) + Number(en.unclaimed_nrt || 0),
           status: deviceStatus
         } as CampaignParticipant;
       }));

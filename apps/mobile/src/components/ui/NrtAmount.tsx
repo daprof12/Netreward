@@ -10,8 +10,15 @@ interface NrtAmountProps {
   unitStyle?: StyleProp<TextStyle>;
 }
 
+const subscriptMap = ['₀','₁','₂','₃','₄','₅','₆','₇','₈','₉'];
+function toSubscript(num: number): string {
+  return num.toString().split('').map(d => subscriptMap[parseInt(d)]).join('');
+}
+
 export default function NrtAmount({ value, showSign = false, hideUnit = false, style, unitStyle }: NrtAmountProps) {
   const result = formatNrt(value, { showSign });
+  const flattenedStyle = StyleSheet.flatten(style) || {};
+  const baseFontSize = (flattenedStyle as any).fontSize || 14;
 
   const unitLabel = hideUnit ? null : (
     <Text style={[style, styles.unit, unitStyle]}>NRT</Text>
@@ -29,11 +36,7 @@ export default function NrtAmount({ value, showSign = false, hideUnit = false, s
   // result.type === 'subscript'
   return (
     <View style={styles.container}>
-      <Text style={style}>{result.prefix}</Text>
-      <View style={{ justifyContent: 'flex-end', paddingBottom: 2 }}>
-         <Text style={[style, styles.subscript]}>{result.zeros}</Text>
-      </View>
-      <Text style={style}>{result.suffix}</Text>
+      <Text style={style}>{result.prefix}{toSubscript(result.zeros)}{result.suffix}</Text>
       {unitLabel}
     </View>
   );

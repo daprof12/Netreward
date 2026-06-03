@@ -59,30 +59,30 @@ export default function BottomSheet({ visible, onClose, title, children }: Botto
 
   return (
     <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <Animated.View 
-              style={[styles.sheet, { transform: [{ translateY: panY }], paddingBottom: insets.bottom + 20 }]}
-            >
-              <View {...panResponder.panHandlers} style={styles.handleContainer}>
-                <View style={styles.handle} />
-              </View>
-              
-              <View style={styles.header}>
-                <Text style={styles.title}>{title}</Text>
-                <Pressable onPress={onClose} style={styles.closeBtn}>
-                  <X size={16} color={colors.textPrimary} />
-                </Pressable>
-              </View>
+      <View style={styles.overlay}>
+        {/* Backdrop Pressable */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-              <View style={styles.content}>
-                {children}
-              </View>
-            </Animated.View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+        {/* Sheet container */}
+        <Animated.View 
+          style={[styles.sheet, { transform: [{ translateY: panY }], paddingBottom: insets.bottom + 20 }]}
+        >
+          <View {...panResponder.panHandlers} style={styles.handleContainer}>
+            <View style={styles.handle} />
+          </View>
+          
+          <View style={styles.header}>
+            <Text style={styles.title}>{title}</Text>
+            <Pressable onPress={onClose} style={styles.closeBtn}>
+              <X size={16} color={colors.textPrimary} />
+            </Pressable>
+          </View>
+
+          <View style={styles.content}>
+            {children}
+          </View>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }

@@ -146,7 +146,7 @@ export default function SdkDocumentation() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            <div className="grid grid-cols-1 gap-4 mt-6">
               <div className="bg-bg-secondary p-4 rounded-xl border border-glass-border">
                 <h3 className="font-bold flex items-center gap-2"><CheckCircle2 size={16} className="text-green-500" /> BGP IP Validation</h3>
                 <p className="text-xs text-text-secondary mt-1">Automatically resolves device IP against global BGP routing tables to verify ISP authenticity and prevent VPN abuse.</p>

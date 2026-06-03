@@ -8,6 +8,7 @@ import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { useTokenPrice } from '@/hooks/useTokenPrice';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useThemeColors } from '@/theme';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 export default function P2PMarketplaceScreen() {
   const router = useRouter();
@@ -173,7 +174,7 @@ export default function P2PMarketplaceScreen() {
 
                     <View style={[styles.offerLimits, { borderTopWidth: 0, paddingVertical: 0, marginTop: 12 }]}>
                       <View>
-                        <Text style={[styles.priceValue, { color: colors.accentPrimary }]}>{Number(order.nrt_amount).toLocaleString()} NRT</Text>
+                        <NrtAmount value={order.nrt_amount} style={[styles.priceValue, { color: colors.accentPrimary }]} />
                         <Text style={styles.limitValue}>${Number(order.fiat_amount).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
                       </View>
                       <View style={{ alignItems: 'flex-end', justifyContent: 'flex-end' }}>
@@ -223,7 +224,7 @@ export default function P2PMarketplaceScreen() {
                   <View style={styles.offerLimits}>
                     <View>
                       <Text style={styles.limitLabel}>AVAILABLE</Text>
-                      <Text style={styles.limitValue}>{(Number(offer.maxAmount) || 0).toLocaleString()} {offer.asset}</Text>
+                      <NrtAmount value={offer.maxAmount} style={styles.limitValue} />
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={styles.limitLabel}>LIMITS</Text>

@@ -7,6 +7,7 @@ import { X, TrendingUp, Laptop, Smartphone, Search } from 'lucide-react-native';
 import { useThemeColors } from '@/theme';
 import { useCampaignAnalytics } from '@/hooks/useCampaignAnalytics';
 import { formatNrtText } from '@/lib/formatNrt';
+import NrtAmount from '@/components/ui/NrtAmount';
 import WebViewChart from '@/components/WebViewChart';
 import { Dimensions } from 'react-native';
 
@@ -86,9 +87,11 @@ export default function CampaignAnalyticsModal({
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>Budget Spent</Text>
-              <Text style={[styles.statValue, { color: colors.accentPrimary }]}>
-                {formatNrtText(campaign.spentNrt || campaign.budget_spent || 0)}
-              </Text>
+              <NrtAmount 
+                value={campaign.spentNrt || campaign.budget_spent || 0} 
+                style={[styles.statValue, { color: colors.accentPrimary }]} 
+                hideUnit 
+              />
             </View>
           </View>
 
@@ -161,7 +164,7 @@ export default function CampaignAnalyticsModal({
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.participantNrt}>+{formatNrtText(u.nrt_earned)} NRT</Text>
+                  <NrtAmount value={u.nrt_earned} showSign style={styles.participantNrt} />
                   <Text
                     style={[
                       styles.participantStatus,

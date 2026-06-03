@@ -519,16 +519,7 @@ export default function KYCVerification() {
               {(profile?.kyc_status === 'pending' || existingSubmission?.status === 'pending' || 
                 profile?.kyc_status === 'verified' || existingSubmission?.status === 'verified') ? (
                 <button
-                  onClick={() => {
-                    if (profile?.kyc_status === 'verified' || existingSubmission?.status === 'verified') {
-                      // Navigate to appropriate dashboard
-                      if (targetRole === 'sp') navigate('/sp/dashboard');
-                      else if (targetRole === 'isp') navigate('/isp/dashboard');
-                      else navigate('/');
-                    } else {
-                      navigate('/');
-                    }
-                  }}
+                  onClick={() => navigate('/')}
                   className="w-full py-4 bg-bg-secondary text-text-primary font-bold rounded-xl border border-glass-border shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
                   <UserIcon size={18} /> Back to Dashboard

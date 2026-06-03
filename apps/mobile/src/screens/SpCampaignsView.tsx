@@ -1,18 +1,27 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Modal, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Modal, TextInput, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/theme';
 import { Plus, Settings, Play, Pause, Square, Trash2, X, Edit, Users, Loader2, ChevronRight, Search, Filter } from 'lucide-react-native';
 import { useSpStore, type SpCampaign } from '@/stores/useSpStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { useToastStore } from '@/stores/useToastStore';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 export default function SpCampaignsView() {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const router = useRouter();
   const { showToast } = useToastStore();
+  const { user } = useAuthStore();
 
-  const { services, campaigns, updateCampaign, stopCampaign, deleteCampaign, deleteService } = useSpStore();
+  const { services, campaigns, updateCampaign, stopCampaign, deleteCampaign, deleteService, initialize } = useSpStore();
+
+  useEffect(() => {
+    if (user?.id) {
+      initialize(user.id);
+    }
+  }, [user?.id, initialize]);
 
   const [activeTab, setActiveTab] = useState<'services' | 'campaigns'>('services');
   const [showCreateSheet, setShowCreateSheet] = useState(false);
@@ -147,13 +156,13 @@ export default function SpCampaignsView() {
               <Text style={styles.emptyText}>No services found. Tap the + icon to create one.</Text>
             ) : (
               services.map(service => (
-                <View key={service.id} style={styles.card}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View key={service.id} style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
                     <View style={styles.cardIconWrapper}>
                       {service.logoUrl || (service as any).logo_url ? (
-                        <Text style={styles.cardIconText}>Img</Text> // Handle actual image here
+                        <Image source={{ uri: service.logoUrl || (service as any).logo_url }} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
                       ) : (
-                        <Text style={styles.cardIconText}>{service.name[0]}</Text>
+                        <Text style={styles.cardIconText}>{service.name[0]?.toUpperCase()}</Text>
                       )}
                     </View>
                     <View style={{ flex: 1 }}>
@@ -161,7 +170,7 @@ export default function SpCampaignsView() {
                       <Text style={styles.cardMeta}>{service.category}</Text>
                     </View>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 12 }}>
                     <View style={styles.verifiedBadge}><Text style={styles.verifiedText}>VERIFIED</Text></View>
                     <Pressable onPress={() => router.push(`/campaigns/edit-service/${service.id}` as any)}><Edit size={18} color={colors.textSecondary} /></Pressable>
                     <Pressable onPress={() => handleDeleteService(service.id)}><Trash2 size={18} color="#ef4444" /></Pressable>
@@ -228,8 +237,14 @@ export default function SpCampaignsView() {
                       <View style={[styles.progressFill, { width: `${budgetPct}%` }]} />
                     </View>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 10, color: colors.textSecondary }}>{campaign.spentNrt} NRT Spent</Text>
-                      <Text style={{ fontSize: 10, color: colors.textSecondary }}>{campaign.budgetNrt} NRT Budget</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <NrtAmount value={campaign.spentNrt} style={{ fontSize: 10, color: colors.textSecondary }} />
+                        <Text style={{ fontSize: 10, color: colors.textSecondary }}> Spent</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <NrtAmount value={campaign.budgetNrt} style={{ fontSize: 10, color: colors.textSecondary }} />
+                        <Text style={{ fontSize: 10, color: colors.textSecondary }}> Budget</Text>
+                      </View>
                     </View>
 
                     <Pressable onPress={() => setViewingCampaignDetails(campaign)} style={styles.analyticsBtn}>

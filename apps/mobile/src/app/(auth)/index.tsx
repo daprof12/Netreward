@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert, Dimensions } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert, Dimensions, Image } from 'react-native';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { Mail, Lock, User as UserIcon, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Eye, EyeOff } from 'lucide-react-native';
 import { useForm, Controller } from 'react-hook-form';
@@ -12,6 +12,8 @@ import Svg, { Path } from 'react-native-svg';
 import LocationSearch from '@/components/LocationSearch';
 
 const { width } = Dimensions.get('window');
+
+const nrtLogo = require('@/../assets/images/nrt-logo.png');
 
 const authSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -108,21 +110,26 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Background Orbs to match Web theme */}
+      {/* Blurred background orbs — matching web */}
       <View style={styles.bgOrbTopLeft} />
       <View style={styles.bgOrbBottomRight} />
-      
-      <KeyboardAvoidingView 
+
+      <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+
+          {/* Logo + Title — matching web layout */}
           <View style={styles.header}>
-            <Text style={styles.title}>NetReward</Text>
+            <View style={styles.logoRow}>
+              <Image source={nrtLogo} style={styles.logoImage} resizeMode="contain" />
+              <Text style={styles.title}>NetReward</Text>
+            </View>
             <Text style={styles.subtitle}>Your Data, Your Rewards, Your Growth</Text>
           </View>
 
+          {/* ── Forgot Password — Sent ── */}
           {authView === 'forgot_sent' && (
             <View style={styles.card}>
               <View style={styles.iconCircle}>
@@ -137,6 +144,7 @@ export default function AuthScreen() {
             </View>
           )}
 
+          {/* ── Forgot Password — Form ── */}
           {authView === 'forgot' && (
             <View style={styles.card}>
               <Pressable style={styles.backButton} onPress={() => setAuthView('auth')}>
@@ -145,7 +153,7 @@ export default function AuthScreen() {
               </Pressable>
               <Text style={styles.cardTitle}>Forgot Password?</Text>
               <Text style={styles.cardText}>Enter your email address to reset your password.</Text>
-              
+
               <View style={styles.inputContainer}>
                 <Mail color={colors.textSecondary} size={20} style={styles.inputIcon} />
                 <Controller
@@ -166,28 +174,31 @@ export default function AuthScreen() {
               </View>
 
               <Pressable style={styles.primaryButton} onPress={onForgotSubmit} disabled={isLoading}>
-                {isLoading ? <ActivityIndicator color="#0f172a" /> : <Text style={styles.primaryButtonText}>Send Reset Link</Text>}
+                {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Send Reset Link</Text>}
               </Pressable>
             </View>
           )}
 
+          {/* ── Main Auth Form ── */}
           {authView === 'auth' && (
             <View style={styles.card}>
+              {/* Tab Switcher — matching web */}
               <View style={styles.tabContainer}>
-                <Pressable 
-                  style={[styles.tab, isLogin && styles.activeTab]} 
+                <Pressable
+                  style={[styles.tab, isLogin && styles.activeTab]}
                   onPress={() => toggleMode(true)}
                 >
                   <Text style={[styles.tabText, isLogin && styles.activeTabText]}>Login</Text>
                 </Pressable>
-                <Pressable 
-                  style={[styles.tab, !isLogin && styles.activeTab]} 
+                <Pressable
+                  style={[styles.tab, !isLogin && styles.activeTab]}
                   onPress={() => toggleMode(false)}
                 >
                   <Text style={[styles.tabText, !isLogin && styles.activeTabText]}>Register</Text>
                 </Pressable>
               </View>
 
+              {/* Registration-only fields */}
               {!isLogin && (
                 <>
                   <View style={styles.inputContainer}>
@@ -216,7 +227,7 @@ export default function AuthScreen() {
                         <LocationSearch
                           value={value || ''}
                           onChange={onChange}
-                          placeholder="Search country..."
+                          placeholder="Search your country or city"
                           hasError={!!errors.country}
                         />
                       )}
@@ -226,6 +237,7 @@ export default function AuthScreen() {
                 </>
               )}
 
+              {/* Email */}
               <View style={styles.inputContainer}>
                 <Mail color={colors.textSecondary} size={20} style={styles.inputIcon} />
                 <Controller
@@ -246,6 +258,7 @@ export default function AuthScreen() {
               </View>
               {errors.email && <Text style={styles.errorText}>{errors.email.message}</Text>}
 
+              {/* Password */}
               <View style={styles.inputContainer}>
                 <Lock color={colors.textSecondary} size={20} style={styles.inputIcon} />
                 <Controller
@@ -268,31 +281,42 @@ export default function AuthScreen() {
               </View>
               {errors.password && <Text style={styles.errorText}>{errors.password.message}</Text>}
 
+              {/* Forgot Password link */}
               {isLogin && (
-                <Pressable onPress={() => setAuthView('forgot')} style={{ alignItems: 'flex-end', marginTop: 8 }}>
+                <Pressable onPress={() => setAuthView('forgot')} style={{ alignItems: 'flex-end', marginTop: 4 }}>
                   <Text style={styles.forgotText}>Forgot password?</Text>
                 </Pressable>
               )}
 
+              {/* Submit Button */}
               <Pressable style={styles.primaryButton} onPress={handleSubmit(onSubmit)} disabled={isLoading}>
                 {isLoading ? (
-                  <ActivityIndicator color="#0f172a" />
+                  <ActivityIndicator color="#fff" />
                 ) : (
                   <>
                     <Text style={styles.primaryButtonText}>{isLogin ? 'Sign In' : 'Sign Up'}</Text>
-                    <ArrowRight size={20} color="#0f172a" />
+                    <ArrowRight size={20} color="#fff" />
                   </>
                 )}
               </Pressable>
 
+              {/* Security Notice — matching web */}
+              {isLogin && (
+                <Text style={styles.securityNotice}>
+                  Security Notice: Biometric and PIN unlock are configured in Settings after logging in.
+                </Text>
+              )}
+
+              {/* Divider */}
               <View style={styles.dividerContainer}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>or continue with</Text>
                 <View style={styles.dividerLine} />
               </View>
 
+              {/* Social Buttons */}
               <View style={styles.socialContainer}>
-                <Pressable 
+                <Pressable
                   style={styles.socialButton}
                   onPress={() => Alert.alert('Notice', 'Google login will be handled by Expo AuthSession')}
                 >
@@ -303,7 +327,7 @@ export default function AuthScreen() {
                     <Path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                   </Svg>
                 </Pressable>
-                <Pressable 
+                <Pressable
                   style={styles.socialButton}
                   onPress={() => Alert.alert('Notice', 'Apple login will be handled by Expo AuthSession')}
                 >
@@ -328,23 +352,25 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.bgPrimary,
     position: 'relative',
   },
+  // Background orbs — subtle blurred circles matching web's blur-[100px]
   bgOrbTopLeft: {
     position: 'absolute',
-    top: -100,
-    left: -100,
+    top: -width * 0.2,
+    left: -width * 0.2,
     width: width * 0.8,
     height: width * 0.8,
     borderRadius: width * 0.4,
-    backgroundColor: 'rgba(5, 150, 105, 0.15)', // Green accentPrimary with opacity
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    // RN doesn't support CSS blur on views, so keep opacity very low
   },
   bgOrbBottomRight: {
     position: 'absolute',
-    bottom: -100,
-    right: -100,
+    bottom: -width * 0.2,
+    right: -width * 0.2,
     width: width * 0.8,
     height: width * 0.8,
     borderRadius: width * 0.4,
-    backgroundColor: 'rgba(5, 150, 105, 0.1)',
+    backgroundColor: 'rgba(16, 185, 129, 0.06)',
   },
   keyboardView: {
     flex: 1,
@@ -354,21 +380,33 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
+  // Header — logo + title side-by-side, matching web's flex row layout
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 24,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: colors.textPrimary,
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     marginBottom: 8,
   },
+  logoImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#10B981', // Matches web's text-gradient (green)
+  },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
   },
+  // Card — glass effect matching web's glass class
   card: {
     backgroundColor: colors.bgSecondary,
     borderRadius: 24,
@@ -377,29 +415,33 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.glassBorder,
     ...shadows.md,
   },
+  // Tabs — matching web's bg-bg-secondary container
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: colors.bgPrimary,
     padding: 4,
     borderRadius: 12,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
     borderRadius: 8,
   },
   activeTab: {
     backgroundColor: colors.bgSecondary,
+    ...shadows.sm,
   },
   tabText: {
     color: colors.textSecondary,
+    fontSize: 14,
     fontWeight: '600',
   },
   activeTabText: {
     color: colors.textPrimary,
   },
+  // Inputs — matching web's bg-bg-secondary + rounded-xl
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -408,16 +450,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.glassBorder,
     marginBottom: 12,
-    paddingHorizontal: 16,
-    height: 56,
+    paddingHorizontal: 14,
+    height: 50,
   },
   inputIcon: {
-    marginRight: 12,
+    marginRight: 10,
   },
   input: {
     flex: 1,
     color: colors.textPrimary,
-    fontSize: 16,
+    fontSize: 15,
     height: '100%',
   },
   eyeIcon: {
@@ -435,29 +477,42 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
+  // Primary button — matching web's accent-primary with white text
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.accentPrimary,
-    height: 56,
-    borderRadius: 12,
-    marginTop: 24,
+    height: 52,
+    borderRadius: 14,
+    marginTop: 20,
     gap: 8,
-    ...shadows.glow,
+    shadowColor: colors.accentPrimary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
   },
   primaryButtonText: {
-    color: colors.textPrimary,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },
+  // Security Notice — matching web
+  securityNotice: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 16,
+    lineHeight: 16,
+  },
   secondaryButton: {
-    height: 56,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.glassBorder,
-    borderRadius: 12,
+    borderRadius: 14,
     marginTop: 24,
   },
   secondaryButtonText: {
@@ -474,6 +529,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
     marginBottom: 24,
+    borderWidth: 2,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
   },
   cardTitle: {
     fontSize: 24,
@@ -506,10 +563,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  // Divider — matching web
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 20,
     marginBottom: 16,
   },
   dividerLine: {
@@ -520,8 +578,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   dividerText: {
     color: colors.textSecondary,
     paddingHorizontal: 16,
-    fontSize: 12,
+    fontSize: 13,
   },
+  // Social buttons — matching web's glass bordered style
   socialContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -532,8 +591,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.glassBorder,
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: colors.bgPrimary,
     alignItems: 'center',
     justifyContent: 'center',
-  }
+  },
 });

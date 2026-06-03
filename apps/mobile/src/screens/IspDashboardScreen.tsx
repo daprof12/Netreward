@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, ActivityIndicator, Image } from 'react-native';
 import { useAuthStore } from '@/stores/useAuthStore';
+import PulseDot from '@/components/ui/PulseDot';
 import { useIspStore } from '@/stores/useIspStore';
 import { useSystemStore } from '@/stores/useSystemStore';
 import { useCurrencyStore } from '@/stores/useCurrencyStore';
@@ -13,6 +14,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Activity, Users, Zap, DollarSign, Key, Code, Bell, BarChart3, Info, TrendingUp, Network, Wifi, Server } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import NotificationBell from '@/components/ui/NotificationBell';
+import NrtAmount from '@/components/ui/NrtAmount';
+import { useToastStore } from '@/stores/useToastStore';
+
+// Helper to add alpha to hex safely
+const getRgba = (hex: string, alpha: number) => {
+  if (!hex) return 'transparent';
+  if (hex.startsWith('rgba')) return hex;
+  const r = parseInt(hex.slice(1, 3), 16) || 0;
+  const g = parseInt(hex.slice(3, 5), 16) || 0;
+  const b = parseInt(hex.slice(5, 7), 16) || 0;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 const { width } = Dimensions.get('window');
 
@@ -28,11 +41,29 @@ export default function IspDashboardScreen() {
   const { getCurrencyDetails } = useCurrencyStore();
   const { networkStats, fetchNetworkStats, isLoading: isStatsLoading } = useAnalyticsStore();
   const { ispTelemetry, ispHeatmap, isIspHeatmapLoading, isIspTelemetryLoading } = useTelemetry();
+  const { showToast } = useToastStore();
 
   const [activeNetworkIndex, setActiveNetworkIndex] = useState(0);
   const [chartView, setChartView] = useState<'campaigns' | 'cashback' | 'network'>('campaigns');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24H');
   const [chartType, setChartType] = useState<'line' | 'bar'>('line');
+
+  const sdkScrollViewRef = useRef<ScrollView>(null);
+  const cardContentWidth = width - 72;
+
+  const handleDotPress = (index: number) => {
+    setActiveNetworkIndex(index);
+    sdkScrollViewRef.current?.scrollTo({
+      x: index * cardContentWidth,
+      animated: true,
+    });
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      useIspStore.getState().initialize(user.id);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (ispProfileId) {
@@ -57,9 +88,9 @@ export default function IspDashboardScreen() {
     if (!networkStats) return [];
     return networkStats.map(s => ({
       name: new Date(s.date).toLocaleDateString(undefined, { weekday: 'short' }),
-      value: chartView === 'network' ? s.avg_latency_ms :
-        chartView === 'cashback' ? Number(s.total_traffic_bytes) / 1024 / 1024 / 1024 * 0.05 : // 5% cashback approximation
-          s.active_users,
+      value: chartView === 'network' ? Number(s.avg_latency_ms || 0) :
+        chartView === 'cashback' ? Number(s.total_traffic_bytes || 0) / 1024 / 1024 / 1024 * 0.05 : // 5% cashback approximation
+          Number(s.active_users || 0),
     }));
   }, [networkStats, chartView]);
 
@@ -153,6 +184,9 @@ export default function IspDashboardScreen() {
                   <View style={styles.verifiedBadge}>
                     <Text style={styles.verifiedText}>{sdkStatus.replace('_', ' ').toUpperCase()}</Text>
                   </View>
+                  {sdkStatus === 'verified' && (
+                    <PulseDot size={8} color="#10b981" />
+                  )}
                 </View>
               </View>
               <Text style={styles.cardDescription}>
@@ -160,19 +194,63 @@ export default function IspDashboardScreen() {
               </Text>
               
               {networks.length > 0 ? (
-                <View style={styles.networkBox}>
-                  <View style={styles.networkIcon}>
-                    <Network size={14} color={colors.accentPrimary} />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.networkName}>{networks[activeNetworkIndex]?.name || 'NETWORK NODE'}</Text>
-                    <Text style={styles.networkDesc}>
-                      {networks[activeNetworkIndex]?.apiKey 
-                        ? `${networks[activeNetworkIndex].apiKey.slice(0, 12)}••••${networks[activeNetworkIndex].apiKey.slice(-4)}`
-                        : 'No API key'}
-                    </Text>
-                  </View>
-                </View>
+                <>
+                  <ScrollView
+                    ref={sdkScrollViewRef}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onMomentumScrollEnd={(e) => {
+                      const offset = e.nativeEvent.contentOffset.x;
+                      const index = Math.round(offset / cardContentWidth);
+                      if (index !== activeNetworkIndex) {
+                        setActiveNetworkIndex(index);
+                      }
+                    }}
+                    style={{ width: cardContentWidth, marginBottom: 16 }}
+                    contentContainerStyle={{ alignItems: 'center' }}
+                  >
+                    {networks.map((item, i) => (
+                      <View 
+                        key={item.id || i} 
+                        style={[styles.networkBox, { width: cardContentWidth, marginBottom: 0 }]}
+                      >
+                        <View style={styles.networkIcon}>
+                          {item?.logoUrl ? (
+                            <Image source={{ uri: item.logoUrl }} style={{ width: '100%', height: '100%', borderRadius: 16 }} />
+                          ) : (
+                            <Network size={14} color={colors.accentPrimary} />
+                          )}
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={styles.networkName}>{item?.name || 'NETWORK NODE'}</Text>
+                          <Text style={styles.networkDesc}>
+                            {item?.apiKey 
+                              ? `${item.apiKey.slice(0, 12)}••••${item.apiKey.slice(-4)}`
+                              : 'No API key'}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                  
+                  {networks.length > 1 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 16 }}>
+                      {networks.map((_, i) => (
+                        <Pressable
+                          key={i}
+                          onPress={() => handleDotPress(i)}
+                          style={{
+                            width: i === activeNetworkIndex ? 16 : 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: i === activeNetworkIndex ? colors.accentPrimary : 'rgba(128,128,128,0.3)'
+                          }}
+                        />
+                      ))}
+                    </View>
+                  )}
+                </>
               ) : (
                 <View style={styles.networkBox}>
                   <View style={styles.networkIcon}>
@@ -186,8 +264,8 @@ export default function IspDashboardScreen() {
               )}
 
               <View style={styles.sdkFooter}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Activity size={14} color={colors.textSecondary} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <PulseDot size={8} color="#10b981" />
                   <Text style={styles.sdkFooterText}>Last Ping: <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>Just now</Text></Text>
                 </View>
                 <Pressable onPress={() => router.push('/documentation/sdk' as any)}>
@@ -218,20 +296,44 @@ export default function IspDashboardScreen() {
               </View>
             ) : (
               <View style={{ paddingVertical: 16 }}>
-                 <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 4 }}>99.9%</Text>
-                 <Text style={{ fontSize: 12, color: colors.success }}>Uptime (30d)</Text>
-                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
-                   <View>
-                     <Text style={{ fontSize: 10, color: colors.textSecondary, marginBottom: 2 }}>Avg Latency</Text>
-                     <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.textPrimary }}>
-                       {ispTelemetry && ispTelemetry.length > 0 ? `${(ispTelemetry.reduce((s,t) => s + (t.avg_latency_ms||0),0)/ispTelemetry.length).toFixed(0)}ms` : '0ms'}
-                     </Text>
-                   </View>
-                   <View>
-                     <Text style={{ fontSize: 10, color: colors.textSecondary, marginBottom: 2 }}>Active Nodes</Text>
-                     <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.textPrimary }}>{activeNodes}</Text>
-                   </View>
-                 </View>
+                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+                  <View style={{ flex: 1, backgroundColor: 'rgba(128,128,128,0.1)', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.glassBorder }}>
+                    <Text style={{ fontSize: 10, color: colors.textSecondary, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Avg. Latency</Text>
+                    <Text style={{ fontSize: 20, fontWeight: '900', color: colors.textPrimary }}>
+                      {(ispTelemetry.reduce((sum, t) => sum + (t.avg_latency_ms || 0), 0) / ispTelemetry.length).toFixed(0)}ms
+                    </Text>
+                    <Text style={{ fontSize: 10, color: colors.success, fontWeight: 'bold', marginTop: 4 }}>Live Tracking</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: 'rgba(128,128,128,0.1)', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.glassBorder }}>
+                    <Text style={{ fontSize: 10, color: colors.textSecondary, fontWeight: '900', textTransform: 'uppercase', marginBottom: 4 }}>Packet Loss</Text>
+                    <Text style={{ fontSize: 20, fontWeight: '900', color: colors.textPrimary }}>
+                      {((ispTelemetry.reduce((sum, t) => sum + Number(t.packet_loss_pct || 0), 0) / ispTelemetry.length) * 100).toFixed(2)}%
+                    </Text>
+                    <Text style={{ fontSize: 10, color: '#3B82F6', fontWeight: 'bold', marginTop: 4 }}>Excellent</Text>
+                  </View>
+                </View>
+
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 12 }}>Top Performing Nodes</Text>
+                {Object.entries(
+                  ispTelemetry.reduce((acc, t) => {
+                    if (!acc[t.node_name]) acc[t.node_name] = { users: 0, uptime: 0, count: 0 };
+                    acc[t.node_name].users += (t.active_users || 0);
+                    acc[t.node_name].uptime += Number(t.uptime_pct || 0);
+                    acc[t.node_name].count += 1;
+                    return acc;
+                  }, {} as Record<string, { users: number, uptime: number, count: number }>)
+                ).sort((a, b) => b[1].users - a[1].users).slice(0, 3).map(([name, stats], i) => (
+                  <View key={name} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: i === 0 ? colors.success : i === 1 ? '#3B82F6' : '#F59E0B' }} />
+                      <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.textPrimary }}>{name}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>{stats.users} users</Text>
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary }}>{((stats.uptime / stats.count) * 100).toFixed(2)}%</Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             )}
           </View>
@@ -251,22 +353,33 @@ export default function IspDashboardScreen() {
                  <Text style={styles.emptyTitle}>Insufficient Data</Text>
                  <Text style={styles.emptyText}>Node revenue metrics require active tracking.</Text>
                </View>
-            ) : (
-               <View style={{ paddingVertical: 16 }}>
-                 <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 4 }}>
-                   {activeNodes > 0 ? (cashbackNrt / activeNodes).toFixed(2) : '0'} NRT
-                 </Text>
-                 <Text style={{ fontSize: 12, color: colors.accentPrimary }}>Average per active node</Text>
-                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
-                   <View>
-                     <Text style={{ fontSize: 10, color: colors.textSecondary, marginBottom: 2 }}>Top Node Users</Text>
-                     <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.textPrimary }}>
-                       {ispTelemetry && ispTelemetry.length > 0 ? `${Math.max(...ispTelemetry.map(t => t.active_users||0)).toLocaleString()} users` : '0 users'}
-                     </Text>
-                   </View>
+            ) : (() => {
+               const totalUsers = ispTelemetry.reduce((s, t) => s + (t.active_users || 0), 0);
+               return (
+                 <View style={{ paddingVertical: 16 }}>
+                   {Object.entries(
+                     ispTelemetry.reduce((acc, t) => {
+                       if (!acc[t.node_name]) acc[t.node_name] = 0;
+                       acc[t.node_name] += (t.active_users || 0); // Proxy for revenue until actual node revenue table is built
+                       return acc;
+                     }, {} as Record<string, number>)
+                   ).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, proxyRev], i) => {
+                     const barColors = [colors.accentPrimary, '#3B82F6', '#8B5CF6'];
+                     return (
+                       <View key={name} style={{ marginBottom: 12 }}>
+                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                           <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.textPrimary }}>{name}</Text>
+                           <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.accentPrimary }}>{(proxyRev * 0.1).toFixed(2)} NRT</Text>
+                         </View>
+                         <View style={{ height: 6, backgroundColor: 'rgba(128,128,128,0.2)', borderRadius: 3, overflow: 'hidden' }}>
+                           <View style={{ height: '100%', width: `${(proxyRev / totalUsers) * 100}%`, backgroundColor: barColors[i % barColors.length] }} />
+                         </View>
+                       </View>
+                     );
+                   })}
                  </View>
-               </View>
-            )}
+               );
+            })()}
           </View>
         </View>
 
@@ -279,46 +392,63 @@ export default function IspDashboardScreen() {
             </View>
             <View style={styles.heatmapLegend}>
               <Text style={styles.heatmapLegendText}>Less</Text>
-              <View style={[styles.heatmapDot, { backgroundColor: colors.bgSecondary }]} />
-              <View style={[styles.heatmapDot, { backgroundColor: 'rgba(5, 150, 105, 0.25)' }]} />
-              <View style={[styles.heatmapDot, { backgroundColor: 'rgba(5, 150, 105, 0.5)' }]} />
-              <View style={[styles.heatmapDot, { backgroundColor: 'rgba(5, 150, 105, 0.75)' }]} />
+              <View style={[styles.heatmapDot, { backgroundColor: 'rgba(128,128,128,0.15)' }]} />
+              <View style={[styles.heatmapDot, { backgroundColor: getRgba(colors.accentPrimary, 0.25) }]} />
+              <View style={[styles.heatmapDot, { backgroundColor: getRgba(colors.accentPrimary, 0.5) }]} />
+              <View style={[styles.heatmapDot, { backgroundColor: getRgba(colors.accentPrimary, 0.75) }]} />
               <View style={[styles.heatmapDot, { backgroundColor: colors.accentPrimary }]} />
               <Text style={styles.heatmapLegendText}>More</Text>
             </View>
           </View>
           
           {isIspHeatmapLoading ? (
-             <View style={{ paddingVertical: 32 }}><ActivityIndicator color={colors.textSecondary} /></View>
-          ) : (!ispHeatmap || ispHeatmap.length === 0 || ispHeatmap.every((d:any) => d.intensity === 0)) ? (
+             <View style={{ paddingVertical: 32 }}><ActivityIndicator color={colors.accentPrimary} /></View>
+          ) : (!ispHeatmap || ispHeatmap.length === 0) ? (
             <View style={styles.emptyState}>
               <Activity size={24} color={colors.textSecondary} style={{ marginBottom: 12, opacity: 0.5 }} />
               <Text style={styles.emptyTitle}>No Network Activity</Text>
               <Text style={styles.emptyText}>Activity will appear here once users consume data on your connected nodes.</Text>
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
-              {[...Array(16)].map((_, weekIdx) => (
-                <View key={weekIdx} style={styles.heatmapCol}>
-                  {[...Array(7)].map((_, dayIdx) => {
-                     const dataIndex = weekIdx * 7 + dayIdx;
-                     const dayData = ispHeatmap[dataIndex];
-                     const intensity = dayData?.intensity || 0;
-                     const bgColor = intensity === 4 ? colors.accentPrimary :
-                                     intensity === 3 ? 'rgba(5, 150, 105, 0.75)' :
-                                     intensity === 2 ? 'rgba(5, 150, 105, 0.5)' :
-                                     intensity === 1 ? 'rgba(5, 150, 105, 0.25)' :
-                                     'rgba(255,255,255,0.05)';
-                     return (
-                       <View 
-                         key={dayIdx} 
-                         style={[styles.heatmapCell, { backgroundColor: bgColor }]} 
-                       />
-                     );
-                  })}
-                </View>
-              ))}
-            </ScrollView>
+            <View style={styles.heatmapGrid}>
+              <View style={styles.heatmapDays}>
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                  <View key={d} style={styles.heatmapDayWrapper}>
+                    <Text style={styles.heatmapDayText}>{d}</Text>
+                  </View>
+                ))}
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
+                {[...Array(16)].map((_, weekIdx) => (
+                  <View key={weekIdx} style={styles.heatmapCol}>
+                    {[...Array(7)].map((_, dayIdx) => {
+                       const dataIndex = weekIdx * 7 + dayIdx;
+                       const dayData = ispHeatmap[dataIndex];
+                       const intensity = dayData?.intensity || 0;
+                       
+                       const bgColor = 
+                         intensity === 4 ? colors.accentPrimary :
+                         intensity === 3 ? getRgba(colors.accentPrimary, 0.75) :
+                         intensity === 2 ? getRgba(colors.accentPrimary, 0.5) :
+                         intensity === 1 ? getRgba(colors.accentPrimary, 0.25) :
+                         'rgba(128,128,128,0.15)';
+
+                       return (
+                         <Pressable 
+                           key={dayIdx} 
+                           style={[styles.heatmapCell, { backgroundColor: bgColor }]} 
+                           onPress={() => {
+                             if (dayData && dayData.activity_date) {
+                               showToast(`${dayData.activity_date}: ${dayData.value} GB Tracked`, 'success');
+                             }
+                           }}
+                         />
+                       );
+                    })}
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
           )}
         </View>
 
@@ -422,7 +552,7 @@ export default function IspDashboardScreen() {
                   </View>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.liveCampBudget}>{(camp.spentNrt || 0).toLocaleString()} NRT</Text>
+                  <NrtAmount value={camp.spentNrt || 0} style={styles.liveCampBudget} />
                   <Text style={styles.liveCampBudgetLabel}>budget spent</Text>
                 </View>
               </Pressable>
@@ -470,7 +600,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   verifiedBadge: { backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   verifiedText: { color: colors.success, fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
   
-  networkBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.glassBorder, marginBottom: 16 },
+  networkBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: getRgba(colors.bgSecondary, 0.5), padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.glassBorder, marginBottom: 16 },
   networkIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(5, 150, 105, 0.1)', alignItems: 'center', justifyContent: 'center' },
   networkName: { fontSize: 10, fontWeight: '800', color: colors.textSecondary, letterSpacing: 1, marginBottom: 2, textTransform: 'uppercase' },
   networkDesc: { fontSize: 12, color: colors.textSecondary },
@@ -489,8 +619,12 @@ const createStyles = (colors: any) => StyleSheet.create({
   heatmapLegendText: { fontSize: 9, color: colors.textSecondary },
   heatmapDot: { width: 10, height: 10, borderRadius: 2 },
   
-  heatmapCol: { gap: 4 },
-  heatmapCell: { width: 14, height: 14, borderRadius: 3 },
+  heatmapGrid: { flexDirection: 'row', gap: 4 },
+  heatmapDays: { justifyContent: 'space-between', paddingVertical: 2, marginRight: 8 },
+  heatmapDayWrapper: { height: 12, justifyContent: 'center' },
+  heatmapDayText: { fontSize: 10, color: colors.textSecondary },
+  heatmapCol: { justifyContent: 'space-between', gap: 4 },
+  heatmapCell: { width: 12, height: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3 },
   
   chartToggleActive: { backgroundColor: colors.accentPrimary, padding: 6, borderRadius: 6 },
   chartToggleInactive: { backgroundColor: 'transparent', padding: 6, borderRadius: 6 },

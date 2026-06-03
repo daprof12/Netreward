@@ -31,6 +31,19 @@ const getDeviceIcon = (type: string) => {
   }
 };
 
+const getDynamicStatus = (updatedAt?: string, dbStatus?: string, createdAt?: string): 'active' | 'idle' | 'offline' => {
+  if (dbStatus === 'offline' || dbStatus === 'disconnected') {
+    return 'offline';
+  }
+  const timeStr = updatedAt || createdAt;
+  if (!timeStr) return 'offline';
+  const diffMs = Date.now() - new Date(timeStr).getTime();
+  const diffMin = diffMs / 60000;
+  if (diffMin < 5) return 'active';
+  if (diffMin < 15) return 'idle';
+  return 'offline';
+};
+
 
 function UserDevicesView() {
 
@@ -227,7 +240,7 @@ function UserDevicesView() {
             action={{ label: "Add Device", onClick: () => setShowAddDevice(true) }}
           />
         ) : devices?.map((device) => {
-          const isActive = device.status === 'active';
+          const dynamicStatus = getDynamicStatus(device.updated_at, device.status, device.created_at);
           const DeviceIcon = getDeviceIcon(device.device_type);
           const devSummary = summaries[device.id];
           
@@ -236,10 +249,15 @@ function UserDevicesView() {
               <motion.div 
                 whileTap={{ scale: 0.98 }}
                 className={`glass p-4 rounded-xl border relative overflow-hidden cursor-pointer hover:bg-glass-bg/50 transition-colors ${
-                  isActive ? 'border-accent-primary/50' : 'border-glass-border'
+                  dynamicStatus === 'active' 
+                    ? 'border-accent-primary/50' 
+                    : dynamicStatus === 'idle'
+                      ? 'border-amber-500/50'
+                      : 'border-glass-border'
                 }`}
               >
-                {isActive && <div className="absolute top-0 right-0 w-1 h-full bg-accent-primary"></div>}
+                {dynamicStatus === 'active' && <div className="absolute top-0 right-0 w-1 h-full bg-accent-primary"></div>}
+                {dynamicStatus === 'idle' && <div className="absolute top-0 right-0 w-1 h-full bg-amber-500"></div>}
                 
                 {/* Absolute Delete Button */}
                 <button 
@@ -252,9 +270,11 @@ function UserDevicesView() {
 
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    isActive 
+                    dynamicStatus === 'active' 
                       ? 'bg-accent-primary/10 text-accent-primary' 
-                      : 'bg-bg-secondary text-text-secondary'
+                      : dynamicStatus === 'idle'
+                        ? 'bg-amber-500/10 text-amber-500'
+                        : 'bg-bg-secondary text-text-secondary'
                   }`}>
                     <DeviceIcon size={24} />
                   </div>
@@ -267,12 +287,14 @@ function UserDevicesView() {
                     </div>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                       <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md ${
-                        isActive 
+                        dynamicStatus === 'active' 
                           ? 'text-accent-primary bg-accent-primary/10' 
-                          : 'text-text-secondary bg-bg-secondary'
+                          : dynamicStatus === 'idle'
+                            ? 'text-amber-500 bg-amber-500/10'
+                            : 'text-text-secondary bg-bg-secondary'
                       }`}>
-                        {isActive ? <Wifi size={10} /> : <WifiOff size={10} />}
-                        {isActive ? 'Active' : 'Offline'}
+                        {dynamicStatus === 'offline' ? <WifiOff size={10} /> : <Wifi size={10} />}
+                        <span className="capitalize">{dynamicStatus}</span>
                       </span>
                       <span className="flex items-center gap-1 text-[10px] text-text-secondary">
                         <MapPin size={10} className="text-accent-primary" />
@@ -408,7 +430,7 @@ function UserDevicesView() {
                                   <p className="font-semibold text-sm">{device.device_name}</p>
                                   {isCurrent && <span className="text-[9px] font-bold bg-accent-primary/20 text-accent-primary px-1.5 py-0.5 rounded uppercase">Current</span>}
                                 </div>
-                                <p className="text-xs text-text-secondary">{device.status}</p>
+                                <p className="text-xs text-text-secondary capitalize">{getDynamicStatus(device.updated_at, device.status, device.created_at)}</p>
                               </div>
                             </div>
                             <button

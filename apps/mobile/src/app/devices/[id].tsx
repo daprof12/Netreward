@@ -6,7 +6,7 @@ import { ChevronLeft, Wifi, Signal, Filter, X, Tv, Music, Globe, Gamepad2, Messa
 import WebViewChart from '@/components/WebViewChart';
 import { useThemeColors } from '@/theme';
 import { useUserDeviceStats, useDeviceAppUsage, useDeviceById, TimeFilter } from '@/hooks/useDeviceAnalytics';
-import { formatNrtText } from '@/lib/formatNrt';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -27,6 +27,19 @@ function SignalBars({ strength, colors }: { strength: number, colors: any }) {
     </View>
   );
 }
+
+const getDynamicStatus = (updatedAt?: string, dbStatus?: string, createdAt?: string): 'active' | 'idle' | 'offline' => {
+  if (dbStatus === 'offline' || dbStatus === 'disconnected') {
+    return 'offline';
+  }
+  const timeStr = updatedAt || createdAt;
+  if (!timeStr) return 'offline';
+  const diffMs = Date.now() - new Date(timeStr).getTime();
+  const diffMin = diffMs / 60000;
+  if (diffMin < 5) return 'active';
+  if (diffMin < 15) return 'idle';
+  return 'offline';
+};
 
 export default function DeviceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -49,6 +62,7 @@ export default function DeviceDetailScreen() {
   const deviceName = deviceInfo?.device_name || 'Device';
   const deviceStatus = deviceInfo?.status || 'offline';
   const deviceIsp = deviceInfo?.isp_name || 'Unknown ISP';
+  const dynamicStatus = getDynamicStatus(deviceInfo?.updated_at, deviceInfo?.status, deviceInfo?.created_at);
 
   const getCategoryForApp = (name: string) => {
     const n = name.toLowerCase();
@@ -88,18 +102,6 @@ export default function DeviceDetailScreen() {
 
   const hasChartData = currentData.length > 0 && !currentData.every(d => d.data === 0 && d.nrt === 0);
 
-  const chartConfig = {
-    backgroundGradientFrom: colors.bgSecondary,
-    backgroundGradientTo: colors.bgSecondary,
-    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-    labelColor: (opacity = 1) => colors.textSecondary,
-    strokeWidth: 2,
-    barPercentage: 0.5,
-    useShadowColorFromDataset: false,
-    decimalPlaces: 2,
-    propsForDots: { r: '3', strokeWidth: '1', stroke: colors.bgPrimary }
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
@@ -113,10 +115,30 @@ export default function DeviceDetailScreen() {
             <Text style={styles.headerTitle}>{deviceName}</Text>
           )}
           <View style={styles.headerSubtitleRow}>
-            <Wifi size={12} color={deviceStatus === 'active' ? '#10B981' : colors.textSecondary} />
-            <Text style={styles.headerSubtitleText}>
-              {deviceStatus === 'active' ? 'Active Now' : 'Offline'} • {deviceIsp}
-            </Text>
+            {(() => {
+              const dynamicStatus = getDynamicStatus(deviceInfo?.updated_at, deviceInfo?.status, deviceInfo?.created_at);
+              let statusText = 'Offline';
+              if (dynamicStatus === 'active') statusText = 'Active Now';
+              else if (dynamicStatus === 'idle') statusText = 'Idle';
+              else if (deviceInfo?.updated_at || deviceInfo?.created_at) {
+                const timeStr = deviceInfo.updated_at || deviceInfo.created_at;
+                if (timeStr) {
+                  const diffM = Math.floor((Date.now() - new Date(timeStr).getTime()) / 60000);
+                  if (diffM < 60) statusText = `Last active ${diffM}m ago`;
+                  else if (diffM < 1440) statusText = `Last active ${Math.floor(diffM/60)}h ago`;
+                  else statusText = `Last active ${Math.floor(diffM/1440)}d ago`;
+                }
+              }
+              const wifiColor = dynamicStatus === 'active' ? '#10B981' : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary;
+              return (
+                <>
+                  <Wifi size={12} color={wifiColor} />
+                  <Text style={styles.headerSubtitleText}>
+                    {statusText} • {deviceIsp}
+                  </Text>
+                </>
+              );
+            })()}
           </View>
         </View>
       </View>
@@ -131,7 +153,7 @@ export default function DeviceDetailScreen() {
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>NRT Earned</Text>
-            <Text style={styles.summaryValueAccent}>{formatNrtText(totalNrt)} NRT</Text>
+            <NrtAmount value={totalNrt} style={styles.summaryValueAccent} />
           </View>
         </View>
 
@@ -198,6 +220,9 @@ export default function DeviceDetailScreen() {
           {filteredApps.map((app, index) => {
             const isClaimed = claimedIds.has(app.campaign_id);
             const { icon: AppIcon, color: iconColor } = getAppIcon(app.app_name);
+            const appStatus = (dynamicStatus === 'offline') 
+              ? 'offline' 
+              : (dynamicStatus === 'idle' ? 'idle' : app.status);
 
             return (
               <View key={app.campaign_id + index} style={styles.appCard}>
@@ -206,9 +231,9 @@ export default function DeviceDetailScreen() {
                     <View style={[styles.appIconWrapper, { backgroundColor: `${iconColor}15` }]}>
                       <AppIcon size={20} color={iconColor} />
                     </View>
-                    <View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.appName}>{app.app_name}</Text>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={styles.appName} numberOfLines={1} ellipsizeMode="tail">{app.app_name}</Text>
                         <View style={[styles.categoryBadge, app.service_category === 'Network' ? { backgroundColor: 'rgba(168,85,247,0.1)' } : { backgroundColor: 'rgba(59,130,246,0.1)' }]}>
                           <Text style={[styles.categoryBadgeText, app.service_category === 'Network' ? { color: '#A855F7' } : { color: '#3B82F6' }]}>{app.service_category}</Text>
                         </View>
@@ -216,10 +241,11 @@ export default function DeviceDetailScreen() {
                       <Text style={styles.appDuration}>{Math.floor(app.duration_seconds / 60)}m</Text>
                     </View>
                   </View>
-                  <View style={[styles.statusBadge, app.status === 'active' ? styles.statusBadgeActive : styles.statusBadgeInactive]}>
-                    {app.status === 'active' && <View style={styles.statusDotActive} />}
-                    <Text style={[styles.statusBadgeText, app.status === 'active' ? { color: '#10B981' } : { color: colors.textSecondary }]}>
-                      {app.status.toUpperCase()}
+                  <View style={[styles.statusBadge, appStatus === 'active' ? styles.statusBadgeActive : appStatus === 'idle' ? styles.statusBadgeIdle : styles.statusBadgeInactive]}>
+                    {appStatus === 'active' && <View style={styles.statusDotActive} />}
+                    {appStatus === 'idle' && <View style={styles.statusDotIdle} />}
+                    <Text style={[styles.statusBadgeText, appStatus === 'active' ? { color: '#10B981' } : appStatus === 'idle' ? { color: '#f59e0b' } : { color: colors.textSecondary }]}>
+                      {appStatus.toUpperCase()}
                     </Text>
                   </View>
                 </View>
@@ -227,8 +253,8 @@ export default function DeviceDetailScreen() {
                 <View style={styles.appCardMiddle}>
                   <View style={styles.ispDataRow}>
                     <Signal size={12} color={colors.textSecondary} />
-                    <Text style={styles.ispDataText}>ISP Data</Text>
-                    <SignalBars strength={app.status === 'active' ? 4 : 1} colors={colors} />
+                    <Text style={styles.ispDataText} numberOfLines={1} ellipsizeMode="tail">{deviceIsp}</Text>
+                    <SignalBars strength={appStatus === 'active' ? 4 : appStatus === 'idle' ? 2 : 1} colors={colors} />
                   </View>
                   <View style={styles.dataBreakdownRow}>
                     <ArrowDownToLine size={10} color="#10B981" />
@@ -246,7 +272,7 @@ export default function DeviceDetailScreen() {
                     </View>
                     <View>
                       <Text style={styles.footerLabel}>EARNED</Text>
-                      <Text style={styles.footerEarnedValue}>{formatNrtText(app.nrt_earned)} NRT</Text>
+                      <NrtAmount value={app.nrt_earned} style={styles.footerEarnedValue} />
                     </View>
                   </View>
                   <Pressable 
@@ -390,13 +416,15 @@ const createStyles = (colors: any) => StyleSheet.create({
   
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   statusBadgeActive: { backgroundColor: 'rgba(16, 185, 129, 0.1)' },
+  statusBadgeIdle: { backgroundColor: 'rgba(245, 158, 11, 0.1)' },
   statusBadgeInactive: { backgroundColor: colors.bgPrimary },
   statusDotActive: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' },
+  statusDotIdle: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#f59e0b' },
   statusBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
 
   appCardMiddle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  ispDataRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  ispDataText: { fontSize: 11, color: colors.textSecondary },
+  ispDataRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 },
+  ispDataText: { fontSize: 11, color: colors.textSecondary, flexShrink: 1 },
   dataBreakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dataBreakdownText: { fontSize: 11, color: colors.textSecondary },
 

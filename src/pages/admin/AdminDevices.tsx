@@ -50,6 +50,19 @@ interface AdminGamingAccount {
   unclaimedNrt: number;
 }
 
+const getDynamicStatus = (updatedAt?: string, dbStatus?: string, createdAt?: string): 'active' | 'idle' | 'offline' => {
+  if (dbStatus === 'offline' || dbStatus === 'disconnected') {
+    return 'offline';
+  }
+  const timeStr = updatedAt || createdAt;
+  if (!timeStr) return 'offline';
+  const diffMs = Date.now() - new Date(timeStr).getTime();
+  const diffMin = diffMs / 60000;
+  if (diffMin < 5) return 'active';
+  if (diffMin < 15) return 'idle';
+  return 'offline';
+};
+
 export default function AdminDevices() {
   usePageTitle('Admin — Devices');
   const [devices, setDevices] = useState<AdminDevice[]>([]);
@@ -123,6 +136,7 @@ export default function AdminDevices() {
       const dataGb = Number(d.total_data_bytes || 0) / (1024 * 1024 * 1024);
       const earned = Number(d.nrt_earned || d.total_nrt || 0);
       const claimed = Number(d.nrt_claimed || 0);
+      const dynamicStatus = getDynamicStatus(d.updated_at, d.status, d.created_at);
 
       return {
         ...d,
@@ -141,6 +155,7 @@ export default function AdminDevices() {
         createdAt: d.created_at,
         activeEarnings: d.active_earnings || [],
         pastEarnings: d.past_earnings || [],
+        status: dynamicStatus,
       };
     }));
   };
@@ -234,8 +249,8 @@ export default function AdminDevices() {
           {activeTab === 'devices' ? (
             <>
               <option value="active">Active</option>
+              <option value="idle">Idle</option>
               <option value="offline">Offline</option>
-              <option value="disconnected">Disconnected</option>
             </>
           ) : (
             <>
@@ -302,7 +317,13 @@ export default function AdminDevices() {
                   <td className="px-6 py-4 text-center font-bold text-green-500">{d.claimedNrt.toLocaleString(undefined, { maximumFractionDigits: 7 })}</td>
                   <td className="px-6 py-4 text-center font-bold text-amber-500">{d.unclaimedNrt.toLocaleString(undefined, { maximumFractionDigits: 7 })}</td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${d.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                      d.status === 'active' 
+                        ? 'bg-green-500/10 text-green-500' 
+                        : d.status === 'idle'
+                          ? 'bg-amber-500/10 text-amber-500'
+                          : 'bg-red-500/10 text-red-500'
+                    }`}>
                       {d.status}
                     </span>
                   </td>
@@ -422,7 +443,13 @@ export default function AdminDevices() {
               <div className="p-5 space-y-5">
                 {/* Status & Duration */}
                 <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase ${selectedDevice.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>{selectedDevice.status}</span>
+                  <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase ${
+                    selectedDevice.status === 'active' 
+                      ? 'bg-green-500/10 text-green-500' 
+                      : selectedDevice.status === 'idle'
+                        ? 'bg-amber-500/10 text-amber-500'
+                        : 'bg-red-500/10 text-red-500'
+                  }`}>{selectedDevice.status}</span>
                   <div className="flex items-center gap-1.5 text-text-secondary text-sm">
                     <Clock size={14} /> Active for {selectedDevice.duration}
                   </div>

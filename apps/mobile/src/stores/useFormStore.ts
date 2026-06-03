@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { customStorage } from '@/lib/storage';
 
 interface FormDrafts {
   campaign: {
@@ -85,7 +85,7 @@ export const useFormStore = create<FormStore>()(
     }),
     {
       name: 'nrt-form-drafts',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => customStorage),
     }
   )
 );

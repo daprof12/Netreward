@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { LogOut, Activity, Users, Zap, DollarSign, BarChart3, TrendingUp as TrendingUpIcon, Key, CheckCircle2, Code, Server, Signal, PieChart as PieIcon, Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -40,6 +40,67 @@ export default function IspDashboard() {
   const [sdkStatus, setSdkStatus] = useState<'verified' | 'test_pending' | 'not_integrated'>('verified');
   const [activeNetworkIndex, setActiveNetworkIndex] = useState(0);
   const [viewingCampaignDetails, setViewingCampaignDetails] = useState<any | null>(null);
+
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!carouselRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - carouselRef.current.offsetLeft);
+    setScrollLeft(carouselRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    snapToNearest();
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !carouselRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - carouselRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    carouselRef.current.scrollLeft = scrollLeft - walk;
+  };
+
+  const snapToNearest = () => {
+    if (!carouselRef.current) return;
+    const scrollLeftVal = carouselRef.current.scrollLeft;
+    const width = carouselRef.current.clientWidth;
+    const index = Math.round(scrollLeftVal / width);
+    setActiveNetworkIndex(index);
+    carouselRef.current.scrollTo({
+      left: index * width,
+      behavior: 'smooth'
+    });
+  };
+
+  const handleScroll = () => {
+    if (!carouselRef.current || isDragging) return;
+    const scrollLeftVal = carouselRef.current.scrollLeft;
+    const width = carouselRef.current.clientWidth;
+    if (width > 0) {
+      const index = Math.round(scrollLeftVal / width);
+      if (index !== activeNetworkIndex && index >= 0 && index < networks.length) {
+        setActiveNetworkIndex(index);
+      }
+    }
+  };
+
+  const handleDotClick = (index: number) => {
+    setActiveNetworkIndex(index);
+    carouselRef.current?.scrollTo({
+      left: index * (carouselRef.current.clientWidth || 0),
+      behavior: 'smooth'
+    });
+  };
 
   useEffect(() => {
     refreshProfile();
@@ -202,25 +263,41 @@ export default function IspDashboard() {
             <div className="flex flex-col gap-3">
               {networks.length > 0 ? (
                 <>
-                  <div className="flex items-center justify-between bg-bg-secondary/50 rounded-xl p-3 border border-glass-border">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center shrink-0">
-                        {networks[activeNetworkIndex]?.logoUrl ? (
-                          <img src={networks[activeNetworkIndex].logoUrl} alt="" className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                          <Key size={14} className="text-accent-primary" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5 truncate">
-                          {networks[activeNetworkIndex]?.name || 'Network'}
-                        </p>
-                        <code className="text-xs font-mono text-text-primary">
-                          {networks[activeNetworkIndex]?.apiKey
-                            ? `${networks[activeNetworkIndex].apiKey.slice(0, 12)}••••${networks[activeNetworkIndex].apiKey.slice(-4)}`
-                            : 'No API key'}
-                        </code>
-                      </div>
+                  <div className="w-full overflow-hidden">
+                    <div
+                      ref={carouselRef}
+                      onScroll={handleScroll}
+                      onMouseDown={handleMouseDown}
+                      onMouseLeave={handleMouseLeave}
+                      onMouseUp={handleMouseUp}
+                      onMouseMove={handleMouseMove}
+                      className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none cursor-grab active:cursor-grabbing select-none"
+                    >
+                      {networks.map((item, i) => (
+                        <div key={item.id || i} className="w-full shrink-0 snap-start snap-always pr-1">
+                          <div className="flex items-center justify-between bg-bg-secondary/50 rounded-xl p-3 border border-glass-border">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="w-8 h-8 rounded-full bg-accent-primary/10 flex items-center justify-center shrink-0">
+                                {item?.logoUrl ? (
+                                  <img src={item.logoUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                                ) : (
+                                  <Key size={14} className="text-accent-primary" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5 truncate">
+                                  {item?.name || 'Network'}
+                                </p>
+                                <code className="text-xs font-mono text-text-primary">
+                                  {item?.apiKey
+                                    ? `${item.apiKey.slice(0, 12)}••••${item.apiKey.slice(-4)}`
+                                    : 'No API key'}
+                                </code>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -230,7 +307,7 @@ export default function IspDashboard() {
                       {networks.map((_, i) => (
                         <button
                           key={i}
-                          onClick={() => setActiveNetworkIndex(i)}
+                          onClick={() => handleDotClick(i)}
                           className={`transition-all duration-200 rounded-full ${i === activeNetworkIndex
                               ? 'w-4 h-1.5 bg-accent-primary'
                               : 'w-1.5 h-1.5 bg-text-secondary/30 hover:bg-text-secondary/50'
@@ -409,7 +486,7 @@ export default function IspDashboard() {
 
         {isIspHeatmapLoading ? (
           <div className="flex justify-center py-6"><Loader2 className="animate-spin text-text-secondary" /></div>
-        ) : (!ispHeatmap || ispHeatmap.length === 0 || ispHeatmap.every(d => d.intensity === 0)) ? (
+        ) : (!ispHeatmap || ispHeatmap.length === 0) ? (
           <EmptyState
             icon={<Activity size={24} />}
             title="No Network Activity"
@@ -443,10 +520,10 @@ export default function IspDashboard() {
                         className="aspect-square w-full rounded-[2px] transition-colors hover:ring-1 hover:ring-text-secondary/30"
                         style={{
                           backgroundColor: intensity === 4 ? 'var(--accent-primary)' :
-                            intensity === 3 ? 'rgba(var(--accent-primary-rgb), 0.75)' :
-                              intensity === 2 ? 'rgba(var(--accent-primary-rgb), 0.5)' :
-                                intensity === 1 ? 'rgba(var(--accent-primary-rgb), 0.25)' :
-                                  'var(--bg-secondary)'
+                                           intensity === 3 ? 'rgba(var(--accent-primary-rgb), 0.75)' :
+                                           intensity === 2 ? 'rgba(var(--accent-primary-rgb), 0.5)' :
+                                           intensity === 1 ? 'rgba(var(--accent-primary-rgb), 0.25)' :
+                                           'rgba(128, 128, 128, 0.15)'
                         }}
                       />
                     );
@@ -562,12 +639,21 @@ export default function IspDashboard() {
               onClick={() => setViewingCampaignDetails(camp)}
               className="w-full text-left glass p-4 rounded-xl border border-glass-border flex justify-between items-center active:scale-[0.98] transition-transform hover:bg-glass-bg"
             >
-              <div>
-                <h4 className="font-semibold text-text-primary text-sm">{camp.name}</h4>
-                <p className="text-xs text-text-secondary mt-1">
-                  <span className="w-2 h-2 inline-block rounded-full bg-accent-primary animate-pulse mr-1"></span>
-                  Running
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-bg-primary border border-glass-border flex items-center justify-center overflow-hidden shrink-0">
+                  {camp.logo_url ? (
+                    <img src={camp.logo_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-bold text-accent-primary uppercase">{camp.name?.[0]}</span>
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-semibold text-text-primary text-sm">{camp.name}</h4>
+                  <p className="text-xs text-text-secondary mt-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-pulse"></span>
+                    Running
+                  </p>
+                </div>
               </div>
               <div className="text-right">
                 <p className="font-semibold text-accent-primary text-sm">{camp.spentNrt} NRT</p>

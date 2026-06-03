@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Wifi, Signal, Filter, X,
   Tv, Music, Globe, Gamepad2, MessageCircle, Video,
@@ -14,6 +14,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import NrtAmount from '@/components/ui/NrtAmount';
+import MarqueeText from '@/components/ui/MarqueeText';
 
 function SignalBars({ strength }: { strength: number }) {
   return (
@@ -31,8 +32,22 @@ function SignalBars({ strength }: { strength: number }) {
   );
 }
 
+const getDynamicStatus = (updatedAt?: string, dbStatus?: string, createdAt?: string): 'active' | 'idle' | 'offline' => {
+  if (dbStatus === 'offline' || dbStatus === 'disconnected') {
+    return 'offline';
+  }
+  const timeStr = updatedAt || createdAt;
+  if (!timeStr) return 'offline';
+  const diffMs = Date.now() - new Date(timeStr).getTime();
+  const diffMin = diffMs / 60000;
+  if (diffMin < 5) return 'active';
+  if (diffMin < 15) return 'idle';
+  return 'offline';
+};
+
 export default function DeviceDetail() {
   usePageTitle('Device Details');
+  const navigate = useNavigate();
   const { deviceId } = useParams<{ deviceId: string }>();
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24H');
   const [showFilters, setShowFilters] = useState(false);
@@ -46,8 +61,8 @@ export default function DeviceDetail() {
   const { data: appUsage = [] } = useDeviceAppUsage(deviceId || '');
   const { data: deviceInfo, isLoading: isDeviceLoading } = useDeviceById(deviceId || '');
   const deviceName = deviceInfo?.device_name || 'Device';
-  const deviceStatus = deviceInfo?.status || 'offline';
   const deviceIsp = deviceInfo?.isp_name || 'Unknown ISP';
+  const dynamicStatus = getDynamicStatus(deviceInfo?.updated_at, deviceInfo?.status, deviceInfo?.created_at);
 
   // Derive meaningful categories from app names
   const getCategoryForApp = (name: string) => {
@@ -95,9 +110,12 @@ export default function DeviceDetail() {
     >
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link to="/devices" className="p-2 bg-bg-secondary rounded-full hover:bg-glass-bg transition-colors">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 bg-bg-secondary rounded-full hover:bg-glass-bg transition-colors"
+        >
           <ChevronLeft size={20} className="text-text-primary" />
-        </Link>
+        </button>
         <div>
           {isDeviceLoading ? (
             <Skeleton className="h-6 w-32 rounded-md" />
@@ -105,20 +123,25 @@ export default function DeviceDetail() {
             <h1 className="text-xl font-bold tracking-tight">{deviceName}</h1>
           )}
           <div className="flex items-center gap-2 mt-0.5">
-            <Wifi size={12} className={deviceStatus === 'active' ? 'text-accent-primary' : 'text-text-secondary'} />
+            <Wifi size={12} className={dynamicStatus === 'active' ? 'text-accent-primary' : dynamicStatus === 'idle' ? 'text-amber-500' : 'text-text-secondary'} />
             <span className="text-xs text-text-secondary flex items-center gap-1.5">
-              {deviceStatus === 'active' && (
+              {dynamicStatus === 'active' && (
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-100"></span>
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
                 </span>
               )}
+              {dynamicStatus === 'idle' && (
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                </span>
+              )}
               {(() => {
-                if (deviceStatus === 'active') return 'Active Now';
-                // Try to get last-seen from device
-                const updatedAt = (window as any).__nrtDeviceUpdatedAt;
-                if (updatedAt) {
-                  const diffMs = Date.now() - new Date(updatedAt).getTime();
+                if (dynamicStatus === 'active') return 'Active Now';
+                if (dynamicStatus === 'idle') return 'Idle';
+                const timeStr = deviceInfo?.updated_at || deviceInfo?.created_at;
+                if (timeStr) {
+                  const diffMs = Date.now() - new Date(timeStr).getTime();
                   const diffM = Math.floor(diffMs / 60000);
                   const diffH = Math.floor(diffM / 60);
                   const diffD = Math.floor(diffH / 24);
@@ -345,6 +368,9 @@ export default function DeviceDetail() {
         {filteredApps.map((app, i) => {
           const isClaimed = claimedIds.has(app.campaign_id);
           const { icon: AppIcon, color: iconColor } = getAppIcon(app.app_name);
+          const appStatus = (dynamicStatus === 'offline') 
+            ? 'offline' 
+            : (dynamicStatus === 'idle' ? 'idle' : app.status);
 
           return (
             <motion.div
@@ -355,18 +381,20 @@ export default function DeviceDetail() {
               className="glass rounded-xl border border-glass-border p-4 space-y-3"
             >
               {/* Top Row: Icon + Name + Duration */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shrink-0"
                     style={{ backgroundColor: `${iconColor}20` }}
                   >
                     <AppIcon size={20} style={{ color: iconColor }} />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-text-primary text-sm">{app.app_name}</h4>
-                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border ${
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h4 className="font-semibold text-text-primary text-sm min-w-0 flex-1">
+                        <MarqueeText text={app.app_name} />
+                      </h4>
+                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 ${
                         app.service_category === 'Network' 
                           ? 'bg-purple-500/10 text-purple-500 border-purple-500/20'
                           : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
@@ -377,34 +405,35 @@ export default function DeviceDetail() {
                     <p className="text-xs text-text-secondary">{Math.floor(app.duration_seconds / 60)}m</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md flex items-center gap-1.5 ${
-                    app.status === 'active'
+                    appStatus === 'active'
                       ? 'bg-green-500/10 text-green-400'
-                      : app.status === 'idle'
+                      : appStatus === 'idle'
                         ? 'bg-yellow-500/10 text-yellow-400'
                         : 'bg-bg-secondary text-text-secondary'
                   }`}>
-                    {app.status === 'active' && (
+                    {appStatus === 'active' && (
                       <span className="relative flex h-1.5 w-1.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
                       </span>
                     )}
-                    {app.status}
+                    {appStatus}
                   </span>
                 </div>
               </div>
 
               {/* Middle Row: ISP + Signal + Data Breakdown */}
-              <div className="flex items-center justify-between text-xs text-text-secondary">
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1">
-                    <Signal size={10} /> ISP Data
+              <div className="flex items-center justify-between text-xs text-text-secondary gap-4">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="flex items-center gap-1 min-w-0 flex-1">
+                    <Signal size={10} className="shrink-0" />
+                    <MarqueeText text={deviceIsp} className="text-text-secondary flex-1" />
                   </span>
-                  <SignalBars strength={app.status === 'active' ? 4 : 1} />
+                  <SignalBars strength={appStatus === 'active' ? 4 : appStatus === 'idle' ? 2 : 1} />
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <span className="flex items-center gap-1">
                     <ArrowDownToLine size={10} className="text-accent-primary" /> {app.total_data_gb ? (app.total_data_gb * 0.8).toFixed(6) : '0.00'} GB
                   </span>

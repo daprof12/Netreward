@@ -8,9 +8,9 @@
  * ─────────
  * • value ≥ 1 000     → "1,234.56"          (comma-separated, 2 dp)
  * • value ≥ 1         → "5.00"              (2 dp)
- * • value ≥ 0.001     → "0.0042"            (4 dp, short enough for UI)
- * • value ≥ 0.0001    → "0.000089"          (6 dp, still reasonable)
- * • value < 0.0001    → COMPACT subscript   { prefix:"0.0", zeros:8, sig:"89" }
+ * • value ≥ 0.01      → "0.0042"            (4 dp, short enough for UI)
+ * • value ≥ 0.001     → "0.0010"
+ * • value < 0.001     → COMPACT subscript   { prefix:"0.0", zeros:2, sig:"44" }
  *   rendered as: 0.0₈89  (subscript zero-count, plain suffix)
  *
  * The actual stored value is NEVER rounded — only the display is affected.
@@ -34,39 +34,58 @@ export function formatNrt(
   const num = typeof value === 'string' ? parseFloat(value) : (value ?? 0);
 
   if (isNaN(num)) return { type: 'plain', text: '0' };
-  if (num === 0)  return { type: 'plain', text: '0' };
+  if (num === 0) return { type: 'plain', text: '0' };
 
-  const abs  = Math.abs(num);
+  let abs = Math.abs(num);
   const sign = num < 0 ? '-' : showSign && num > 0 ? '+' : '';
 
-  // ── Compact subscript range (< 0.0001) ─────────────────────────────────────
-  if (abs > 0 && abs < 0.0001) {
-    // Show full precision for micro amounts without rounding to 0
-    const raw         = abs.toFixed(18).replace(/0+$/, ''); 
-    if (raw === '0' || raw === '0.') return { type: 'plain', text: sign + '0' };
-
-    const afterDot    = raw.split('.')[1] ?? '';
-
-    // Count leading zeros before first non-zero digit
-    let leadingZeros  = 0;
-    for (const ch of afterDot) {
-      if (ch === '0') leadingZeros++;
+  // ── Compact subscript range (< 0.001) ─────────────────────────────────────
+  if (abs > 0 && abs < 0.001) {
+    // Determine how many leading zeros the raw absolute value has
+    const initialRaw = abs.toFixed(18);
+    const initialAfterDot = initialRaw.split('.')[1] || '';
+    let initialLeadingZeros = 0;
+    for (const ch of initialAfterDot) {
+      if (ch === '0') initialLeadingZeros++;
       else break;
     }
 
-    // Extract significant digits (capped by the .toFixed(6) above)
-    const sigStart = leadingZeros;
-    const sig      = afterDot.slice(sigStart) || '0';
+    // Round up to the nearest 3 digits after the leading zeros
+    const decimals = Math.min(18, initialLeadingZeros + 3);
+    const factor = Math.pow(10, decimals);
+    const roundedAbs = Math.ceil(abs * factor) / factor;
 
-    // "0.0" already shows one zero; subscript shows how many MORE zeros follow
-    const subscriptZeros = leadingZeros - 1;
+    if (roundedAbs < 0.001) {
+      // Show capped precision for micro amounts without trailing zeros
+      const raw = roundedAbs.toFixed(18).replace(/0+$/, '');
+      if (raw === '0' || raw === '0.') return { type: 'plain', text: sign + '0' };
 
-    return {
-      type:   'subscript',
-      prefix: sign + '0.0',
-      zeros:  subscriptZeros,
-      suffix: sig,
-    };
+      const afterDot = raw.split('.')[1] ?? '';
+
+      // Count leading zeros again (rounding may have shifted it)
+      let leadingZeros = 0;
+      for (const ch of afterDot) {
+        if (ch === '0') leadingZeros++;
+        else break;
+      }
+
+      // Extract significant digits
+      const sigStart = leadingZeros;
+      const sig = afterDot.slice(sigStart) || '0';
+
+      // "0.0" already shows one zero; subscript shows how many MORE zeros follow
+      const subscriptZeros = leadingZeros - 1;
+
+      return {
+        type: 'subscript',
+        prefix: sign + '0.0',
+        zeros: subscriptZeros,
+        suffix: sig,
+      };
+    } else {
+      // Rounding pushed the value to ≥ 0.001, so let it fall through to normal formatting
+      abs = roundedAbs;
+    }
   }
 
   // ── Normal range (≥ 0.0001) ───────────────────────────────────────────────
@@ -86,11 +105,16 @@ export function formatNrt(
  * Plain-text version — useful for toasts, console logs, input placeholders.
  * Renders compact form as  "0.0[8]89"  (bracket notation, no real subscript).
  */
+const subscriptMap = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+function toSubscript(num: number): string {
+  return num.toString().split('').map(d => subscriptMap[parseInt(d)]).join('');
+}
+
 export function formatNrtText(
   value: number | string | null | undefined,
   opts: { showSign?: boolean } = {},
 ): string {
   const r = formatNrt(value, opts);
   if (r.type === 'plain') return r.text;
-  return `${r.prefix}[${r.zeros}]${r.suffix}`;
+  return `${r.prefix}${toSubscript(r.zeros)}${r.suffix}`;
 }

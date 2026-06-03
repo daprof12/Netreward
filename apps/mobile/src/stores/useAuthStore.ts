@@ -48,11 +48,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   isOnboarded: false,
   isLoading: true,
-  setUser: (user, role) => set((state) => ({ 
-    user, 
-    role: role || (user?.user_metadata?.role as UserRole) || 'user',
-    active_role: (user?.user_metadata?.active_role as UserRole) || role || (user?.user_metadata?.role as UserRole) || 'user'
-  })),
+  setUser: (user, role) => {
+    const targetRole = role || (user?.user_metadata?.role as UserRole) || 'user';
+    const targetActiveRole = (user?.user_metadata?.active_role as UserRole) || role || (user?.user_metadata?.role as UserRole) || 'user';
+    set({ 
+      user, 
+      role: targetRole,
+      active_role: targetActiveRole
+    });
+    if (user?.id) {
+      if (targetActiveRole === 'sp') {
+        useSpStore.getState().initialize(user.id).catch(console.error);
+      } else if (targetActiveRole === 'isp') {
+        useIspStore.getState().initialize(user.id).catch(console.error);
+      }
+    }
+  },
   setSession: (session) => set({ session }),
   setHasOnboarded: (status) => {
     SecureStore.setItemAsync('hasOnboarded', String(status));
@@ -121,9 +132,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           };
 
           // Initialize Role-specific stores
-          if (role === 'sp') {
+          const targetActiveRole = (data.active_role || data.role) as UserRole;
+          if (targetActiveRole === 'sp') {
             await useSpStore.getState().initialize(session.user.id);
-          } else if (role === 'isp') {
+          } else if (targetActiveRole === 'isp') {
             await useIspStore.getState().initialize(session.user.id);
           }
         }
@@ -156,7 +168,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .single();
         
       if (!error && data) {
-        set({ profile: data, role: data.role as UserRole, active_role: (data.active_role || data.role) as UserRole });
+        const targetActiveRole = (data.active_role || data.role) as UserRole;
+        set({ profile: data, role: data.role as UserRole, active_role: targetActiveRole });
+        if (targetActiveRole === 'sp') {
+          await useSpStore.getState().initialize(session.user.id);
+        } else if (targetActiveRole === 'isp') {
+          await useIspStore.getState().initialize(session.user.id);
+        }
       }
     } catch (e) {
       console.error('Error refreshing profile', e);

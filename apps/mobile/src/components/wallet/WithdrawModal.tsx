@@ -8,6 +8,7 @@ import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { useWalletStore } from '@/stores/useWalletStore';
 import { useThemeColors } from '@/theme';
 import { formatNrtText } from '@/lib/formatNrt';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -86,7 +87,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
             <View style={styles.stepContainer}>
               <View style={styles.balanceHeader}>
                 <Text style={styles.balanceLabel}>Available Balance</Text>
-                <Text style={styles.balanceValue}>{formatNrtText(availableBalance)} NRT</Text>
+                <NrtAmount value={availableBalance} style={styles.balanceValue} />
               </View>
 
               <View style={styles.inputGroup}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { View, ActivityIndicator } from 'react-native';
@@ -58,7 +58,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <StatusBar style="light" />
           <NetworkStatusManager />
-          <Slot />
+          <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }} />
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

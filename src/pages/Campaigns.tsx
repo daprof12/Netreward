@@ -5,7 +5,7 @@ import {
   Search, Filter, Play, CheckCircle2, Loader2, X,
   Tv, Music, Globe, MapPin, TrendingUp, Info,
   ChevronRight, Wifi, ArrowDownToLine, ArrowUpFromLine, Clock,
-  Gamepad2, Link2
+  Gamepad2, Link2, ExternalLink
 } from 'lucide-react';
 import { useCampaigns } from '@/hooks/useCampaigns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,8 +18,9 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import NrtAmount from '@/components/ui/NrtAmount';
+import MarqueeText from '@/components/ui/MarqueeText';
 import { useGamingAccounts, GAMING_PLATFORMS, type GamingPlatform } from '@/hooks/useGamingAccounts';
-import { PlatformLogoCircle } from '@/components/ui/PlatformLogos';
+import { PlatformLogo, PlatformLogoCircle } from '@/components/ui/PlatformLogos';
 
 // No static mock data needed here anymore
 
@@ -306,6 +307,17 @@ export default function Campaigns() {
                 const isThisJoining = joiningId === campaign.id;
                 const budgetPct = (campaign.budget_spent / campaign.total_budget) * 100;
 
+                const platformButtons = [
+                  { platform: 'steam', url: campaign.steam_url, label: 'Steam' },
+                  { platform: 'playstation', url: campaign.playstation_url, label: 'PlayStation' },
+                  { platform: 'xbox', url: campaign.xbox_url, label: 'Xbox' },
+                  { platform: 'oculus_vr', url: campaign.oculus_url, label: 'Oculus' },
+                  { platform: 'nintendo_switch', url: campaign.nintendo_url, label: 'Nintendo Switch' },
+                  { platform: 'android', url: campaign.android_url, label: 'Android' },
+                  { platform: 'ios', url: campaign.ios_url, label: 'iOS' },
+                  { platform: 'web', url: campaign.web_url, label: 'Web' }
+                ].filter(p => !!p.url);
+
                 return (
                   <motion.div
                     layout
@@ -332,19 +344,21 @@ export default function Campaigns() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-bold text-text-primary text-base truncate flex items-center gap-2">
-                              {campaign.title}
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-text-primary text-base flex items-center gap-2 min-w-0">
+                              <MarqueeText text={campaign.title} className="flex-1" />
                               {campaign.joined && recentActivity?.some((s: any) => s.campaign_id === campaign.id && (new Date().getTime() - new Date(s.session_end).getTime() < 5 * 60 * 1000)) && (
-                                <span className="relative flex h-2 w-2">
+                                <span className="relative flex h-2 w-2 shrink-0">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                                 </span>
                               )}
                             </h3>
-                            <p className="text-xs text-text-secondary font-medium truncate flex items-center gap-1">
-                              {campaign.creator_name} • <span className="text-accent-primary/80">{campaign.category || 'General'}</span>
+                            <p className="text-xs text-text-secondary font-medium flex items-center gap-1 min-w-0 mt-0.5">
+                              <MarqueeText text={campaign.creator_name} className="max-w-[120px] inline-block text-text-secondary" />
+                              <span className="shrink-0">•</span>
+                              <span className="text-accent-primary/80 shrink-0">{campaign.category || 'General'}</span>
                             </p>
                           </div>
                           <div className="flex flex-col items-end shrink-0">
@@ -367,7 +381,7 @@ export default function Campaigns() {
 
                     {/* CTA */}
                     {campaign.joined ? (
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2.5">
                         {/* Instruction message */}
                         <div className="flex items-start gap-2 bg-accent-primary/5 border border-accent-primary/20 rounded-lg px-3 py-2.5">
                           <Info size={14} className="text-accent-primary mt-0.5 shrink-0" />
@@ -375,16 +389,49 @@ export default function Campaigns() {
                             Open <span className="font-semibold text-accent-primary">{campaign.target_app}</span> and use the service to start earning NRT based on your data consumption.
                           </p>
                         </div>
-                        {/* View Earnings button */}
-                        <motion.button
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => setEarningCampaign(campaign)}
-                          className="flex items-center justify-center gap-2 bg-accent-primary/10 text-accent-primary py-2.5 rounded-lg text-sm font-semibold border border-accent-primary/30 hover:bg-accent-primary/20 transition-colors"
-                        >
-                          <TrendingUp size={16} />
-                          View Your Earnings
-                          <ChevronRight size={14} />
-                        </motion.button>
+                        {/* Action buttons */}
+                        <div className="flex items-center justify-between gap-3 w-full border-t border-glass-border/50 pt-3">
+                          {platformButtons.length > 0 ? (
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Launch:</span>
+                              <div className="flex items-center gap-1.5">
+                                {platformButtons.map(p => {
+                                  const isWeb = p.platform === 'web';
+                                  const brandColor = isWeb ? 'var(--accent-primary)' : (GAMING_PLATFORMS[p.platform as GamingPlatform]?.color || '#a2aaad');
+                                  return (
+                                    <motion.button
+                                      key={p.platform}
+                                      whileHover={{ scale: 1.1 }}
+                                      whileTap={{ scale: 0.9 }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (p.url) window.open(p.url, '_blank', 'noopener,noreferrer');
+                                      }}
+                                      title={`Launch on ${p.label}`}
+                                      className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group"
+                                      style={{ backgroundColor: brandColor }}
+                                    >
+                                      {isWeb ? (
+                                        <Globe size={14} />
+                                      ) : (
+                                        <PlatformLogo platform={p.platform as GamingPlatform} size={14} />
+                                      )}
+                                    </motion.button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
+                          <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setEarningCampaign(campaign)}
+                            className="flex-1 flex items-center justify-center gap-1.5 bg-accent-primary/10 text-accent-primary py-2 px-3 rounded-lg text-xs font-bold border border-accent-primary/20 hover:bg-accent-primary/20 transition-colors"
+                          >
+                            <TrendingUp size={14} />
+                            View Earnings
+                            <ChevronRight size={12} />
+                          </motion.button>
+                        </div>
                       </div>
                     ) : (
                       <button

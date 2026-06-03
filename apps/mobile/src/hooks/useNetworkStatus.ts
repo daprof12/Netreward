@@ -1,70 +1,38 @@
 import { useState, useEffect } from 'react';
-
-interface CustomNavigator extends Navigator {
-  connection?: any;
-  mozConnection?: any;
-  webkitConnection?: any;
-}
+import NetInfo from '@react-native-community/netinfo';
 
 export function useNetworkStatus() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(true);
   const [connectionInfo, setConnectionInfo] = useState<{
-    downlink?: number;
-    effectiveType?: string;
-    rtt?: number;
+    type?: string;
     signalPercentage?: number;
-  }>({});
+  }>({ signalPercentage: 100 });
 
   useEffect(() => {
-    const nav = navigator as CustomNavigator;
-    const connection = nav.connection || nav.mozConnection || nav.webkitConnection;
-
-    const updateConnectionStatus = () => {
-      if (connection) {
-        let percentage = 100;
-        
-        // Calculate a rough percentage based on downlink (assuming 10 Mbps is 100%)
-        if (typeof connection.downlink === 'number') {
-          percentage = Math.min(Math.round((connection.downlink / 10) * 100), 100);
-        } else if (connection.effectiveType) {
-          switch (connection.effectiveType) {
-            case 'slow-2g': percentage = 10; break;
-            case '2g': percentage = 30; break;
-            case '3g': percentage = 70; break;
-            case '4g': percentage = 100; break;
-            default: percentage = 100;
-          }
-        }
-
-        setConnectionInfo({
-          downlink: connection.downlink,
-          effectiveType: connection.effectiveType,
-          rtt: connection.rtt,
-          signalPercentage: percentage,
-        });
+    // Subscribe to network state updates
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected ?? true);
+      
+      let signalPct = 100;
+      if (state.type === 'wifi' && state.details && 'strength' in state.details) {
+        signalPct = (state.details as any).strength ?? 100;
+      } else if (state.type === 'cellular' && state.details && 'cellularGeneration' in state.details) {
+        const gen = (state.details as any).cellularGeneration;
+        if (gen === '2g') signalPct = 25;
+        else if (gen === '3g') signalPct = 50;
+        else if (gen === '4g') signalPct = 75;
+        else if (gen === '5g') signalPct = 100;
+        else signalPct = 75;
       }
-    };
 
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    if (connection) {
-      connection.addEventListener('change', updateConnectionStatus);
-      updateConnectionStatus(); // Set initial values
-    } else {
-      // Fallback if Network Information API is not supported
-      setConnectionInfo({ signalPercentage: 100 });
-    }
+      setConnectionInfo({
+        type: state.type.toUpperCase(),
+        signalPercentage: signalPct
+      });
+    });
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      if (connection) {
-        connection.removeEventListener('change', updateConnectionStatus);
-      }
+      unsubscribe();
     };
   }, []);
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { customStorage } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { type TargetLocation } from './useSpStore';
 import { useWalletStore } from './useWalletStore';
@@ -18,6 +18,7 @@ export interface IspNetwork {
   ipRanges?: string[]; // CIDR blocks e.g. ["197.210.0.0/16"]
   handshakeUrl?: string; // ISP endpoint for BGP challenge-response
   apiKey?: string;
+  apiSecret?: string;
   createdAt: string;
 }
 
@@ -106,13 +107,17 @@ export const useIspStore = create<IspStore>()(
             apiKey: d.api_key, createdAt: d.created_at
           }));
 
-          const campaignsData: IspCampaign[] = campaignsRes.data.map(d => ({
-            id: d.id, networkId: d.network_id, name: d.title,
-            targetLocation: d.target_locations || [], budgetNrt: d.total_budget,
-            rewardRate: d.reward_rate_per_gb, startDate: d.start_date, endDate: d.end_date,
-            isRecurring: d.is_recurring, status: d.status, createdAt: d.created_at,
-            country: d.country, spentNrt: d.budget_spent
-          }));
+          const campaignsData: IspCampaign[] = campaignsRes.data.map(d => {
+            const network = networksData.find(n => n.id === d.network_id);
+            return {
+              id: d.id, networkId: d.network_id, name: d.title,
+              targetLocation: d.target_locations || [], budgetNrt: d.total_budget,
+              rewardRate: d.reward_rate_per_gb, startDate: d.start_date, endDate: d.end_date,
+              isRecurring: d.is_recurring, status: d.status, createdAt: d.created_at,
+              country: d.country, spentNrt: d.budget_spent,
+              logo_url: network?.logoUrl
+            };
+          });
 
           set({ networks: networksData, campaigns: campaignsData, isLoading: false });
         } catch (err: any) {
@@ -226,9 +231,11 @@ export const useIspStore = create<IspStore>()(
           const { data: newCampaignData, error: fetchError } = await supabase.from('campaigns').select('*').eq('id', data.campaign_id).single();
           if (fetchError) throw fetchError;
           
+          const network = get().networks.find(n => n.id === campaign.networkId);
           const newCampaign: IspCampaign = {
             ...campaign,
-            id: newCampaignData.id, status: newCampaignData.status, spentNrt: newCampaignData.budget_spent, createdAt: newCampaignData.created_at
+            id: newCampaignData.id, status: newCampaignData.status, spentNrt: newCampaignData.budget_spent, createdAt: newCampaignData.created_at,
+            logo_url: network?.logoUrl
           };
           
           set((state) => ({ campaigns: [...state.campaigns, newCampaign], isLoading: false }));
@@ -350,7 +357,7 @@ export const useIspStore = create<IspStore>()(
     }),
     {
       name: 'isp-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => customStorage),
     }
   )
 );

@@ -34,7 +34,7 @@ export interface IspTelemetry {
 }
 
 export function useTelemetry() {
-  const { user, role } = useAuthStore();
+  const { user, active_role } = useAuthStore();
   const spProfileId = useSpStore(state => state.profileId);
   const ispProfileId = useIspStore(state => state.profileId);
 
@@ -42,7 +42,7 @@ export function useTelemetry() {
   const { data: userHeatmap, isLoading: isUserHeatmapLoading } = useQuery({
     queryKey: ['userHeatmap', user?.id],
     queryFn: async () => {
-      if (!user?.id || role !== 'user') return [];
+      if (!user?.id || active_role !== 'user') return [];
       const { data, error } = await supabase
         .rpc('get_user_earnings_heatmap', { p_user_id: user.id });
       if (error) throw error;
@@ -52,14 +52,14 @@ export function useTelemetry() {
         value: d.nrt_earned
       })) as HeatmapData[];
     },
-    enabled: !!user?.id && role === 'user',
+    enabled: !!user?.id && active_role === 'user',
   });
 
   // 2. SP Platform Activity Heatmap
   const { data: spHeatmap, isLoading: isSpHeatmapLoading } = useQuery({
     queryKey: ['spHeatmap', spProfileId],
     queryFn: async () => {
-      if (!spProfileId || role !== 'sp') return [];
+      if (!spProfileId || active_role !== 'sp') return [];
       const { data, error } = await supabase
         .rpc('get_sp_platform_activity_heatmap', { p_sp_id: spProfileId });
       if (error) throw error;
@@ -69,14 +69,14 @@ export function useTelemetry() {
         value: d.nrt_distributed
       })) as HeatmapData[];
     },
-    enabled: !!spProfileId && role === 'sp',
+    enabled: !!spProfileId && active_role === 'sp',
   });
 
   // 3. ISP Network Activity Heatmap
   const { data: ispHeatmap, isLoading: isIspHeatmapLoading } = useQuery({
     queryKey: ['ispHeatmap', ispProfileId],
     queryFn: async () => {
-      if (!ispProfileId || role !== 'isp') return [];
+      if (!ispProfileId || active_role !== 'isp') return [];
       const { data, error } = await supabase
         .rpc('get_isp_network_activity_heatmap', { p_isp_id: ispProfileId });
       if (error) throw error;
@@ -86,14 +86,14 @@ export function useTelemetry() {
         value: d.data_consumed_gb
       })) as HeatmapData[];
     },
-    enabled: !!ispProfileId && role === 'isp',
+    enabled: !!ispProfileId && active_role === 'isp',
   });
 
   // 4. SP Telemetry (Audience Insights & ROI) — derived from device_data_sessions via RPC
   const { data: spTelemetry, isLoading: isSpTelemetryLoading } = useQuery({
     queryKey: ['spTelemetry', spProfileId],
     queryFn: async () => {
-      if (!spProfileId || role !== 'sp') return [];
+      if (!spProfileId || active_role !== 'sp') return [];
       const { data, error } = await supabase
         .rpc('get_sp_telemetry_insights', {
           p_sp_id: spProfileId,
@@ -102,14 +102,14 @@ export function useTelemetry() {
       if (error) throw error;
       return data as SpTelemetry[];
     },
-    enabled: !!spProfileId && role === 'sp',
+    enabled: !!spProfileId && active_role === 'sp',
   });
 
   // 5. ISP Telemetry (Network Health) — derived from device_data_sessions via RPC
   const { data: ispTelemetry, isLoading: isIspTelemetryLoading } = useQuery({
     queryKey: ['ispTelemetry', ispProfileId],
     queryFn: async () => {
-      if (!ispProfileId || role !== 'isp') return [];
+      if (!ispProfileId || active_role !== 'isp') return [];
       const { data, error } = await supabase
         .rpc('get_isp_telemetry_insights', {
           p_isp_id: ispProfileId,
@@ -118,7 +118,7 @@ export function useTelemetry() {
       if (error) throw error;
       return data as IspTelemetry[];
     },
-    enabled: !!ispProfileId && role === 'isp',
+    enabled: !!ispProfileId && active_role === 'isp',
   });
 
   return {

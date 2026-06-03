@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useTokenPrice } from '@/hooks/useTokenPrice';
 import { useCurrencyStore } from '@/stores/useCurrencyStore';
 import { useThemeColors } from '@/theme';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 type P2PStep = 'enter-amount' | 'waiting-acceptance' | 'pay-seller' | 'waiting-payment' | 'success' | 'cancelled';
 
@@ -105,9 +106,11 @@ export default function P2PFlowScreen() {
                 </View>
                 <View style={styles.calcRowBottom}>
                   <Text style={styles.calcLabel}>{isSelling ? 'You receive (USD)' : 'You receive (NRT)'}</Text>
-                  <Text style={styles.receiveValue}>
-                    {isSelling ? `$${usdValue.toFixed(2)}` : `${nrtValue.toFixed(6)} NRT`}
-                  </Text>
+                  {isSelling ? (
+                    <Text style={styles.receiveValue}>${usdValue.toFixed(2)}</Text>
+                  ) : (
+                    <NrtAmount value={nrtValue} style={styles.receiveValue} />
+                  )}
                   <Text style={styles.rateText}>Rate: 1 NRT = ${currentPrice.toFixed(2)}</Text>
                 </View>
               </View>
@@ -160,9 +163,11 @@ export default function P2PFlowScreen() {
             <View style={styles.centeredContainer}>
               <ActivityIndicator size="large" color={colors.accentPrimary} style={{ marginBottom: 24 }} />
               <Text style={styles.title}>Waiting for Seller</Text>
-              <Text style={[styles.subtitle, { textAlign: 'center', marginTop: 8 }]}>
-                Your order for <Text style={{ color: colors.accentPrimary, fontWeight: 'bold' }}>{nrtValue.toFixed(2)} NRT</Text> has been sent.
-              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+                <Text style={styles.subtitle}>Your order for </Text>
+                <NrtAmount value={nrtValue} style={{ color: colors.accentPrimary, fontWeight: 'bold', fontSize: 14 }} />
+                <Text style={styles.subtitle}> has been sent.</Text>
+              </View>
               <View style={styles.timerBadge}>
                 <Clock size={16} color={colors.accentPrimary} />
                 <Text style={styles.timerText}>09:59</Text>
@@ -189,7 +194,7 @@ export default function P2PFlowScreen() {
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>You will receive</Text>
-                  <Text style={styles.detailValue}>{nrtValue.toFixed(4)} NRT</Text>
+                  <NrtAmount value={nrtValue} style={styles.detailValue} />
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Seller Name</Text>
@@ -235,9 +240,10 @@ export default function P2PFlowScreen() {
                 <Check size={40} color="#10b981" />
               </View>
               <Text style={styles.title}>Trade Successful!</Text>
-              <Text style={[styles.subtitle, { textAlign: 'center', marginTop: 8 }]}>
-                <Text style={{ fontWeight: 'bold', color: colors.textPrimary }}>{nrtValue.toFixed(4)} NRT</Text> has been added to your balance.
-              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+                <NrtAmount value={nrtValue} style={{ fontWeight: 'bold', color: colors.textPrimary, fontSize: 14 }} />
+                <Text style={styles.subtitle}> has been added to your balance.</Text>
+              </View>
               <Pressable style={[styles.actionBtn, { marginTop: 40, width: '100%' }]} onPress={() => router.replace('/wallet')}>
                 <Text style={styles.actionBtnText}>Return to Wallet</Text>
               </Pressable>

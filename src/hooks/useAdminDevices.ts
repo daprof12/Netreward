@@ -19,6 +19,8 @@ export interface AdminDeviceView {
     isp_name: string;
     country: string;
     users?: { display_name: string | null; email: string };
+    updated_at?: string;
+    created_at?: string;
   };
   campaign: {
     title: string;
@@ -142,7 +144,9 @@ export function useSpDevices() {
             status: d.status, 
             isp_name: d.isp_name, 
             country: d.country, 
-            users: d.users 
+            users: d.users,
+            updated_at: d.updated_at,
+            created_at: d.created_at
           },
           campaign: camp ? { title: camp.title, service: serviceObj } : null
         };

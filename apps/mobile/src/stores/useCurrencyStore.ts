@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { customStorage } from '@/lib/storage';
 import { getTokenPrice } from '@/hooks/useTokenPrice';
 
 export type Currency = {
@@ -53,7 +53,7 @@ export const useCurrencyStore = create<CurrencyStore>()(
     }),
     {
       name: 'currency-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => customStorage),
     }
   )
 );

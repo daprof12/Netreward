@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { Search, Smartphone, Laptop, Tablet, MapPin, Wifi, CheckCircle2, AlertCircle, X } from 'lucide-react-native';
 import { useSpDevices } from '@/hooks/useAdminDevices';
 import { useSpStore } from '@/stores/useSpStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { useThemeColors } from '@/theme';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 function SignalBars({ strength, colors }: { strength: number, colors: any }) {
   return (
@@ -23,16 +25,36 @@ function SignalBars({ strength, colors }: { strength: number, colors: any }) {
   );
 }
 
+const getDynamicStatus = (updatedAt?: string, dbStatus?: string, createdAt?: string): 'active' | 'idle' | 'offline' => {
+  if (dbStatus === 'offline' || dbStatus === 'disconnected') {
+    return 'offline';
+  }
+  const timeStr = updatedAt || createdAt;
+  if (!timeStr) return 'offline';
+  const diffMs = Date.now() - new Date(timeStr).getTime();
+  const diffMin = diffMs / 60000;
+  if (diffMin < 5) return 'active';
+  if (diffMin < 15) return 'idle';
+  return 'offline';
+};
+
 export default function SpDevicesView() {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const { user } = useAuthStore();
 
   const { sessions, isLoading } = useSpDevices();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'service' | 'campaign'>('all');
   const [filterValue, setFilterValue] = useState<string>('');
 
-  const { services, campaigns } = useSpStore();
+  const { services, campaigns, initialize } = useSpStore();
+
+  useEffect(() => {
+    if (user?.id) {
+      initialize(user.id);
+    }
+  }, [user?.id, initialize]);
   const availableCampaigns = campaigns.map(c => c.name).filter(Boolean);
   const availableServices = services.map(s => s.name).filter(Boolean);
 
@@ -74,7 +96,7 @@ export default function SpDevicesView() {
       devices: filteredDevices.length,
       dataGB: totalDataGB.toFixed(6),
       nrt: totalNrt,
-      cashback: (totalNrt * 0.10).toFixed(6) // 10% of user earnings for SP
+      cashback: totalNrt * 0.10 // 10% of user earnings for SP
     };
   }, [filteredDevices]);
 
@@ -149,11 +171,11 @@ export default function SpDevicesView() {
             </View>
             <View style={styles.analyticsCard}>
               <Text style={styles.analyticsLabel}>NRT DISTRIBUTED</Text>
-              <Text style={[styles.analyticsValue, { color: colors.accentPrimary }]}>{analyticsSummary.nrt.toFixed(6)}</Text>
+              <NrtAmount value={analyticsSummary.nrt} hideUnit style={[styles.analyticsValue, { color: colors.accentPrimary }]} />
             </View>
             <View style={[styles.analyticsCard, styles.analyticsCardSpecial]}>
               <Text style={styles.analyticsLabel}>SP CASHBACK (10%)</Text>
-              <Text style={[styles.analyticsValue, { color: '#3B82F6' }]}>{analyticsSummary.cashback}</Text>
+              <NrtAmount value={analyticsSummary.cashback} hideUnit style={[styles.analyticsValue, { color: '#3B82F6' }]} />
             </View>
           </ScrollView>
         )}
@@ -179,24 +201,33 @@ export default function SpDevicesView() {
               const campaignObj = Array.isArray(session.campaign) ? session.campaign[0] : session.campaign;
               const serviceObj = campaignObj ? (Array.isArray(campaignObj.service) ? campaignObj.service[0] : campaignObj.service) : null;
               
+              const dynamicStatus = getDynamicStatus(device.updated_at, device.status, device.created_at);
               let lastActiveText = 'Offline';
-              if (device.status === 'active') lastActiveText = 'Active Now';
-              else if (session.session_end) {
-                const diffM = Math.floor((Date.now() - new Date(session.session_end).getTime()) / 60000);
+              if (dynamicStatus === 'active') lastActiveText = 'Active Now';
+              else if (dynamicStatus === 'idle') lastActiveText = 'Idle';
+              else if (device.updated_at) {
+                const diffM = Math.floor((Date.now() - new Date(device.updated_at).getTime()) / 60000);
                 if (diffM < 60) lastActiveText = `Last active ${diffM}m ago`;
                 else if (diffM < 1440) lastActiveText = `Last active ${Math.floor(diffM/60)}h ago`;
                 else lastActiveText = `Last active ${Math.floor(diffM/1440)}d ago`;
               }
 
               return (
-                <View key={session.id} style={[styles.sessionCard, device.status === 'active' && styles.sessionCardActive]}>
+                <View key={session.id} style={[
+                  styles.sessionCard, 
+                  dynamicStatus === 'active' && styles.sessionCardActive,
+                  dynamicStatus === 'idle' && { borderColor: 'rgba(245, 158, 11, 0.3)' }
+                ]}>
                   {/* Header */}
                   <View style={styles.cardHeader}>
                     <View style={styles.cardHeaderLeft}>
-                      <View style={[styles.deviceIconWrapper, device.status === 'active' ? styles.iconActive : styles.iconInactive]}>
-                        {device.device_type === 'laptop' ? <Laptop size={20} color={device.status === 'active' ? colors.accentPrimary : colors.textSecondary} /> : 
-                         device.device_type === 'tablet' ? <Tablet size={20} color={device.status === 'active' ? colors.accentPrimary : colors.textSecondary} /> : 
-                         <Smartphone size={20} color={device.status === 'active' ? colors.accentPrimary : colors.textSecondary} />}
+                      <View style={[
+                        styles.deviceIconWrapper, 
+                        dynamicStatus === 'active' ? styles.iconActive : dynamicStatus === 'idle' ? { backgroundColor: 'rgba(245, 158, 11, 0.1)' } : styles.iconInactive
+                      ]}>
+                        {device.device_type === 'laptop' ? <Laptop size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} /> : 
+                         device.device_type === 'tablet' ? <Tablet size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} /> : 
+                         <Smartphone size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} />}
                       </View>
                       <View>
                         <Text style={styles.userName}>{(device.users as any)?.display_name || (device.users as any)?.email || 'Unknown User'}</Text>
@@ -204,8 +235,15 @@ export default function SpDevicesView() {
                           <Text style={styles.deviceMetaText}>{device.device_name}</Text>
                           <Text style={styles.deviceMetaDot}>•</Text>
                           <View style={styles.statusRow}>
-                            <View style={[styles.statusDot, device.status === 'active' ? { backgroundColor: '#10b981' } : { backgroundColor: colors.textSecondary }]} />
-                            <Text style={[styles.statusText, device.status === 'active' && { color: '#10b981' }]}>{lastActiveText}</Text>
+                            <View style={[
+                              styles.statusDot, 
+                              dynamicStatus === 'active' ? { backgroundColor: '#10b981' } : dynamicStatus === 'idle' ? { backgroundColor: '#f59e0b' } : { backgroundColor: colors.textSecondary }
+                            ]} />
+                            <Text style={[
+                              styles.statusText, 
+                              dynamicStatus === 'active' && { color: '#10b981' },
+                              dynamicStatus === 'idle' && { color: '#f59e0b' }
+                            ]}>{lastActiveText}</Text>
                           </View>
                         </View>
                       </View>
@@ -239,7 +277,7 @@ export default function SpDevicesView() {
                       </View>
                       <View>
                         <Text style={styles.statLabel}>NRT EARNED</Text>
-                        <Text style={[styles.statValue, { color: colors.accentPrimary }]}>{session.nrt_awarded.toFixed(6)}</Text>
+                        <NrtAmount value={session.nrt_awarded} hideUnit style={[styles.statValue, { color: colors.accentPrimary }]} />
                       </View>
                     </View>
 
@@ -252,7 +290,7 @@ export default function SpDevicesView() {
                         <Wifi size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
                         <Text style={styles.footerMetaText}>{device.isp_name || 'Unknown ISP'}</Text>
                         <View style={{ marginLeft: 6 }}>
-                          <SignalBars strength={device.status === 'active' ? 4 : 1} colors={colors} />
+                           <SignalBars strength={dynamicStatus === 'active' ? 4 : dynamicStatus === 'idle' ? 2 : 1} colors={colors} />
                         </View>
                       </View>
                     </View>

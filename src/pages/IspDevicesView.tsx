@@ -19,6 +19,19 @@ function SignalBars({ strength }: { strength: number }) {
   );
 }
 
+const getDynamicStatus = (updatedAt?: string, dbStatus?: string, createdAt?: string): 'active' | 'idle' | 'offline' => {
+  if (dbStatus === 'offline' || dbStatus === 'disconnected') {
+    return 'offline';
+  }
+  const timeStr = updatedAt || createdAt;
+  if (!timeStr) return 'offline';
+  const diffMs = Date.now() - new Date(timeStr).getTime();
+  const diffMin = diffMs / 60000;
+  if (diffMin < 5) return 'active';
+  if (diffMin < 15) return 'idle';
+  return 'offline';
+};
+
 export default function IspDevicesView() {
   usePageTitle('ISP Devices');
   const { devices, isLoading } = useIspDevices();
@@ -210,14 +223,20 @@ export default function IspDevicesView() {
           
           return (
           <div key={device.id} className="glass p-4 rounded-xl border border-glass-border space-y-4 relative overflow-hidden group">
-            {device.status === 'active' && (
+            {getDynamicStatus(device.updated_at, device.status, device.created_at) === 'active' && (
               <div className="absolute -inset-10 bg-accent-primary/5 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
             )}
 
             {/* Header */}
             <div className="flex justify-between items-start relative z-10">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${device.status === 'active' ? 'bg-accent-primary/10 text-accent-primary' : 'bg-bg-secondary text-text-secondary'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  getDynamicStatus(device.updated_at, device.status, device.created_at) === 'active'
+                    ? 'bg-accent-primary/10 text-accent-primary'
+                    : getDynamicStatus(device.updated_at, device.status, device.created_at) === 'idle'
+                      ? 'bg-amber-500/10 text-amber-500'
+                      : 'bg-bg-secondary text-text-secondary'
+                }`}>
                   {device.device_type === 'laptop' ? <Laptop size={20} /> : device.device_type === 'tablet' ? <Tablet size={20} /> : <Smartphone size={20} />}
                 </div>
                 <div>
@@ -227,23 +246,40 @@ export default function IspDevicesView() {
                   <div className="flex items-center gap-2 text-xs text-text-secondary">
                     <span>{device.device_name}</span>
                     <span className="w-1 h-1 rounded-full bg-glass-border" />
-                    <span className={`flex items-center gap-1 ${device.status === 'active' ? 'text-green-500' : ''}`}>
-                      {device.status === 'active' ? <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> : <span className="w-1.5 h-1.5 rounded-full bg-text-secondary" />}
-                      {(() => {
-                        if (device.status === 'active') return 'Active Now';
+                    {(() => {
+                      const dynamicStatus = getDynamicStatus(device.updated_at, device.status, device.created_at);
+                      let colorClass = 'text-text-secondary';
+                      let dotColorClass = 'bg-text-secondary';
+                      let label = 'Offline';
+                      
+                      if (dynamicStatus === 'active') {
+                        colorClass = 'text-green-500';
+                        dotColorClass = 'bg-green-500 animate-pulse';
+                        label = 'Active Now';
+                      } else if (dynamicStatus === 'idle') {
+                        colorClass = 'text-amber-500';
+                        dotColorClass = 'bg-amber-500';
+                        label = 'Idle';
+                      } else {
                         if (device.updated_at) {
                           const diffMs = Date.now() - new Date(device.updated_at).getTime();
                           const diffM = Math.floor(diffMs / 60000);
                           const diffH = Math.floor(diffM / 60);
                           const diffD = Math.floor(diffH / 24);
-                          if (diffD > 0) return `Last active ${diffD}d ago`;
-                          if (diffH > 0) return `Last active ${diffH}h ago`;
-                          if (diffM > 0) return `Last active ${diffM}m ago`;
-                          return 'Last active just now';
+                          if (diffD > 0) label = `Last active ${diffD}d ago`;
+                          else if (diffH > 0) label = `Last active ${diffH}h ago`;
+                          else if (diffM > 0) label = `Last active ${diffM}m ago`;
+                          else label = 'Last active just now';
                         }
-                        return 'Offline';
-                      })()}
-                    </span>
+                      }
+
+                      return (
+                        <span className={`flex items-center gap-1 ${colorClass}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${dotColorClass}`} />
+                          {label}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -291,7 +327,13 @@ export default function IspDevicesView() {
                 <div className="flex items-center gap-1.5 text-[10px] text-text-secondary font-medium bg-bg-secondary px-2 py-0.5 rounded">
                   <Wifi size={10} />
                   <span>{device.isp_name || 'Unknown ISP'}</span>
-                  <SignalBars strength={device.signal_strength ? Math.ceil(device.signal_strength / 25) : 4} />
+                  <SignalBars strength={
+                    getDynamicStatus(device.updated_at, device.status, device.created_at) === 'offline'
+                      ? 1
+                      : getDynamicStatus(device.updated_at, device.status, device.created_at) === 'idle'
+                        ? 2
+                        : (device.signal_strength ? Math.ceil(device.signal_strength / 25) : 4)
+                  } />
                 </div>
               </div>
             </div>

@@ -10,6 +10,7 @@ import { useThemeColors } from '@/theme';
 import { formatNrtText } from '@/lib/formatNrt';
 import BottomSheet from '@/components/ui/BottomSheet';
 import TransactionDetailModal, { getTxMeta } from '@/components/wallet/TransactionDetailModal';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 // Redefine locally or rely on getTxMeta from Modal file
 const TYPE_OPTIONS = [
@@ -172,9 +173,11 @@ export default function TransactionsScreen() {
                     <View style={styles.txDetails}>
                       <View style={styles.txRow}>
                         <Text style={styles.txDesc} numberOfLines={1}>{tx.description}</Text>
-                        <Text style={[styles.txAmount, { color: isPositive ? colors.success : colors.error }]}>
-                          {isPositive ? '+' : ''}{formatNrtText(tx.amount)} NRT
-                        </Text>
+                        <NrtAmount 
+                          value={tx.amount} 
+                          showSign={isPositive} 
+                          style={[styles.txAmount, { color: isPositive ? colors.success : colors.error }]} 
+                        />
                       </View>
                       <View style={styles.txRow}>
                         <Text style={styles.txDate}>{formatDate(tx.created_at)}</Text>
@@ -203,9 +206,10 @@ export default function TransactionsScreen() {
                   <View style={styles.txDetails}>
                     <View style={styles.txRow}>
                       <Text style={styles.txDesc} numberOfLines={1}>{chk.description}</Text>
-                      <Text style={[styles.txAmount, { color: colors.textPrimary }]}>
-                        {formatNrtText(Math.abs(chk.amount))} NRT
-                      </Text>
+                      <NrtAmount 
+                        value={Math.abs(chk.amount)} 
+                        style={[styles.txAmount, { color: colors.textPrimary }]} 
+                      />
                     </View>
                     <View style={styles.txRow}>
                       <Text style={styles.txDate}>{formatDate(chk.created_at)}</Text>

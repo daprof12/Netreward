@@ -9,6 +9,7 @@ import { useDevices } from '@/hooks/useDevices';
 import { useDeviceManager } from '@/hooks/useDeviceManager';
 import { useUserDeviceStats, useDeviceSummaries, TimeFilter } from '@/hooks/useDeviceAnalytics';
 import { formatNrtText } from '@/lib/formatNrt';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -19,6 +20,19 @@ const getDeviceIcon = (type: string) => {
     case 'tablet': return Tablet;
     default: return Smartphone;
   }
+};
+
+const getDynamicStatus = (updatedAt?: string, dbStatus?: string, createdAt?: string): 'active' | 'idle' | 'offline' => {
+  if (dbStatus === 'offline' || dbStatus === 'disconnected') {
+    return 'offline';
+  }
+  const timeStr = updatedAt || createdAt;
+  if (!timeStr) return 'offline';
+  const diffMs = Date.now() - new Date(timeStr).getTime();
+  const diffMin = diffMs / 60000;
+  if (diffMin < 5) return 'active';
+  if (diffMin < 15) return 'idle';
+  return 'offline';
 };
 
 export default function UserDevicesView() {
@@ -39,6 +53,16 @@ export default function UserDevicesView() {
   const { devices, addDevice, removeDevice, isAdding, isRemoving, isLoading } = useDevices();
   const { data: summaries = {} } = useDeviceSummaries();
 
+  const aggregateSummary = useMemo(() => {
+    let totalData = 0;
+    let totalNrt = 0;
+    Object.values(summaries).forEach((s: any) => {
+      totalData += s.total_data_gb;
+      totalNrt += s.total_nrt_earned;
+    });
+    return { totalData, totalNrt };
+  }, [summaries]);
+
   const sortedDevices = useMemo(() => {
     if (!devices) return [];
     return [...devices].sort((a, b) => {
@@ -46,7 +70,10 @@ export default function UserDevicesView() {
       const bIsCurrent = b.fingerprint === currentDevice?.fingerprint;
       if (aIsCurrent && !bIsCurrent) return -1;
       if (!aIsCurrent && bIsCurrent) return 1;
-      return 0;
+      
+      const dateA = new Date(a.created_at || 0).getTime() || 0;
+      const dateB = new Date(b.created_at || 0).getTime() || 0;
+      return dateB - dateA;
     });
   }, [devices, currentDevice?.fingerprint]);
 
@@ -84,18 +111,6 @@ export default function UserDevicesView() {
 
   const hasChartData = currentData.length > 0 && !currentData.every(d => d.data === 0 && d.nrt === 0);
   
-  const chartConfig = {
-    backgroundGradientFrom: colors.bgSecondary,
-    backgroundGradientTo: colors.bgSecondary,
-    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-    labelColor: (opacity = 1) => colors.textSecondary,
-    strokeWidth: 2,
-    barPercentage: 0.5,
-    useShadowColorFromDataset: false,
-    decimalPlaces: 2,
-    propsForDots: { r: '3', strokeWidth: '1', stroke: colors.bgPrimary }
-  };
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -113,11 +128,11 @@ export default function UserDevicesView() {
           <View style={styles.statsRow}>
             <View>
               <Text style={styles.statLabel}>Data Consumed</Text>
-              <Text style={styles.statValueGB}>{Number(summary.totalData).toFixed(6)} GB</Text>
+              <Text style={styles.statValueGB}>{Number(aggregateSummary.totalData).toFixed(6)} GB</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={styles.statLabel}>NRT Earned</Text>
-              <Text style={styles.statValueNRT}>{formatNrtText(summary.totalNrt)} NRT</Text>
+              <NrtAmount value={aggregateSummary.totalNrt} style={styles.statValueNRT} />
             </View>
           </View>
 
@@ -181,21 +196,29 @@ export default function UserDevicesView() {
               <Text style={styles.emptyChartText}>Add a device to start tracking data usage and earning NRT rewards.</Text>
             </View>
           ) : sortedDevices.map(device => {
-            const isActive = device.status === 'active';
+            const dynamicStatus = getDynamicStatus(device.updated_at, device.status, device.created_at);
             const DeviceIcon = getDeviceIcon(device.device_type);
             const devSummary = summaries[device.id];
 
             return (
-              <Pressable key={device.id} onPress={() => router.push(`/devices/${device.id}` as any)} style={[styles.deviceCard, isActive && styles.deviceCardActive]}>
-                {isActive && <View style={styles.activeIndicator} />}
+              <Pressable key={device.id} onPress={() => router.push(`/devices/${device.id}` as any)} style={[
+                styles.deviceCard, 
+                dynamicStatus === 'active' && styles.deviceCardActive,
+                dynamicStatus === 'idle' && { borderColor: 'rgba(245, 158, 11, 0.5)' }
+              ]}>
+                {dynamicStatus === 'active' && <View style={[styles.activeIndicator, { backgroundColor: colors.accentPrimary }]} />}
+                {dynamicStatus === 'idle' && <View style={[styles.activeIndicator, { backgroundColor: '#f59e0b' }]} />}
                 
                 <Pressable onPress={() => setDeviceToRemove(device.id)} style={styles.removeBtnAbs}>
                   <Trash2 size={16} color={colors.textSecondary} />
                 </Pressable>
 
                 <View style={styles.deviceCardInner}>
-                  <View style={[styles.deviceIconWrapper, isActive ? styles.iconActive : styles.iconInactive]}>
-                    <DeviceIcon size={24} color={isActive ? colors.accentPrimary : colors.textSecondary} />
+                  <View style={[
+                    styles.deviceIconWrapper, 
+                    dynamicStatus === 'active' ? styles.iconActive : dynamicStatus === 'idle' ? { backgroundColor: 'rgba(245, 158, 11, 0.1)' } : styles.iconInactive
+                  ]}>
+                    <DeviceIcon size={24} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} />
                   </View>
                   <View style={styles.deviceInfo}>
                     <View style={styles.deviceNameRow}>
@@ -207,10 +230,16 @@ export default function UserDevicesView() {
                       )}
                     </View>
                     <View style={styles.deviceMetaRow}>
-                      <View style={[styles.metaBadge, isActive ? styles.metaBadgeActive : styles.metaBadgeInactive]}>
-                        {isActive ? <Wifi size={10} color={colors.accentPrimary} /> : <WifiOff size={10} color={colors.textSecondary} />}
-                        <Text style={[styles.metaBadgeText, isActive ? { color: colors.accentPrimary } : { color: colors.textSecondary }]}>
-                          {isActive ? 'Active' : 'Offline'}
+                      <View style={[
+                        styles.metaBadge, 
+                        dynamicStatus === 'active' ? styles.metaBadgeActive : dynamicStatus === 'idle' ? { backgroundColor: 'rgba(245, 158, 11, 0.1)' } : styles.metaBadgeInactive
+                      ]}>
+                        {dynamicStatus === 'offline' ? <WifiOff size={10} color={colors.textSecondary} /> : <Wifi size={10} color={dynamicStatus === 'active' ? colors.accentPrimary : '#f59e0b'} />}
+                        <Text style={[
+                          styles.metaBadgeText, 
+                          dynamicStatus === 'active' ? { color: colors.accentPrimary } : dynamicStatus === 'idle' ? { color: '#f59e0b' } : { color: colors.textSecondary }
+                        ]}>
+                          <Text style={{ textTransform: 'capitalize' }}>{dynamicStatus}</Text>
                         </Text>
                       </View>
                       <View style={styles.metaRowItem}>
@@ -227,7 +256,7 @@ export default function UserDevicesView() {
                     </Text>
                   </View>
                   <View style={styles.deviceRight}>
-                    <Text style={styles.deviceNrt} numberOfLines={1} ellipsizeMode="tail">+{devSummary ? devSummary.total_nrt_earned.toFixed(6) : '0.00'} NRT</Text>
+                    <NrtAmount value={devSummary ? devSummary.total_nrt_earned : 0} showSign style={styles.deviceNrt} />
                     <ChevronRight size={16} color={colors.textSecondary} style={{ marginTop: 8 }} />
                   </View>
                 </View>
@@ -321,7 +350,7 @@ export default function UserDevicesView() {
                             <Text style={styles.linkedItemName}>{dev.device_name}</Text>
                             {isCurrent && <View style={styles.thisDeviceBadge}><Text style={styles.thisDeviceText}>CURRENT</Text></View>}
                           </View>
-                          <Text style={styles.linkedItemStatus}>{dev.status}</Text>
+                          <Text style={[styles.linkedItemStatus, { textTransform: 'capitalize' }]}>{getDynamicStatus(dev.updated_at, dev.status, dev.created_at)}</Text>
                         </View>
                       </View>
                       <Pressable onPress={() => setDeviceToRemove(dev.id)} style={{ padding: 8 }}>

@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Modal, Image, ActivityIn
 import { useThemeColors } from '@/theme';
 import { X, Globe, Wifi, MapPin, ArrowDownToLine, Clock, CheckCircle2 } from 'lucide-react-native';
 import { formatNrtText } from '@/lib/formatNrt';
+import NrtAmount from './ui/NrtAmount';
+import PulseDot from './ui/PulseDot';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 interface EarningsDetailModalProps {
   earningCampaign: any;
@@ -43,6 +46,11 @@ export default function EarningsDetailModal({
 }: EarningsDetailModalProps) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+
+  const { signalPercentage } = useNetworkStatus();
+  const strength = signalPercentage
+    ? (signalPercentage > 75 ? 4 : signalPercentage > 50 ? 3 : signalPercentage > 25 ? 2 : 1)
+    : 4;
 
   if (!earningCampaign) return null;
 
@@ -92,7 +100,7 @@ export default function EarningsDetailModal({
                     </View>
                   </View>
                   <View style={styles.sheetActiveBadge}>
-                    {isRecent && <View style={styles.sheetPulseDot} />}
+                    {isRecent && <PulseDot size={6} />}
                     <Text style={styles.sheetActiveBadgeText}>active</Text>
                   </View>
                 </View>
@@ -109,7 +117,7 @@ export default function EarningsDetailModal({
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={styles.sheetTrackingText}>Signal</Text>
-                    <SignalBars strength={4} />
+                    <SignalBars strength={strength} />
                   </View>
                 </View>
 
@@ -157,15 +165,17 @@ export default function EarningsDetailModal({
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.sheetTotalsLabel}>NRT EARNED</Text>
-                    <Text style={[styles.sheetTotalsValue, { color: colors.accentPrimary }]}>
-                      {formatNrtText(nrtEarned)} NRT
-                    </Text>
+                    <NrtAmount 
+                      value={nrtEarned} 
+                      style={[styles.sheetTotalsValue, { color: colors.accentPrimary }]} 
+                    />
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.sheetTotalsLabel}>RATE</Text>
-                    <Text style={styles.sheetTotalsValue}>
-                      {earningCampaign.reward_rate_per_gb} NRT/GB
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                      <NrtAmount value={earningCampaign.reward_rate_per_gb} style={styles.sheetTotalsValue} hideUnit />
+                      <Text style={[styles.sheetTotalsValue, { fontSize: 12, opacity: 0.7, marginLeft: 4 }]}>NRT/GB</Text>
+                    </View>
                   </View>
                 </View>
               </View>

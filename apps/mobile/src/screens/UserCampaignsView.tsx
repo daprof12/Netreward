@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator, Modal, Dimensions } from 'react-native';
 import { useThemeColors } from '@/theme';
 import { Search, Filter, Play, CheckCircle2, X, Globe, MapPin, TrendingUp, Info, ChevronRight, Wifi, ArrowDownToLine, Clock, Gamepad2 } from 'lucide-react-native';
@@ -11,6 +12,8 @@ import { supabase } from '@/lib/supabase';
 import { formatNrtText } from '@/lib/formatNrt';
 import Slider from '@react-native-community/slider';
 import EarningsDetailModal from '@/components/EarningsDetailModal';
+import NrtAmount from '@/components/ui/NrtAmount';
+import ActiveCampaignCard from '@/components/ui/ActiveCampaignCard';
 
 const SERVICE_CATEGORIES = ['All', 'Streaming', 'AI Service', 'Gaming', 'Social', 'Browsing', 'Cloud', 'Broadband', 'Telecommunication', 'Satellite', 'Fiber', 'Mobile Network', 'Other'];
 const STATUSES = ['All', 'active', 'paused', 'completed'];
@@ -55,6 +58,46 @@ export default function UserCampaignsView() {
   const [gamingPlatformSelect, setGamingPlatformSelect] = useState<GamingPlatform>(availableGamingPlatforms[0] || 'playstation');
   const [gamingUsernameInput, setGamingUsernameInput] = useState('');
 
+  // Fetch campaign durations (shared cache with UserHomeScreen)
+  const { data: campaignDurations } = useQuery({
+    queryKey: ['campaign_durations', user?.id],
+    queryFn: async () => {
+      if (!user) return {};
+      const { data: devicesData } = await supabase.from('devices').select('id').eq('user_id', user.id);
+      const deviceIds = devicesData?.map((d: any) => d.id) || [];
+      if (deviceIds.length === 0) return {};
+      const { data: sessions } = await supabase
+        .from('device_data_sessions').select('campaign_id, duration_seconds').in('device_id', deviceIds);
+      const map: Record<string, number> = {};
+      for (const s of sessions || []) {
+        map[s.campaign_id] = (map[s.campaign_id] || 0) + (s.duration_seconds || 0);
+      }
+      return map;
+    },
+    staleTime: 30000,
+  });
+
+  // Fetch recent sessions to power the pulse dot
+  const { data: recentSessionsRaw } = useQuery({
+    queryKey: ['recent_sessions_raw', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase.from('device_data_sessions')
+        .select('campaign_id, session_end')
+        .order('session_end', { ascending: false })
+        .limit(20);
+      return data || [];
+    },
+    refetchInterval: 10000,
+  });
+
+  const isSessionRecent = (campId: string) =>
+    (recentSessionsRaw || []).some(
+      (s: any) =>
+        s.campaign_id === campId &&
+        new Date().getTime() - new Date(s.session_end).getTime() < 15 * 60 * 1000
+    );
+
   const joinedCampaignIds = new Set(userEnrollments?.map((en: any) => en.campaign_id) || []);
   const campaignsList = (activeCampaigns || []).map(camp => ({ ...camp, joined: joinedCampaignIds.has(camp.id) }));
 
@@ -73,6 +116,16 @@ export default function UserCampaignsView() {
       if (filterStatus !== 'All' && c.status !== filterStatus) return false;
       if (c.reward_rate_per_gb < filterRewardMin || c.reward_rate_per_gb > filterRewardMax) return false;
       return true;
+    })
+    .sort((a: any, b: any) => {
+      if (activeTab === 'joined') {
+        const enA = userEnrollments?.find((e: any) => e.campaign_id === a.id);
+        const enB = userEnrollments?.find((e: any) => e.campaign_id === b.id);
+        const dateA = enA?.created_at || a.created_at || 0;
+        const dateB = enB?.created_at || b.created_at || 0;
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      }
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
     });
 
   const handleJoin = async (id: string, category?: string) => {
@@ -118,7 +171,7 @@ export default function UserCampaignsView() {
     try {
       const res = await claimRewards();
       if (res?.success) {
-        showToast(`Successfully claimed ${Number(res.net_amount || 0).toFixed(6)} NRT!`, 'success');
+        showToast(`Successfully claimed ${formatNrtText(res.net_amount || 0)} NRT!`, 'success');
         setEarningCampaign(null);
       } else {
         showToast(res?.message || 'Failed to claim rewards', 'warning');
@@ -185,6 +238,19 @@ export default function UserCampaignsView() {
             const isThisJoining = joiningId === campaign.id;
             const budgetPct = Math.min((campaign.budget_spent / (campaign.total_budget || 1)) * 100, 100);
 
+            if (campaign.joined) {
+              const en = userEnrollments?.find((e: any) => e.campaign_id === campaign.id);
+              return (
+                <ActiveCampaignCard
+                  key={campaign.id}
+                  campaign={campaign}
+                  enrollment={en}
+                  isRecent={isSessionRecent(campaign.id)}
+                  onPress={() => setEarningCampaign(campaign)}
+                />
+              );
+            }
+
             return (
               <View key={campaign.id} style={styles.card}>
                 <View style={styles.cardHeader}>
@@ -196,7 +262,7 @@ export default function UserCampaignsView() {
                     <Text style={styles.cardMeta} numberOfLines={1}>{campaign.creator_name} • {campaign.category || 'General'}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.cardRate}>{campaign.reward_rate_per_gb}</Text>
+                    <NrtAmount value={campaign.reward_rate_per_gb} hideUnit style={styles.cardRate} />
                     <Text style={styles.cardRateLabel}>NRT / GB</Text>
                   </View>
                 </View>
@@ -205,36 +271,20 @@ export default function UserCampaignsView() {
                   <View style={[styles.progressFill, { width: `${budgetPct}%` }]} />
                 </View>
 
-                {campaign.joined ? (
-                  <View style={{ gap: 12 }}>
-                    <View style={styles.instructionBox}>
-                      <Info size={14} color={colors.accentPrimary} style={{ marginTop: 2, marginRight: 6 }} />
-                      <Text style={styles.instructionText}>
-                        Open <Text style={{ fontWeight: 'bold', color: colors.accentPrimary }}>{campaign.target_app}</Text> and use the service to start earning NRT.
-                      </Text>
-                    </View>
-                    <Pressable onPress={() => setEarningCampaign(campaign)} style={styles.viewEarningsBtn}>
-                      <TrendingUp size={16} color={colors.accentPrimary} style={{ marginRight: 6 }} />
-                      <Text style={styles.viewEarningsText}>View Your Earnings</Text>
-                      <ChevronRight size={14} color={colors.accentPrimary} style={{ marginLeft: 4 }} />
-                    </Pressable>
-                  </View>
-                ) : (
-                  <Pressable
-                    onPress={() => handleJoin(campaign.id, campaign.category)}
-                    disabled={isJoining || isThisJoining}
-                    style={[styles.joinBtn, (isJoining || isThisJoining) && { opacity: 0.7 }]}
-                  >
-                    {isThisJoining ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <Play size={16} color="#fff" style={{ marginRight: 6 }} />
-                        <Text style={styles.joinBtnText}>Join Campaign</Text>
-                      </>
-                    )}
-                  </Pressable>
-                )}
+                <Pressable
+                  onPress={() => handleJoin(campaign.id, campaign.category)}
+                  disabled={isJoining || isThisJoining}
+                  style={[styles.joinBtn, (isJoining || isThisJoining) && { opacity: 0.7 }]}
+                >
+                  {isThisJoining ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Play size={16} color="#fff" style={{ marginRight: 6 }} />
+                      <Text style={styles.joinBtnText}>Join Campaign</Text>
+                    </>
+                  )}
+                </Pressable>
               </View>
             );
           })
@@ -289,7 +339,7 @@ export default function UserCampaignsView() {
                   thumbTintColor={colors.accentPrimary}
                 />
                 <Text style={{ textAlign: 'center', color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>
-                  Up to {filterRewardMax.toFixed(2)} NRT/GB
+                  Up to {formatNrtText(filterRewardMax)} NRT/GB
                 </Text>
               </View>
 
@@ -317,10 +367,10 @@ export default function UserCampaignsView() {
         earningCampaign={earningCampaign}
         onClose={() => setEarningCampaign(null)}
         enrollment={earningCampaign ? userEnrollments?.find((e: any) => e.campaign_id === earningCampaign.id) : null}
-        durationSecs={0} // Campaigns view doesn't fetch session duration by default; can pass 0 or fetch it
+        durationSecs={earningCampaign ? (campaignDurations?.[earningCampaign.id] || 0) : 0}
         handleClaim={handleClaim}
         isClaiming={isClaiming}
-        isRecent={false}
+        isRecent={earningCampaign ? isSessionRecent(earningCampaign.id) : false}
       />
 
       {/* Gaming Account Modal */}

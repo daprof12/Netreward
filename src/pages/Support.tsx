@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HelpCircle, Plus, MessageSquare, ChevronLeft, Send, AlertCircle, Loader2, Inbox } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -20,6 +20,7 @@ type SupportFormValues = z.infer<typeof supportSchema>;
 
 export default function Support() {
   usePageTitle('Support');
+  const navigate = useNavigate();
   const [view, setView] = useState<'list' | 'create'>('list');
   const { tickets, isLoading, createTicket, isCreating } = useSupportTickets();
   const { showToast } = useToastStore();
@@ -76,9 +77,12 @@ export default function Support() {
     >
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
-          <Link to="/settings" className="p-2 bg-bg-secondary rounded-full hover:bg-glass-bg transition-colors">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 bg-bg-secondary rounded-full hover:bg-glass-bg transition-colors"
+          >
             <ChevronLeft size={20} className="text-text-primary" />
-          </Link>
+          </button>
           <h1 className="text-2xl font-bold tracking-tight">Support Center</h1>
         </div>
         

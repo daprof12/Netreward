@@ -14,6 +14,7 @@ import { useThemeColors } from '@/theme';
 import { formatNrtText } from '@/lib/formatNrt';
 import WithdrawModal from '@/components/wallet/WithdrawModal';
 import TransactionDetailModal from '@/components/wallet/TransactionDetailModal';
+import NrtAmount from '@/components/ui/NrtAmount';
 
 const { width } = Dimensions.get('window');
 
@@ -89,7 +90,7 @@ export default function WalletScreen() {
           </View>
           <Text style={styles.balanceLabel}>Total Balance</Text>
           <View style={styles.balanceRow}>
-            <Text style={styles.balanceValue}>{formatNrtText(displayBalance)}</Text>
+            <NrtAmount value={displayBalance} hideUnit style={styles.balanceValue} />
             <Text style={styles.balanceCurrency}>NRT</Text>
           </View>
           <Text style={styles.fiatPreview}>≈ {fiatPreview.symbol}{fiatPreview.amount} {selectedCurrency.split(' ')[0]}</Text>
@@ -97,11 +98,11 @@ export default function WalletScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>Total Earned</Text>
-              <Text style={styles.statValuePositive}>+{formatNrtText(totalEarned)} NRT</Text>
+              <NrtAmount value={totalEarned} showSign style={styles.statValuePositive} />
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>Withdrawn</Text>
-              <Text style={styles.statValueNegative}>-{formatNrtText(totalWithdrawn)} NRT</Text>
+              <NrtAmount value={-Math.abs(Number(totalWithdrawn) || 0)} style={styles.statValueNegative} />
             </View>
           </View>
         </LinearGradient>
@@ -184,9 +185,11 @@ export default function WalletScreen() {
                       {new Date(tx.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
                     </Text>
                   </View>
-                  <Text style={[styles.txAmount, { color: Number(tx.amount) > 0 ? colors.success : colors.textPrimary }]}>
-                    {Number(tx.amount) > 0 ? '+' : ''}{formatNrtText(tx.amount)} NRT
-                  </Text>
+                  <NrtAmount 
+                    value={tx.amount} 
+                    showSign 
+                    style={[styles.txAmount, { color: Number(tx.amount) > 0 ? colors.success : colors.textPrimary }]} 
+                  />
                 </Pressable>
               ))
             )}

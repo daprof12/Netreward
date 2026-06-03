@@ -16,6 +16,7 @@ export interface Device {
   isp_name?: string;
   signal_strength: number;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface DeviceSession {

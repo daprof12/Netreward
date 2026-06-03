@@ -279,9 +279,9 @@ export default function KycScreen() {
             )}
 
             {(profile?.kyc_status === 'pending' || existingSubmission?.status === 'pending' || profile?.kyc_status === 'verified' || existingSubmission?.status === 'verified') ? (
-              <Pressable style={styles.secondaryBtn} onPress={() => router.back()}>
+              <Pressable style={styles.secondaryBtn} onPress={() => router.replace('/(tabs)')}>
                 <UserIcon size={18} color={colors.textPrimary} />
-                <Text style={styles.secondaryBtnText}>Back to Settings</Text>
+                <Text style={styles.secondaryBtnText}>Back to Dashboard</Text>
               </Pressable>
             ) : (
               <Pressable style={styles.primaryBtn} onPress={() => setPageStep('liveness')}>
