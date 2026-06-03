@@ -239,8 +239,9 @@ function UserDevicesView() {
             message="Add a device to start tracking data usage and earning NRT rewards."
             action={{ label: "Add Device", onClick: () => setShowAddDevice(true) }}
           />
-        ) : devices?.map((device) => {
-          const dynamicStatus = getDynamicStatus(device.updated_at, device.status, device.created_at);
+        ) : sortedDevices?.map((device) => {
+          const isCurrent = device.fingerprint === currentDevice?.fingerprint;
+          const dynamicStatus = isCurrent ? 'active' : getDynamicStatus(device.updated_at, device.status, device.created_at);
           const DeviceIcon = getDeviceIcon(device.device_type);
           const devSummary = summaries[device.id];
           
@@ -409,15 +410,16 @@ function UserDevicesView() {
                 {/* Linked Devices List */}
                 <div>
                   <h4 className="text-sm font-semibold text-text-secondary mb-3">Your Linked Devices</h4>
-                  {devices?.length === 0 ? (
+                  {sortedDevices?.length === 0 ? (
                     <div className="text-center py-6 px-4 bg-bg-secondary rounded-xl">
                       <p className="text-sm text-text-secondary">No devices linked yet.</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {devices?.map(device => {
+                      {sortedDevices?.map(device => {
                         const DeviceIcon = getDeviceIcon(device.device_type);
                         const isCurrent = device.fingerprint === currentDevice?.fingerprint;
+                        const dynamicStatus = isCurrent ? 'active' : getDynamicStatus(device.updated_at, device.status, device.created_at);
                         
                         return (
                           <div key={device.id} className="flex justify-between items-center glass p-3 rounded-xl border border-glass-border">
@@ -430,7 +432,7 @@ function UserDevicesView() {
                                   <p className="font-semibold text-sm">{device.device_name}</p>
                                   {isCurrent && <span className="text-[9px] font-bold bg-accent-primary/20 text-accent-primary px-1.5 py-0.5 rounded uppercase">Current</span>}
                                 </div>
-                                <p className="text-xs text-text-secondary capitalize">{getDynamicStatus(device.updated_at, device.status, device.created_at)}</p>
+                                <p className="text-xs text-text-secondary capitalize">{dynamicStatus}</p>
                               </div>
                             </div>
                             <button

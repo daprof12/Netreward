@@ -66,16 +66,18 @@ export default function UserDevicesView() {
 
   const sortedDevices = useMemo(() => {
     if (!devices) return [];
-    return [...devices].sort((a, b) => {
-      const aIsCurrent = a.fingerprint === currentDevice?.fingerprint;
-      const bIsCurrent = b.fingerprint === currentDevice?.fingerprint;
-      if (aIsCurrent && !bIsCurrent) return -1;
-      if (!aIsCurrent && bIsCurrent) return 1;
-      
-      const dateA = new Date(a.created_at || 0).getTime() || 0;
-      const dateB = new Date(b.created_at || 0).getTime() || 0;
-      return dateB - dateA;
-    });
+    const current = devices.filter(d => d.fingerprint === currentDevice?.fingerprint);
+    const others = devices.filter(d => d.fingerprint !== currentDevice?.fingerprint);
+    
+    const sortFn = (a: any, b: any) => {
+      const timeA = new Date(a.created_at || 0).getTime();
+      const timeB = new Date(b.created_at || 0).getTime();
+      const validA = Number.isNaN(timeA) ? 0 : timeA;
+      const validB = Number.isNaN(timeB) ? 0 : timeB;
+      return validB - validA;
+    };
+
+    return [...current.sort(sortFn), ...others.sort(sortFn)];
   }, [devices, currentDevice?.fingerprint]);
 
   const handleLinkDevice = async () => {
@@ -197,7 +199,8 @@ export default function UserDevicesView() {
               <Text style={styles.emptyChartText}>Add a device to start tracking data usage and earning NRT rewards.</Text>
             </View>
           ) : sortedDevices.map(device => {
-            const dynamicStatus = getDynamicStatus(device.updated_at, device.status, device.created_at);
+            const isCurrent = device.fingerprint === currentDevice?.fingerprint;
+            const dynamicStatus = isCurrent ? 'active' : getDynamicStatus(device.updated_at, device.status, device.created_at);
             const DeviceIcon = getDeviceIcon(device.device_type);
             const devSummary = summaries[device.id];
 
