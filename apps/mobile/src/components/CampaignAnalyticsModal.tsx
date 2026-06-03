@@ -22,7 +22,10 @@ export default function CampaignAnalyticsModal({
 }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
-  const { data: analytics, isLoading } = useCampaignAnalytics(campaign.id);
+  const [timeFilter, setTimeFilter] = useState<'24H' | '7D' | '3M' | 'All'>('7D');
+  const daysMap = { '24H': 1, '7D': 7, '3M': 90, 'All': 365 };
+
+  const { data: analytics, isLoading } = useCampaignAnalytics(campaign.id, daysMap[timeFilter]);
   const [search, setSearch] = useState('');
 
   const filtered = (analytics?.participants || []).filter(
@@ -97,9 +100,23 @@ export default function CampaignAnalyticsModal({
 
           {/* Performance Chart */}
           <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <TrendingUp size={16} color={colors.accentPrimary} />
-              <Text style={styles.cardTitle}>Performance (Last 7 Days)</Text>
+            <View style={styles.cardHeaderWithFilter}>
+              <View style={styles.cardHeader}>
+                <TrendingUp size={16} color={colors.accentPrimary} />
+                <Text style={styles.cardTitle}>Performance</Text>
+              </View>
+              
+              <View style={styles.timeFilterContainer}>
+                {(['24H', '7D', '3M', 'All'] as const).map((t) => (
+                  <Pressable
+                    key={t}
+                    onPress={() => setTimeFilter(t)}
+                    style={[styles.timeFilterTab, timeFilter === t && styles.timeFilterTabActive]}
+                  >
+                    <Text style={[styles.timeFilterText, timeFilter === t && styles.timeFilterTextActive]}>{t}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
             {isLoading ? (
               <View style={styles.chartPlaceholder}>
@@ -118,7 +135,7 @@ export default function CampaignAnalyticsModal({
             ) : (
               <View style={styles.chartPlaceholder}>
                 <TrendingUp size={32} color={colors.textSecondary} />
-                <Text style={styles.emptyText}>No data for last 7 days</Text>
+                <Text style={styles.emptyText}>No data for {timeFilter}</Text>
               </View>
             )}
             <Text style={styles.chartCaption}>Daily NRT rewards distributed to participants</Text>
@@ -229,7 +246,13 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.bgSecondary, padding: 16, borderRadius: 16,
       borderWidth: 1, borderColor: colors.glassBorder, marginBottom: 20,
     },
-    cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+    cardHeaderWithFilter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+    timeFilterContainer: { flexDirection: 'row', backgroundColor: colors.bgPrimary, borderRadius: 8, padding: 4 },
+    timeFilterTab: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+    timeFilterTabActive: { backgroundColor: colors.accentPrimary },
+    timeFilterText: { fontSize: 10, fontWeight: 'bold', color: colors.textSecondary },
+    timeFilterTextActive: { color: '#fff' },
+    cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     cardTitle: { fontSize: 14, fontWeight: 'bold', color: colors.textPrimary },
     chartPlaceholder: { height: 180, alignItems: 'center', justifyContent: 'center', gap: 8 },
     chartCaption: { fontSize: 10, color: colors.textSecondary, textAlign: 'center', marginTop: 8, fontStyle: 'italic' },

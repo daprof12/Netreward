@@ -7,7 +7,10 @@ import NrtAmount from '@/components/ui/NrtAmount';
 
 // We use any for campaign here to support both SP and ISP campaign types loosely
 export default function CampaignAnalyticsModal({ campaign, onClose }: { campaign: any; onClose: () => void }) {
-  const { data: analytics, isLoading } = useCampaignAnalytics(campaign.id);
+  const [timeFilter, setTimeFilter] = useState<'24H' | '7D' | '3M' | 'All'>('7D');
+  const daysMap = { '24H': 1, '7D': 7, '3M': 90, 'All': 365 };
+  
+  const { data: analytics, isLoading } = useCampaignAnalytics(campaign.id, daysMap[timeFilter]);
   const [search, setSearch] = useState('');
 
   const filtered = (analytics?.participants || []).filter(p => 
@@ -36,10 +39,26 @@ export default function CampaignAnalyticsModal({ campaign, onClose }: { campaign
         <div className="p-4 space-y-6">
           {/* Growth Chart */}
           <div className="glass p-4 rounded-2xl border border-glass-border">
-            <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
-              <TrendingUp size={16} className="text-accent-primary" />
-              Performance (Last 7 Days)
-            </h4>
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="text-sm font-bold flex items-center gap-2">
+                <TrendingUp size={16} className="text-accent-primary" />
+                Performance
+              </h4>
+              <div className="flex bg-bg-secondary p-1 rounded-lg">
+                {(['24H', '7D', '3M', 'All'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setTimeFilter(f)}
+                    className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${timeFilter === f
+                      ? 'bg-accent-primary text-white shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary'
+                      }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="h-48 w-full min-h-[200px]">
               {isLoading ? (
                 <div className="w-full h-full flex items-center justify-center">

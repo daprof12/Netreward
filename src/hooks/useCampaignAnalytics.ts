@@ -19,9 +19,9 @@ export interface ChartData {
   users: number;
 }
 
-export function useCampaignAnalytics(campaignId: string) {
+export function useCampaignAnalytics(campaignId: string, days: number = 7) {
   return useQuery({
-    queryKey: ['campaign_analytics', campaignId],
+    queryKey: ['campaign_analytics', campaignId, days],
     queryFn: async () => {
       if (!campaignId) return { participants: [], chartData: [], totalUsers: 0 };
 
@@ -97,15 +97,16 @@ export function useCampaignAnalytics(campaignId: string) {
         } as CampaignParticipant;
       }));
 
-      // 2. Fetch raw sessions to build the chart (last 7 days)
-      const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
-      sevenDaysAgo.setHours(0, 0, 0, 0);
+      // 2. Fetch raw sessions to build the chart
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      startDate.setHours(0, 0, 0, 0);
 
       const { data: stats, error: statsError } = await supabase
         .from('device_data_sessions')
         .select('session_end, nrt_awarded, device_id')
         .eq('campaign_id', campaignId)
-        .gte('session_end', sevenDaysAgo.toISOString());
+        .gte('session_end', startDate.toISOString());
 
       if (statsError) {
         console.error('Error fetching campaign stats:', statsError);
@@ -115,12 +116,21 @@ export function useCampaignAnalytics(campaignId: string) {
       const dailyMap: Record<string, ChartData> = {};
       const uniqueUsersPerDay: Record<string, Set<string>> = {};
       
-      // Initialize last 7 days with zeros
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      // Initialize days with zeros
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
         const dateStr = d.toISOString().split('T')[0];
+        
+        let dateLabel = d.toLocaleDateString(undefined, { weekday: 'short' });
+        if (days > 7) {
+          dateLabel = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        } else if (days === 1) {
+          dateLabel = d.toLocaleDateString(undefined, { weekday: 'short', hour: 'numeric' });
+        }
+
         dailyMap[dateStr] = { 
-          date: d.toLocaleDateString(undefined, { weekday: 'short' }), 
+          date: dateLabel, 
           nrt: 0, 
           users: 0 
         };
