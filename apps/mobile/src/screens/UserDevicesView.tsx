@@ -255,19 +255,19 @@ export default function UserDevicesView() {
                         {devSummary ? devSummary.total_data_gb.toFixed(6) : '0.00'} GB
                       </Text>
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, width: '100%' }}>
-                      <Wifi size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
-                      <View style={{ flex: 1, overflow: 'hidden' }}>
-                        <MarqueeText style={styles.metaText}>{device.isp_name || 'Unknown ISP'}</MarqueeText>
-                      </View>
                     </View>
-                  </View>
                   <View style={styles.deviceRight}>
                     <NrtAmount value={devSummary ? devSummary.total_nrt_earned : 0} showSign style={styles.deviceNrt} />
                     <ChevronRight size={16} color={colors.textSecondary} style={{ marginTop: 8 }} />
                   </View>
-                </View>
-              </Pressable>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: 'rgba(255,255,255,0.03)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, width: '100%' }}>
+                    <Wifi size={12} color={colors.textSecondary} style={{ marginRight: 6 }} />
+                    <View style={{ flex: 1, overflow: 'hidden' }}>
+                      <MarqueeText style={[styles.metaText, { fontSize: 11 }]}>{device.isp_name || 'Unknown ISP'}</MarqueeText>
+                    </View>
+                  </View>
+                </Pressable>
             );
           })}
         </View>
