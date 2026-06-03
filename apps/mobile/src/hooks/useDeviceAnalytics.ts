@@ -67,20 +67,73 @@ export function useUserDeviceStats(timeFilter: TimeFilter) {
   });
 }
 
-export function useDeviceAppUsage(deviceId: string) {
+export function useDeviceAppUsage(deviceId: string, timeFilter: TimeFilter = 'ALL') {
   const { user } = useAuthStore();
 
   return useQuery({
-    queryKey: ['device_app_usage', deviceId],
+    queryKey: ['device_app_usage', deviceId, timeFilter],
     queryFn: async () => {
       if (!user || !deviceId) return [];
 
-      const { data, error } = await supabase.rpc('get_device_app_usage', {
-        p_device_id: deviceId,
-      });
+      let query = supabase
+        .from('device_data_sessions')
+        .select(`
+          duration_seconds,
+          bytes_up,
+          bytes_down,
+          nrt_awarded,
+          session_end,
+          campaign_id,
+          campaign:campaigns (
+            id,
+            title,
+            status,
+            service:services (
+              category
+            )
+          )
+        `)
+        .eq('device_id', deviceId);
+
+      if (timeFilter !== 'ALL') {
+        const date = new Date();
+        if (timeFilter === '24H') date.setHours(date.getHours() - 24);
+        else if (timeFilter === '7D') date.setDate(date.getDate() - 7);
+        else if (timeFilter === '1M') date.setMonth(date.getMonth() - 1);
+        query = query.gte('session_end', date.toISOString());
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
-      return (data as DeviceAppUsage[]) || [];
+
+      const aggregated = new Map<string, DeviceAppUsage>();
+
+      for (const row of (data || [])) {
+        const camp = Array.isArray(row.campaign) ? row.campaign[0] : row.campaign;
+        if (!camp) continue;
+        const svc = Array.isArray(camp.service) ? camp.service[0] : camp.service;
+        
+        const cid = camp.id;
+        if (!aggregated.has(cid)) {
+          aggregated.set(cid, {
+            campaign_id: cid,
+            app_name: camp.title,
+            service_category: svc?.category || 'Network',
+            duration_seconds: 0,
+            total_data_gb: 0,
+            nrt_earned: 0,
+            status: camp.status
+          });
+        }
+        
+        const acc = aggregated.get(cid)!;
+        acc.duration_seconds += Number(row.duration_seconds || 0);
+        acc.total_data_gb += (Number(row.bytes_up || 0) + Number(row.bytes_down || 0)) / 1e9;
+        acc.nrt_earned += Number(row.nrt_awarded || 0);
+      }
+
+      return Array.from(aggregated.values()).sort((a, b) => b.nrt_earned - a.nrt_earned);
     },
     enabled: !!user && !!deviceId,
   });
@@ -94,23 +147,33 @@ export interface DeviceSummary {
   session_count: number;
 }
 
-export function useDeviceSummaries() {
+export function useDeviceSummaries(timeFilter: TimeFilter = 'ALL') {
   const { user } = useAuthStore();
 
   return useQuery({
-    queryKey: ['device_summaries', user?.id],
+    queryKey: ['device_summaries', user?.id, timeFilter],
     queryFn: async () => {
       if (!user) return {};
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('device_data_sessions')
-        .select('device_id, bytes_up, bytes_down, nrt_awarded')
+        .select('device_id, bytes_up, bytes_down, nrt_awarded, session_end')
         .in('device_id', (
           await supabase
             .from('devices')
             .select('id')
             .eq('user_id', user.id)
         ).data?.map(d => d.id) || []);
+
+      if (timeFilter !== 'ALL') {
+        const date = new Date();
+        if (timeFilter === '24H') date.setHours(date.getHours() - 24);
+        else if (timeFilter === '7D') date.setDate(date.getDate() - 7);
+        else if (timeFilter === '1M') date.setMonth(date.getMonth() - 1);
+        query = query.gte('session_end', date.toISOString());
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
