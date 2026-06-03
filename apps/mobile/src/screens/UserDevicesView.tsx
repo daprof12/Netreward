@@ -243,18 +243,21 @@ export default function UserDevicesView() {
                           <Text style={{ textTransform: 'capitalize' }}>{dynamicStatus}</Text>
                         </Text>
                       </View>
-                      <View style={styles.metaRowItem}>
+                      <View style={[styles.metaRowItem, { maxWidth: 100 }]}>
                         <MapPin size={10} color={colors.accentPrimary} style={{ marginRight: 4 }} />
                         <Text style={styles.metaText} numberOfLines={1}>{device.country || 'Unknown'}</Text>
                       </View>
                       <Text style={styles.metaDot}>•</Text>
+                      <Text style={styles.metaText}>
+                        {devSummary ? devSummary.total_data_gb.toFixed(6) : '0.00'} GB
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, width: '100%' }}>
+                      <Wifi size={10} color={colors.textSecondary} style={{ marginRight: 4 }} />
                       <View style={{ flex: 1, overflow: 'hidden' }}>
                         <MarqueeText style={styles.metaText}>{device.isp_name || 'Unknown ISP'}</MarqueeText>
                       </View>
                     </View>
-                    <Text style={[styles.metaText, { marginTop: 4 }]}>
-                      {devSummary ? devSummary.total_data_gb.toFixed(6) : '0.00'} GB
-                    </Text>
                   </View>
                   <View style={styles.deviceRight}>
                     <NrtAmount value={devSummary ? devSummary.total_nrt_earned : 0} showSign style={styles.deviceNrt} />
