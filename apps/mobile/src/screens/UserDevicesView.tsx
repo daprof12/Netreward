@@ -51,7 +51,7 @@ export default function UserDevicesView() {
   const [addSuccess, setAddSuccess] = useState(false);
 
   const { devices, addDevice, removeDevice, isAdding, isRemoving, isLoading } = useDevices();
-  const { data: summaries = {} } = useDeviceSummaries();
+  const { data: summaries = {} } = useDeviceSummaries(timeFilter);
 
   const aggregateSummary = useMemo(() => {
     let totalData = 0;

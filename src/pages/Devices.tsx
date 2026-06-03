@@ -59,7 +59,7 @@ function UserDevicesView() {
   const [addSuccess, setAddSuccess] = useState(false);
 
   const { devices, addDevice, removeDevice, isAdding, isRemoving, isLoading } = useDevices();
-  const { data: summaries = {} } = useDeviceSummaries();
+  const { data: summaries = {} } = useDeviceSummaries(timeFilter);
 
   const handleLinkDevice = async () => {
     if (!currentDevice || isAdding) return;

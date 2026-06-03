@@ -58,7 +58,7 @@ export default function DeviceDetail() {
   const currentData = stats?.chartData || [];
   const summary = stats?.summary || { totalData: 0, totalNrt: 0 };
 
-  const { data: appUsage = [] } = useDeviceAppUsage(deviceId || '');
+  const { data: appUsage = [] } = useDeviceAppUsage(deviceId || '', timeFilter);
   const { data: deviceInfo, isLoading: isDeviceLoading } = useDeviceById(deviceId || '');
   const deviceName = deviceInfo?.device_name || 'Device';
   const deviceIsp = deviceInfo?.isp_name || 'Unknown ISP';

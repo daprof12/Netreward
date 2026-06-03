@@ -56,7 +56,7 @@ export default function DeviceDetailScreen() {
   const { data: stats } = useUserDeviceStats(timeFilter);
   const currentData = stats?.chartData || [];
 
-  const { data: appUsage = [] } = useDeviceAppUsage(id || '');
+  const { data: appUsage = [] } = useDeviceAppUsage(id || '', timeFilter);
   const { data: deviceInfo, isLoading: isDeviceLoading } = useDeviceById(id || '');
   
   const deviceName = deviceInfo?.device_name || 'Device';
