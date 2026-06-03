@@ -6,6 +6,7 @@ import { useSpStore } from '@/stores/useSpStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useThemeColors } from '@/theme';
 import NrtAmount from '@/components/ui/NrtAmount';
+import MarqueeText from '@/components/ui/MarqueeText';
 
 function SignalBars({ strength, colors }: { strength: number, colors: any }) {
   return (
@@ -229,8 +230,8 @@ export default function SpDevicesView() {
                          device.device_type === 'tablet' ? <Tablet size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} /> : 
                          <Smartphone size={20} color={dynamicStatus === 'active' ? colors.accentPrimary : dynamicStatus === 'idle' ? '#f59e0b' : colors.textSecondary} />}
                       </View>
-                      <View>
-                        <Text style={styles.userName}>{(device.users as any)?.display_name || (device.users as any)?.email || 'Unknown User'}</Text>
+                      <View style={{ flex: 1 }}>
+                        <MarqueeText style={styles.userName}>{(device.users as any)?.display_name || (device.users as any)?.email || 'Unknown User'}</MarqueeText>
                         <View style={styles.deviceMetaRow}>
                           <Text style={styles.deviceMetaText}>{device.device_name}</Text>
                           <Text style={styles.deviceMetaDot}>•</Text>
@@ -344,7 +345,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   sessionCard: { backgroundColor: colors.bgSecondary, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.glassBorder },
   sessionCardActive: { borderColor: 'rgba(16, 185, 129, 0.3)' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 },
   deviceIconWrapper: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   iconActive: { backgroundColor: 'rgba(16, 185, 129, 0.1)' },
   iconInactive: { backgroundColor: colors.bgPrimary },

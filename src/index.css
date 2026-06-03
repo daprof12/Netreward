@@ -142,3 +142,11 @@
     scrollbar-width: none;
   }
 }
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(-100% - 2rem)); }
+}
+.animate-marquee {
+  animation: marquee 10s linear infinite;
+}

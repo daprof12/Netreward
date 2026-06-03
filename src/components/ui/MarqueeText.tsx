@@ -9,7 +9,6 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({ text, className }) => 
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const [scrollDistance, setScrollDistance] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     const checkOverflow = () => {
@@ -33,22 +32,47 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({ text, className }) => 
     };
   }, [text]);
 
-  const duration = Math.max(3, scrollDistance / 25); // 25px per second scrolling speed, min 3 seconds
+  useEffect(() => {
+    if (scrollDistance > 0 && textRef.current) {
+      const duration = Math.max(3, scrollDistance / 25);
+      
+      const animate = () => {
+        if (!textRef.current) return;
+        textRef.current.style.transition = 'none';
+        textRef.current.style.transform = 'translateX(0px)';
+        
+        // Force reflow
+        void textRef.current.offsetWidth;
+        
+        textRef.current.style.transition = `transform ${duration}s linear`;
+        textRef.current.style.transform = `translateX(-${scrollDistance + 20}px)`; // extra padding
+      };
+      
+      const timer = setTimeout(animate, 1000); // initial delay
+      
+      const handleTransitionEnd = () => {
+        animate();
+      };
+      
+      textRef.current.addEventListener('transitionend', handleTransitionEnd);
+      return () => {
+        clearTimeout(timer);
+        if (textRef.current) textRef.current.removeEventListener('transitionend', handleTransitionEnd);
+      };
+    } else if (textRef.current) {
+      textRef.current.style.transition = 'none';
+      textRef.current.style.transform = 'translateX(0px)';
+    }
+  }, [scrollDistance]);
 
   return (
     <div
       ref={containerRef}
       className={`overflow-hidden whitespace-nowrap w-full min-w-0 relative ${className || ''}`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       <span
         ref={textRef}
-        className="inline-block whitespace-nowrap"
-        style={{
-          transform: isHovered && scrollDistance > 0 ? `translateX(-${scrollDistance}px)` : 'translateX(0px)',
-          transition: isHovered && scrollDistance > 0 ? `transform ${duration}s linear` : 'transform 0.4s ease-out',
-        }}
+        className="inline-block whitespace-nowrap pr-8"
       >
         {text}
       </span>

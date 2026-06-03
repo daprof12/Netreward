@@ -4,6 +4,7 @@ import { Search, Smartphone, Laptop, Tablet, MapPin, Wifi, CheckCircle2, AlertCi
 import { useIspDevices } from '@/hooks/useAdminDevices';
 import { useIspStore } from '@/stores/useIspStore';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import MarqueeText from '@/components/ui/MarqueeText';
 
 function SignalBars({ strength }: { strength: number }) {
   return (
@@ -229,8 +230,8 @@ export default function IspDevicesView() {
 
             {/* Header */}
             <div className="flex justify-between items-start relative z-10">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              <div className="flex items-center gap-3 overflow-hidden flex-1 pr-4">
+                <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center ${
                   getDynamicStatus(device.updated_at, device.status, device.created_at) === 'active'
                     ? 'bg-accent-primary/10 text-accent-primary'
                     : getDynamicStatus(device.updated_at, device.status, device.created_at) === 'idle'
@@ -239,12 +240,13 @@ export default function IspDevicesView() {
                 }`}>
                   {device.device_type === 'laptop' ? <Laptop size={20} /> : device.device_type === 'tablet' ? <Tablet size={20} /> : <Smartphone size={20} />}
                 </div>
-                <div>
-                  <p className="font-bold text-sm text-text-primary">
-                    {(device.users as any)?.display_name || (device.users as any)?.email || 'Unknown User'}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-text-secondary">
-                    <span>{device.device_name}</span>
+                <div className="min-w-0 flex-1">
+                  <MarqueeText 
+                    text={(device.users as any)?.display_name || (device.users as any)?.email || 'Unknown User'} 
+                    className="font-bold text-sm text-text-primary" 
+                  />
+                  <div className="flex items-center gap-2 text-xs text-text-secondary mt-1">
+                    <span className="truncate">{device.device_name}</span>
                     <span className="w-1 h-1 rounded-full bg-glass-border" />
                     {(() => {
                       const dynamicStatus = getDynamicStatus(device.updated_at, device.status, device.created_at);
@@ -284,7 +286,7 @@ export default function IspDevicesView() {
                 </div>
               </div>
 
-              <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+              <div className={`shrink-0 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
                 devNrt > 0 ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'
               }`}>
                 {devNrt > 0 ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
