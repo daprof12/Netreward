@@ -46,9 +46,10 @@ export default function UserCampaignsView() {
   const [filterLocation, setFilterLocation] = useState('All');
 
   const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   const [earningCampaign, setEarningCampaign] = useState<any | null>(null);
 
-  const { activeCampaigns, userEnrollments, isLoading, joinCampaign, isJoining } = useCampaigns();
+  const { activeCampaigns, userEnrollments, isLoading, joinCampaign, isJoining, leaveCampaign, isLeaving } = useCampaigns();
   const { claimRewards, isClaiming } = useClaimRewards();
   const { gamingAccounts, linkedPlatforms, linkAccount, isLinking, isLoading: isLoadingGaming } = useGamingAccounts();
 
@@ -151,6 +152,18 @@ export default function UserCampaignsView() {
     }
   };
 
+  const handleLeave = async (id: string) => {
+    setLeavingId(id);
+    try {
+      await leaveCampaign(id);
+      showToast('Unjoined campaign successfully.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to unjoin campaign', 'danger');
+    } finally {
+      setLeavingId(null);
+    }
+  };
+
   const handleLinkAndJoin = async () => {
     if (!gamingUsernameInput.trim() || !pendingGamingCampaignId) return;
     try {
@@ -247,6 +260,8 @@ export default function UserCampaignsView() {
                   enrollment={en}
                   isRecent={isSessionRecent(campaign.id)}
                   onPress={() => setEarningCampaign(campaign)}
+                  onLeave={() => handleLeave(campaign.id)}
+                  isLeaving={leavingId === campaign.id}
                 />
               );
             }

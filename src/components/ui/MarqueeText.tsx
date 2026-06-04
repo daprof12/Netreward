@@ -68,11 +68,11 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({ text, className }) => 
   return (
     <div
       ref={containerRef}
-      className={`overflow-hidden whitespace-nowrap w-full min-w-0 relative ${className || ''}`}
+      className={`overflow-hidden whitespace-nowrap max-w-full min-w-0 relative ${className || ''}`}
     >
       <span
         ref={textRef}
-        className="inline-block whitespace-nowrap pr-8"
+        className="inline-block whitespace-nowrap"
       >
         {text}
       </span>

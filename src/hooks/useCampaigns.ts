@@ -200,11 +200,32 @@ export function useCampaigns() {
     }
   });
 
+  // Mutation to leave/unjoin a campaign
+  const leaveCampaignMutation = useMutation({
+    mutationFn: async (campaignId: string) => {
+      if (!user) throw new Error("Must be logged in to leave campaign");
+
+      const { error } = await supabase
+        .from('user_campaigns')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('campaign_id', campaignId);
+
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user_campaigns', user?.id] });
+    }
+  });
+
   return {
     activeCampaigns,
     userEnrollments,
     isLoading: isLoadingCampaigns || isLoadingEnrollments,
     joinCampaign: joinCampaignMutation.mutateAsync,
-    isJoining: joinCampaignMutation.isPending
+    isJoining: joinCampaignMutation.isPending,
+    leaveCampaign: leaveCampaignMutation.mutateAsync,
+    isLeaving: leaveCampaignMutation.isPending
   };
 }

@@ -1,18 +1,21 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Image, Platform, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, Platform, Linking, ActivityIndicator } from 'react-native';
 import { useThemeColors } from '@/theme';
 import { GAMING_PLATFORMS, type GamingPlatform } from '@/hooks/useGamingAccounts';
 import NrtAmount from './NrtAmount';
 import PulseDot from './PulseDot';
+import { MinusCircle, TrendingUp, ChevronRight } from 'lucide-react-native';
 
 interface ActiveCampaignCardProps {
   campaign: any;
   enrollment: any;
   isRecent: boolean;
   onPress: () => void;
+  onLeave?: () => void;
+  isLeaving?: boolean;
 }
 
-export default function ActiveCampaignCard({ campaign, enrollment, isRecent, onPress }: ActiveCampaignCardProps) {
+export default function ActiveCampaignCard({ campaign, enrollment, isRecent, onPress, onLeave, isLeaving }: ActiveCampaignCardProps) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
 
@@ -30,8 +33,9 @@ export default function ActiveCampaignCard({ campaign, enrollment, isRecent, onP
   ].filter(p => !!p.url);
 
   return (
-    <Pressable style={styles.campaignCard} onPress={onPress}>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
+    <View style={styles.campaignCard}>
+      {/* Top Part: Pressable to view details */}
+      <Pressable onPress={onPress} style={{ flexDirection: 'row', gap: 12 }}>
         {/* Logo */}
         <View style={{ position: 'relative' }}>
           <View style={styles.campLogo}>
@@ -75,37 +79,70 @@ export default function ActiveCampaignCard({ campaign, enrollment, isRecent, onP
             </View>
             <NrtAmount value={(enrollment?.nrt_earned || 0) + (enrollment?.unclaimed_nrt || 0)} showSign style={styles.campNrt} />
           </View>
-
-          {platformButtons.length > 0 ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 12 }}>
-              <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.textSecondary, textTransform: 'uppercase', marginRight: 2 }}>Launch:</Text>
-              {platformButtons.map(p => {
-                const isWeb = p.platform === 'web';
-                const brandColor = isWeb ? colors.accentPrimary : (GAMING_PLATFORMS[p.platform as GamingPlatform]?.color || '#a2aaad');
-                return (
-                  <Pressable
-                    key={p.platform}
-                    style={({ pressed }) => [
-                      styles.platformLaunchBtn,
-                      { backgroundColor: brandColor, opacity: pressed ? 0.8 : 1 }
-                    ]}
-                    onPress={() => {
-                      if (p.url) {
-                        Linking.openURL(p.url).catch((err) => {
-                          console.error("Failed to open platform URL:", err);
-                        });
-                      }
-                    }}
-                  >
-                    <Text style={styles.platformLaunchBtnText}>{p.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+
+      {/* Platform buttons (Launch row) */}
+      {platformButtons.length > 0 ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 12, borderTopWidth: 1, borderTopColor: colors.glassBorder + '20', paddingTop: 8 }}>
+          <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.textSecondary, textTransform: 'uppercase', marginRight: 2 }}>Launch:</Text>
+          {platformButtons.map(p => {
+            const isWeb = p.platform === 'web';
+            const brandColor = isWeb ? colors.accentPrimary : (GAMING_PLATFORMS[p.platform as GamingPlatform]?.color || '#a2aaad');
+            return (
+              <Pressable
+                key={p.platform}
+                style={({ pressed }) => [
+                  styles.platformLaunchBtn,
+                  { backgroundColor: brandColor, opacity: pressed ? 0.8 : 1 }
+                ]}
+                onPress={() => {
+                  if (p.url) {
+                    Linking.openURL(p.url).catch((err) => {
+                      console.error("Failed to open platform URL:", err);
+                    });
+                  }
+                }}
+              >
+                <Text style={styles.platformLaunchBtnText}>{p.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {/* View Earnings + Unjoin row (Bottom Actions) */}
+      {onLeave && (
+        <View style={styles.actionRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.viewEarningsBtn,
+              { opacity: pressed ? 0.8 : 1 }
+            ]}
+            onPress={onPress}
+          >
+            <TrendingUp size={12} color={colors.accentPrimary} style={{ marginRight: 6 }} />
+            <Text style={styles.viewEarningsBtnText}>View Earnings</Text>
+            <ChevronRight size={12} color={colors.accentPrimary} style={{ marginLeft: 2 }} />
+          </Pressable>
+
+          <Pressable
+            disabled={isLeaving}
+            style={({ pressed }) => [
+              styles.unjoinBtn,
+              { opacity: pressed || isLeaving ? 0.6 : 1 }
+            ]}
+            onPress={onLeave}
+          >
+            {isLeaving ? (
+              <ActivityIndicator size="small" color="#ef4444" />
+            ) : (
+              <MinusCircle size={14} color="#ef4444" />
+            )}
+          </Pressable>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -121,4 +158,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   campNrt: { fontSize: 10, fontWeight: '900', color: colors.accentPrimary },
   platformLaunchBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
   platformLaunchBtnText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, borderTopWidth: 1, borderTopColor: colors.glassBorder + '20', paddingTop: 12 },
+  viewEarningsBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.2)' },
+  viewEarningsBtnText: { color: colors.accentPrimary, fontSize: 12, fontWeight: 'bold' },
+  unjoinBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.2)', alignItems: 'center', justifyContent: 'center' },
 });

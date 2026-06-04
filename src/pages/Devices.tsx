@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Smartphone, Laptop, Plus, Wifi, WifiOff, ChevronRight, X, Monitor, Tablet, Check, Activity, MapPin } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -60,6 +60,17 @@ function UserDevicesView() {
 
   const { devices, addDevice, removeDevice, isAdding, isRemoving, isLoading } = useDevices();
   const { data: summaries = {} } = useDeviceSummaries(timeFilter);
+
+  const sortedDevices = useMemo(() => {
+    if (!devices) return [];
+    return [...devices].sort((a, b) => {
+      const isACurrent = a.fingerprint === currentDevice?.fingerprint;
+      const isBCurrent = b.fingerprint === currentDevice?.fingerprint;
+      if (isACurrent && !isBCurrent) return -1;
+      if (!isACurrent && isBCurrent) return 1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [devices, currentDevice]);
 
   const handleLinkDevice = async () => {
     if (!currentDevice || isAdding) return;

@@ -5,7 +5,7 @@ import {
   Search, Filter, Play, CheckCircle2, Loader2, X,
   Tv, Music, Globe, MapPin, TrendingUp, Info,
   ChevronRight, Wifi, ArrowDownToLine, ArrowUpFromLine, Clock,
-  Gamepad2, Link2, ExternalLink
+  Gamepad2, Link2, ExternalLink, MinusCircle
 } from 'lucide-react';
 import { useCampaigns } from '@/hooks/useCampaigns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -65,10 +65,11 @@ export default function Campaigns() {
 
   // Join / earning state
   const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   const [earningCampaign, setEarningCampaign] = useState<any | null>(null);
 
   // Data fetching
-  const { activeCampaigns, userEnrollments, isLoading, joinCampaign, isJoining } = useCampaigns();
+  const { activeCampaigns, userEnrollments, isLoading, joinCampaign, isJoining, leaveCampaign, isLeaving } = useCampaigns();
   const { claimRewards, isClaiming } = useClaimRewards();
 
   // Gaming accounts guard
@@ -180,8 +181,15 @@ export default function Campaigns() {
     });
 
   const handleJoin = async (id: string, category?: string) => {
-    // Gaming campaigns no longer strictly require a linked console account
-    // as web games can be tracked via the Web SDK (tracker.js)
+    // Gaming campaign guard: check if user has linked gaming accounts
+    if (isGamingCategory(category) && !isLoadingGaming && gamingAccounts.length === 0) {
+      setPendingGamingCampaignId(id);
+      setGamingPlatformSelect(availableGamingPlatforms[0] || 'playstation');
+      setGamingUsernameInput('');
+      setShowGamingPrompt(true);
+      return;
+    }
+
     setJoiningId(id);
     try {
       await joinCampaign(id);
@@ -195,6 +203,18 @@ export default function Campaigns() {
       }
     } finally {
       setJoiningId(null);
+    }
+  };
+
+  const handleLeave = async (id: string) => {
+    setLeavingId(id);
+    try {
+      await leaveCampaign(id);
+      showToast('Unjoined campaign successfully.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to unjoin campaign', 'danger');
+    } finally {
+      setLeavingId(null);
     }
   };
 
@@ -383,11 +403,12 @@ export default function Campaigns() {
                           </p>
                         </div>
                         {/* Action buttons */}
-                        <div className="flex items-center justify-between gap-3 w-full border-t border-glass-border/50 pt-3">
-                          {platformButtons.length > 0 ? (
-                            <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex flex-col gap-2.5 w-full border-t border-glass-border/50 pt-3">
+                          {/* Launch row */}
+                          {platformButtons.length > 0 && (
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Launch:</span>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 {platformButtons.map(p => {
                                   const isWeb = p.platform === 'web';
                                   const brandColor = isWeb ? 'var(--accent-primary)' : (GAMING_PLATFORMS[p.platform as GamingPlatform]?.color || '#a2aaad');
@@ -414,16 +435,32 @@ export default function Campaigns() {
                                 })}
                               </div>
                             </div>
-                          ) : null}
-                          <motion.button
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setEarningCampaign(campaign)}
-                            className="flex-1 flex items-center justify-center gap-1.5 bg-accent-primary/10 text-accent-primary py-2 px-3 rounded-lg text-xs font-bold border border-accent-primary/20 hover:bg-accent-primary/20 transition-colors"
-                          >
-                            <TrendingUp size={14} />
-                            View Earnings
-                            <ChevronRight size={12} />
-                          </motion.button>
+                          )}
+                          {/* View Earnings + Unjoin row */}
+                          <div className="flex items-center gap-2">
+                            <motion.button
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setEarningCampaign(campaign)}
+                              className="flex-1 flex items-center justify-center gap-1.5 bg-accent-primary/10 text-accent-primary py-2 px-3 rounded-lg text-xs font-bold border border-accent-primary/20 hover:bg-accent-primary/20 transition-colors"
+                            >
+                              <TrendingUp size={14} />
+                              View Earnings
+                              <ChevronRight size={12} />
+                            </motion.button>
+                            <motion.button
+                              whileTap={{ scale: 0.98 }}
+                              onClick={(e) => { e.stopPropagation(); handleLeave(campaign.id); }}
+                              disabled={leavingId !== null}
+                              className="flex-none p-2 bg-red-500/10 text-red-500 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50 flex items-center justify-center"
+                              title="Leave Campaign"
+                            >
+                              {leavingId === campaign.id ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <MinusCircle size={14} />
+                              )}
+                            </motion.button>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -833,11 +870,10 @@ export default function Campaigns() {
                         <button
                           key={platform}
                           onClick={() => { setGamingPlatformSelect(platform); setGamingUsernameInput(''); }}
-                          className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all text-left ${
-                            isSelected
-                              ? 'bg-accent-primary/10 border-accent-primary ring-1 ring-accent-primary'
-                              : 'glass border-glass-border hover:bg-glass-bg'
-                          }`}
+                          className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all text-left ${isSelected
+                            ? 'bg-accent-primary/10 border-accent-primary ring-1 ring-accent-primary'
+                            : 'glass border-glass-border hover:bg-glass-bg'
+                            }`}
                         >
                           <PlatformLogoCircle platform={platform} size={28} iconSize={12} />
                           <span className="font-semibold text-xs text-text-primary truncate">{meta.label}</span>

@@ -68,7 +68,7 @@ export default function UserHomeScreen() {
   const router = useRouter();
   const { user, profile } = useAuthStore();
   const { wallet, isLoading: isWalletLoading, claimRewards, isClaiming } = useWallet();
-  const { userEnrollments, isLoading: isCampaignsLoading } = useCampaigns();
+  const { userEnrollments, isLoading: isCampaignsLoading, leaveCampaign } = useCampaigns();
   const { devices } = useDevices();
   const { userHeatmap, isUserHeatmapLoading } = useTelemetry();
   const { selectedCurrency, convertNrt } = useCurrencyStore();
@@ -77,6 +77,7 @@ export default function UserHomeScreen() {
   const [recentActivityRaw, setRecentActivityRaw] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [earningCampaign, setEarningCampaign] = useState<any | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
 
   // Fetch campaign durations (total seconds on device per campaign)
   const { data: campaignDurations } = useQuery({
@@ -198,6 +199,18 @@ export default function UserHomeScreen() {
       }
     } catch (err: any) {
       showToast(err.message || 'Error claiming rewards', 'danger');
+    }
+  }
+
+  async function handleLeave(id: string) {
+    setLeavingId(id);
+    try {
+      await leaveCampaign(id);
+      showToast('Unjoined campaign successfully.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to unjoin campaign', 'danger');
+    } finally {
+      setLeavingId(null);
     }
   }
 
@@ -434,6 +447,8 @@ export default function UserHomeScreen() {
                   enrollment={en}
                   isRecent={isRecent}
                   onPress={() => setEarningCampaign(camp)}
+                  onLeave={() => handleLeave(camp.id)}
+                  isLeaving={leavingId === camp.id}
                 />
               );
             })
