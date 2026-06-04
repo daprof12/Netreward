@@ -180,15 +180,8 @@ export default function Campaigns() {
     });
 
   const handleJoin = async (id: string, category?: string) => {
-    // Gaming campaign guard: check if user has linked gaming accounts
-    if (isGamingCategory(category) && !isLoadingGaming && gamingAccounts.length === 0) {
-      setPendingGamingCampaignId(id);
-      setGamingPlatformSelect(availableGamingPlatforms[0] || 'playstation');
-      setGamingUsernameInput('');
-      setShowGamingPrompt(true);
-      return;
-    }
-
+    // Gaming campaigns no longer strictly require a linked console account
+    // as web games can be tracked via the Web SDK (tracker.js)
     setJoiningId(id);
     try {
       await joinCampaign(id);
