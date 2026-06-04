@@ -5,6 +5,9 @@
   const spApiKey = currentScript.getAttribute('data-api-key');
   const ispApiKey = currentScript.getAttribute('data-isp-api-key');
   const endpoint = currentScript.getAttribute('data-endpoint') || 'https://pmpeyfkbqipfnhokfksl.supabase.co/functions/v1/tracking';
+  // Supabase Edge Functions require an Authorization header at the gateway.
+  // The anon key is safe to embed client-side (it's already public in every Supabase app).
+  const supabaseAnonKey = currentScript.getAttribute('data-supabase-key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtcGV5ZmticWlwZm5ob2tma3NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMDc4MDIsImV4cCI6MjA5Mjc4MzgwMn0.H_adIr_LDFTa497OCMWJjYTwKLwDkKMvU6hlwdjp3lY';
   // Optional: gaming platform identifier (e.g. 'steam', 'playstation', 'xbox')
   // Set this on the script tag if embedding on a gaming platform:
   //   <script data-gaming-platform="steam" ...></script>
@@ -88,15 +91,20 @@
       const payload = JSON.stringify({ events: [event] });
 
       if (isUnload && navigator.sendBeacon) {
-        // sendBeacon cannot send custom headers, so pass the API key as a query param
+        // sendBeacon cannot send custom headers, so pass auth + SP key as query params
         const beaconUrl = new URL(endpoint);
         if (spApiKey) beaconUrl.searchParams.set('sp_key', spApiKey);
         if (ispApiKey) beaconUrl.searchParams.set('isp_key', ispApiKey);
+        beaconUrl.searchParams.set('apikey', supabaseAnonKey);
         const blob = new Blob([payload], { type: 'application/json' });
         navigator.sendBeacon(beaconUrl.toString(), blob);
       } else {
         try {
-          const headers = { 'Content-Type': 'application/json' };
+          const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'apikey': supabaseAnonKey
+          };
           if (spApiKey) headers['x-sp-api-key'] = spApiKey;
           if (ispApiKey) headers['x-isp-api-key'] = ispApiKey;
 
@@ -140,7 +148,11 @@
         if (ispApiKey) initUrl.searchParams.set('isp_key', ispApiKey);
 
         const res = await fetch(initUrl.toString(), {
-          method: 'GET'
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'apikey': supabaseAnonKey
+          }
         });
         if (res.ok) {
           const config = await res.json();
