@@ -626,6 +626,7 @@ serve(async (req) => {
         p_duration_seconds: Number(duration_seconds),
         p_session_start: (session_start as string) || new Date(Date.now() - Number(duration_seconds) * 1000).toISOString(),
         p_session_end: (session_end as string) || new Date().toISOString(),
+        p_gaming_platform: gaming_platform as string | null
       });
 
       if (error) {

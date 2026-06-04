@@ -84,6 +84,7 @@ export function useDeviceAppUsage(deviceId: string, timeFilter: TimeFilter = 'AL
           nrt_awarded,
           session_end,
           campaign_id,
+          category,
           campaign:campaigns (
             id,
             title,
@@ -119,7 +120,7 @@ export function useDeviceAppUsage(deviceId: string, timeFilter: TimeFilter = 'AL
           aggregated.set(cid, {
             campaign_id: cid,
             app_name: camp.title,
-            service_category: svc?.category || 'Network',
+            service_category: row.category || svc?.category || 'Network',
             duration_seconds: 0,
             total_data_gb: 0,
             nrt_earned: 0,

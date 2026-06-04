@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
 
-export type GamingPlatform = 'playstation' | 'xbox' | 'steam' | 'oculus_vr' | 'nintendo_switch' | 'android' | 'ios';
+export type GamingPlatform = 'playstation' | 'xbox' | 'steam' | 'oculus_vr' | 'nintendo_switch' | 'android' | 'ios' | 'web';
 
 export interface GamingAccount {
   id: string;
@@ -57,6 +57,12 @@ export const GAMING_PLATFORMS: Record<GamingPlatform, { label: string; usernameP
     usernameLabel: 'Apple Game Center ID',
     usernamePlaceholder: 'e.g. player_one',
     color: '#A2AAAD',
+  },
+  web: {
+    label: 'Web Browser',
+    usernameLabel: 'Web Account ID',
+    usernamePlaceholder: 'e.g. web_player1',
+    color: '#F97316',
   },
 };
 
