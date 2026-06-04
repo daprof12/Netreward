@@ -49,18 +49,25 @@
     }
 
     identify(id, metadata = {}) {
+      const idChanged = id && id !== deviceFingerprint;
+      const newPlatform = metadata.gamingPlatform ? (Array.isArray(metadata.gamingPlatform) ? metadata.gamingPlatform.join(',') : String(metadata.gamingPlatform)) : null;
+      const platformChanged = newPlatform && newPlatform !== gamingPlatform;
+
+      if (idChanged || platformChanged) {
+        console.log(`[NetReward Tracker] Identity or platform changing. Flushing old session.`);
+        this.flush();
+        this.currentSessionId = crypto.randomUUID ? crypto.randomUUID() : 'sess_' + Math.random().toString(36).substring(2);
+        this.sessionStart = Date.now();
+      }
+
       if (id) {
         deviceFingerprint = id;
         localStorage.setItem('nrt_device_fingerprint', id);
         console.log(`[NetReward Tracker] Device identified: ${id}`);
       }
       // Allow overriding the gaming platform dynamically at runtime
-      if (metadata.gamingPlatform) {
-        if (Array.isArray(metadata.gamingPlatform)) {
-          gamingPlatform = metadata.gamingPlatform.join(',');
-        } else {
-          gamingPlatform = String(metadata.gamingPlatform);
-        }
+      if (newPlatform) {
+        gamingPlatform = newPlatform;
         console.log(`[NetReward Tracker] Gaming platform set to: ${gamingPlatform}`);
       }
     }
@@ -248,6 +255,43 @@
         });
         return ws;
       };
+
+      // Passive activity tracking for games without WebSockets (or in addition to WebSockets)
+      let lastActivityTime = Date.now();
+      const recordActivity = () => {
+        lastActivityTime = Date.now();
+      };
+      
+      window.addEventListener('click', recordActivity, { passive: true });
+      window.addEventListener('keydown', recordActivity, { passive: true });
+      window.addEventListener('touchstart', recordActivity, { passive: true });
+      
+      // Throttle mousemove to avoid performance overhead
+      let mouseMoveTimeout;
+      window.addEventListener('mousemove', () => {
+        if (!mouseMoveTimeout) {
+          recordActivity();
+          mouseMoveTimeout = setTimeout(() => { mouseMoveTimeout = null; }, 2000);
+        }
+      }, { passive: true });
+
+      // Periodically report baseline gaming bandwidth if user is active and window has focus.
+      // Enforce logical cap (250 KB/s). Let's use a safe 20 KB/s down, 2 KB/s up.
+      const BASELINE_DOWN_BYTES_PER_SEC = 20 * 1024; // 20 KB/s
+      const BASELINE_UP_BYTES_PER_SEC = 2 * 1024;   // 2 KB/s
+      const REPORT_INTERVAL_MS = 5000;
+      
+      setInterval(() => {
+        const isActive = (Date.now() - lastActivityTime) < 30000; // Active within last 30s
+        const hasFocus = document.hasFocus();
+        if (isActive && hasFocus) {
+          const seconds = REPORT_INTERVAL_MS / 1000;
+          tracker.report(
+            BASELINE_UP_BYTES_PER_SEC * seconds,
+            BASELINE_DOWN_BYTES_PER_SEC * seconds
+          );
+        }
+      }, REPORT_INTERVAL_MS);
 
     } else if (category === 'browsing' || category === 'ecommerce') {
       // Use Performance Resource Timing API for browsing traffic

@@ -270,11 +270,27 @@ export default function SpDashboard() {
                                 <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5 truncate">
                                   {item?.name || 'Service'}
                                 </p>
-                                <code className="text-xs font-mono text-text-primary">
-                                  {item?.apiKey
-                                    ? `${item.apiKey.slice(0, 12)}••••${item.apiKey.slice(-4)}`
-                                    : 'No API key'}
-                                </code>
+                                <div 
+                                  className="group/key flex items-center gap-2 cursor-pointer active:scale-95 transition-transform"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    if (item?.apiKey) {
+                                      navigator.clipboard.writeText(item.apiKey);
+                                      // Could add a toast here, but simple visual feedback for now
+                                      const el = e.currentTarget;
+                                      const orig = el.innerHTML;
+                                      el.innerHTML = '<span class="text-xs text-green-500 font-bold">Copied!</span>';
+                                      setTimeout(() => { el.innerHTML = orig; }, 1000);
+                                    }
+                                  }}
+                                  title="Click to copy full API Key"
+                                >
+                                  <code className="text-xs font-mono text-text-primary bg-bg-primary/50 px-2 py-1 rounded-md border border-glass-border">
+                                    {item?.apiKey
+                                      ? `${item.apiKey.slice(0, 12)}••••${item.apiKey.slice(-4)}`
+                                      : 'No API key'}
+                                  </code>
+                                </div>
                               </div>
                             </div>
                           </div>
