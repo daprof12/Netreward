@@ -293,8 +293,8 @@
         }
       }, REPORT_INTERVAL_MS);
 
-    } else if (category === 'browsing' || category === 'ecommerce') {
-      // Use Performance Resource Timing API for browsing traffic
+    } else if (category === 'browsing' || category === 'ecommerce' || category === 'social') {
+      // Use Performance Resource Timing API for browsing/ecommerce/social traffic
       let lastEntryIndex = 0;
       setInterval(() => {
         const entries = performance.getEntriesByType('resource');

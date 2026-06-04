@@ -143,14 +143,24 @@ function validateTelemetry(
         details: `AI service average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds threshold (5 MB/s).`
       };
     }
-  } else if (category === 'browsing') {
-    // Browsing average rate cap is 4 MB/s.
+  } else if (category === 'browsing' || category === 'ecommerce') {
+    // Browsing/ecommerce average rate cap is 4 MB/s.
     const BROWSING_MAX_BYTES_PER_SEC = 4 * 1024 * 1024;
     if (bytesPerSec > BROWSING_MAX_BYTES_PER_SEC) {
       return {
         isAnomaly: true,
         flagType: 'HIGH_VOLUME',
-        details: `Browsing average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds speed threshold (4 MB/s).`
+        details: `Browsing/Ecommerce average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds speed threshold (4 MB/s).`
+      };
+    }
+  } else if (category === 'social') {
+    // Social average rate cap is 8 MB/s.
+    const SOCIAL_MAX_BYTES_PER_SEC = 8 * 1024 * 1024;
+    if (bytesPerSec > SOCIAL_MAX_BYTES_PER_SEC) {
+      return {
+        isAnomaly: true,
+        flagType: 'HIGH_VOLUME',
+        details: `Social average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds threshold (8 MB/s).`
       };
     }
   } else if (category === 'cloud') {
