@@ -567,6 +567,48 @@ serve(async (req) => {
       return null;
     }
 
+    /** Resolves active ISP campaign user is enrolled in based on device's isp_name */
+    async function resolveIspCampaignId(userId: string, ispName: string): Promise<string | null> {
+      try {
+        if (!ispName) return null;
+
+        // Find the network by name matching the device's isp_name
+        const { data: networkObj } = await supabase
+          .from('networks')
+          .select('id')
+          .ilike('name', ispName)
+          .eq('verified', true)
+          .maybeSingle();
+
+        if (!networkObj) return null;
+
+        // Find the active campaign for this network
+        const { data: networkCamp } = await supabase
+          .from('campaigns')
+          .select('id')
+          .eq('network_id', networkObj.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (!networkCamp) return null;
+
+        // Check if the user is enrolled in this campaign
+        const { data: enrollmentObj } = await supabase
+          .from('user_campaigns')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('campaign_id', networkCamp.id)
+          .maybeSingle();
+
+        if (enrollmentObj) {
+          return networkCamp.id;
+        }
+      } catch (err) {
+        console.error('Failed to resolve ISP campaign ID:', err);
+      }
+      return null;
+    }
+
     // Verify HMAC signature if provided or if this is an ISP (ISPs must always use HMAC)
     if (providerType === 'isp' && !hmacSig) {
       return jsonResponse({ error: 'ISPs must sign requests with x-hmac-sig.' }, 401);
@@ -627,6 +669,23 @@ serve(async (req) => {
         });
         errorCount++;
         continue;
+      }
+
+      // Fetch device user_id and isp_name to support parallel ISP tracking
+      let deviceUserId: string | null = null;
+      let deviceIspName: string | null = null;
+      try {
+        const { data: devObj } = await supabase
+          .from('devices')
+          .select('user_id, isp_name')
+          .eq('id', device_id)
+          .maybeSingle();
+        if (devObj) {
+          deviceUserId = devObj.user_id;
+          deviceIspName = devObj.isp_name;
+        }
+      } catch (e) {
+        console.error('Error fetching device user/isp info:', e);
       }
 
       // Dynamic Telemetry Sanitizer Validation
@@ -771,6 +830,79 @@ serve(async (req) => {
             category: rpcCategory,
             gaming_account_id: rpcGamingAccountId,
           });
+
+          // Parallel ISP Tracking: if the device is on an ISP network and the user has joined that ISP campaign
+          if (deviceUserId && deviceIspName) {
+            const ispCampaignId = await resolveIspCampaignId(deviceUserId, deviceIspName);
+            if (ispCampaignId && ispCampaignId !== finalCampaignId) {
+              try {
+                const { data: ispData, error: ispError } = await supabase.rpc('process_tracking_report', {
+                  p_device_id: device_id,
+                  p_campaign_id: ispCampaignId,
+                  p_session_id: `${session_id}_isp`,
+                  p_bytes_up: Number(bytes_up),
+                  p_bytes_down: Number(bytes_down),
+                  p_duration_seconds: Number(duration_seconds),
+                  p_session_start: (session_start as string) || new Date(Date.now() - Number(duration_seconds) * 1000).toISOString(),
+                  p_session_end: (session_end as string) || new Date().toISOString(),
+                  p_gaming_platform: null
+                });
+
+                if (ispError) {
+                  console.warn(`[ISP Parallel Tracking Failed] Campaign: ${ispCampaignId}, Error: ${ispError.message}`);
+                } else {
+                  console.log(`[ISP Parallel Tracking Succeeded] Campaign: ${ispCampaignId}`);
+                  
+                  // Write parallel entry to tracking_sessions for admin visibility
+                  try {
+                    const { data: ispCampInfo } = await supabase
+                      .from('campaigns')
+                      .select(`
+                        title,
+                        isp:isp_profiles(users(email))
+                      `)
+                      .eq('id', ispCampaignId)
+                      .maybeSingle();
+
+                    const ispCampaignName = ispCampInfo?.title || String(ispCampaignId);
+                    const ispProfileArr = ispCampInfo?.isp;
+                    const ispEmail = ispProfileArr
+                      ? (Array.isArray(ispProfileArr) ? (ispProfileArr[0]?.users as any)?.email : (ispProfileArr as any)?.users?.email) || ''
+                      : '';
+
+                    const ispRpcData = ispData as Record<string, unknown>;
+                    const ispNrtAwarded = ispRpcData.status === 'success'
+                      ? Number((ispRpcData.splits as any)?.user ?? 0)
+                      : 0;
+
+                    await supabase.from('tracking_sessions').insert({
+                      session_id: `${session_id}_isp`,
+                      user_email: userEmail,
+                      campaign_name: ispCampaignName,
+                      sp_email: '',
+                      source: 'isp_sdk',
+                      device_ip: '',
+                      data_rx_bytes: Number(bytes_down),
+                      data_tx_bytes: Number(bytes_up),
+                      duration_seconds: Number(duration_seconds),
+                      nrt_awarded: ispNrtAwarded,
+                      validation_score: validation.isAnomaly ? 0.5 : 1.0,
+                      status: ispRpcData.status === 'success' || ispRpcData.status === 'recorded' ? 'verified' : 'error',
+                      reject_reason: ispRpcData.status !== 'success' && ispRpcData.status !== 'recorded' ? String(ispRpcData.message ?? '') : '',
+                      service_id: null,
+                      network_id: (ispRpcData as any).network_id || null,
+                      category: 'broadband',
+                      gaming_account_id: null
+                    });
+                  } catch (tsIspErr) {
+                    console.error('[ISP tracking_sessions write failed]', tsIspErr);
+                  }
+                }
+              } catch (ispRpcErr) {
+                console.error('[ISP Parallel Tracking RPC Exception]', ispRpcErr);
+              }
+            }
+          }
         } catch (tsErr) {
           // Non-fatal: log but don't fail the response
           console.error('[tracking_sessions write failed]', tsErr);

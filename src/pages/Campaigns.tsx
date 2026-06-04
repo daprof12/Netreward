@@ -399,7 +399,15 @@ export default function Campaigns() {
                         <div className="flex items-start gap-2 bg-accent-primary/5 border border-accent-primary/20 rounded-lg px-3 py-2.5">
                           <Info size={14} className="text-accent-primary mt-0.5 shrink-0" />
                           <p className="text-xs text-text-secondary leading-relaxed">
-                            Open <span className="font-semibold text-accent-primary">{campaign.target_app}</span> and use the service to start earning NRT based on your data consumption.
+                            {campaign.network_id ? (
+                              <>
+                                Use <span className="font-semibold text-accent-primary">{campaign.target_app}</span> network to access all registered service to start earning NRT
+                              </>
+                            ) : (
+                              <>
+                                Open <span className="font-semibold text-accent-primary">{campaign.target_app}</span> and use the service to start earning NRT based on your data consumption.
+                              </>
+                            )}
                           </p>
                         </div>
                         {/* Action buttons */}
