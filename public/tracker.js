@@ -88,8 +88,12 @@
       const payload = JSON.stringify({ events: [event] });
 
       if (isUnload && navigator.sendBeacon) {
+        // sendBeacon cannot send custom headers, so pass the API key as a query param
+        const beaconUrl = new URL(endpoint);
+        if (spApiKey) beaconUrl.searchParams.set('sp_key', spApiKey);
+        if (ispApiKey) beaconUrl.searchParams.set('isp_key', ispApiKey);
         const blob = new Blob([payload], { type: 'application/json' });
-        navigator.sendBeacon(endpoint, blob);
+        navigator.sendBeacon(beaconUrl.toString(), blob);
       } else {
         try {
           const headers = { 'Content-Type': 'application/json' };
@@ -130,13 +134,13 @@
     
     if (!explicitCategory) {
       try {
-        const headers = {};
-        if (spApiKey) headers['x-sp-api-key'] = spApiKey;
-        if (ispApiKey) headers['x-isp-api-key'] = ispApiKey;
+        // Use query params for the GET init request (avoids CORS preflight issues with custom headers)
+        const initUrl = new URL(endpoint);
+        if (spApiKey) initUrl.searchParams.set('sp_key', spApiKey);
+        if (ispApiKey) initUrl.searchParams.set('isp_key', ispApiKey);
 
-        const res = await fetch(endpoint, {
-          method: 'GET',
-          headers: headers
+        const res = await fetch(initUrl.toString(), {
+          method: 'GET'
         });
         if (res.ok) {
           const config = await res.json();

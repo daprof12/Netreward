@@ -173,7 +173,7 @@ serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-sp-api-key, x-isp-api-key, x-hmac-sig',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Credentials': 'true',
   };
 
@@ -192,8 +192,9 @@ serve(async (req) => {
   if (req.method === 'GET') {
     // Dynamic SDK Initialization endpoint
     try {
-      const spApiKey = req.headers.get('x-sp-api-key');
-      const ispApiKey = req.headers.get('x-isp-api-key');
+      const url = new URL(req.url);
+      const spApiKey = req.headers.get('x-sp-api-key') || url.searchParams.get('sp_key');
+      const ispApiKey = req.headers.get('x-isp-api-key') || url.searchParams.get('isp_key');
       if (!spApiKey && !ispApiKey) {
         return jsonResponse({ error: 'Missing API key' }, 401);
       }
@@ -202,27 +203,45 @@ serve(async (req) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
 
-      // Try centralized keys first
       let category = 'other';
       
       if (spApiKey) {
-        const { data: centralKey } = await supabase
-          .from('sp_api_keys')
-          .select('sp_email')
-          .eq('sdk_key', spApiKey)
+        // Always check the services table for category — works for both
+        // centralized keys (sp_api_keys) and legacy per-service keys.
+        const { data: service } = await supabase
+          .from('services')
+          .select('category')
+          .eq('api_key', spApiKey)
           .maybeSingle();
-          
-        if (centralKey) {
-          category = 'other';
+
+        if (service && service.category) {
+          category = service.category.toLowerCase();
         } else {
-          // Try legacy services table
-          const { data: service } = await supabase
-            .from('services')
-            .select('category')
-            .eq('api_key', spApiKey)
+          // Centralized key — resolve SP email → sp_profiles → services
+          const { data: centralKey } = await supabase
+            .from('sp_api_keys')
+            .select('sp_email')
+            .eq('sdk_key', spApiKey)
             .maybeSingle();
-          if (service && service.category) {
-            category = service.category.toLowerCase();
+
+          if (centralKey?.sp_email) {
+            const { data: spProfile } = await supabase
+              .from('sp_profiles')
+              .select('id, users!inner(email)')
+              .eq('users.email', centralKey.sp_email)
+              .maybeSingle();
+
+            if (spProfile) {
+              const { data: svc } = await supabase
+                .from('services')
+                .select('category')
+                .eq('sp_id', spProfile.id)
+                .limit(1)
+                .maybeSingle();
+              if (svc?.category) {
+                category = svc.category.toLowerCase();
+              }
+            }
           }
         }
       } else if (ispApiKey) {
@@ -234,14 +253,14 @@ serve(async (req) => {
           .maybeSingle();
           
         if (!centralKey) {
-          // Fallback legacy
           await supabase.from('networks').select('id').eq('api_key', ispApiKey).maybeSingle();
         }
-        category = 'other'; // ISP traffic is generally 'other'
+        category = 'other';
       }
 
       return jsonResponse({ category });
     } catch (err) {
+      console.error('SDK init error:', err);
       return jsonResponse({ error: 'Failed to initialize SDK' }, 500);
     }
   }
@@ -258,8 +277,10 @@ serve(async (req) => {
     );
 
     // ── 1. Extract API key ─────────────────────────────────────
-    const spApiKey = req.headers.get('x-sp-api-key');
-    const ispApiKey = req.headers.get('x-isp-api-key');
+    // Support both headers (fetch) and query params (sendBeacon fallback)
+    const url = new URL(req.url);
+    const spApiKey = req.headers.get('x-sp-api-key') || url.searchParams.get('sp_key');
+    const ispApiKey = req.headers.get('x-isp-api-key') || url.searchParams.get('isp_key');
     const hmacSig = req.headers.get('x-hmac-sig');
 
     if (!spApiKey && !ispApiKey) {
@@ -297,7 +318,7 @@ serve(async (req) => {
       // 1. Try centralized sp_api_keys table
       const { data: centralKey } = await supabase
         .from('sp_api_keys')
-        .select('webhook_secret, status')
+        .select('webhook_secret, status, sp_email')
         .eq('sdk_key', spApiKey)
         .maybeSingle();
 
@@ -306,6 +327,37 @@ serve(async (req) => {
           return jsonResponse({ error: `SP account is ${centralKey.status}` }, 403);
         }
         secretKey = centralKey.webhook_secret;
+
+        // Resolve serviceId from centralized key → SP email → sp_profiles → services
+        // This is required for auto campaign lookup.
+        const { data: svc } = await supabase
+          .from('services')
+          .select('id, sp_id, status')
+          .eq('api_key', spApiKey)
+          .maybeSingle();
+
+        if (svc) {
+          serviceId = svc.id;
+        } else if (centralKey.sp_email) {
+          // Fallback: resolve via SP email → sp_profiles → services
+          const { data: spProfile } = await supabase
+            .from('sp_profiles')
+            .select('id, users!inner(email)')
+            .eq('users.email', centralKey.sp_email)
+            .maybeSingle();
+
+          if (spProfile) {
+            const { data: spSvc } = await supabase
+              .from('services')
+              .select('id')
+              .eq('sp_id', spProfile.id)
+              .eq('status', 'active')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (spSvc) serviceId = spSvc.id;
+          }
+        }
       } else {
         // 2. Fallback to legacy services table
         const { data: service, error } = await supabase
