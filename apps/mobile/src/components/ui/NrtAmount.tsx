@@ -36,7 +36,13 @@ export default function NrtAmount({ value, showSign = false, hideUnit = false, s
   // result.type === 'subscript'
   return (
     <View style={styles.container}>
-      <Text style={style}>{result.prefix}{toSubscript(result.zeros)}{result.suffix}</Text>
+      <Text style={style}>
+        {result.prefix}
+        <Text style={[style, { fontSize: baseFontSize * 0.65 }]}>
+          {toSubscript(result.zeros)}
+        </Text>
+        {result.suffix}
+      </Text>
       {unitLabel}
     </View>
   );

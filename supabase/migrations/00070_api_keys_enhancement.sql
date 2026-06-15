@@ -2,12 +2,20 @@
 -- 00070: API Keys Enhancement (SP & ISP Centralized Keys)
 -- ============================================================
 
--- 1. Upgrade sp_api_keys table
-ALTER TABLE public.sp_api_keys 
-ADD COLUMN IF NOT EXISTS sdk_key TEXT,
-ADD COLUMN IF NOT EXISTS payment_key TEXT,
-ADD COLUMN IF NOT EXISTS webhook_secret TEXT,
-ADD COLUMN IF NOT EXISTS webhook_url TEXT;
+-- 1. Upgrade sp_api_keys table (Recreate it since it was dropped in 00036)
+CREATE TABLE IF NOT EXISTS public.sp_api_keys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sp_id UUID REFERENCES public.sp_profiles(id) ON DELETE CASCADE,
+  sp_email TEXT NOT NULL,
+  api_key TEXT,
+  sdk_key TEXT,
+  payment_key TEXT,
+  webhook_secret TEXT,
+  webhook_url TEXT,
+  status TEXT DEFAULT 'active',
+  last_used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 
 -- Add index for fast key lookup
 CREATE INDEX IF NOT EXISTS idx_sp_api_keys_sdk ON public.sp_api_keys(sdk_key);

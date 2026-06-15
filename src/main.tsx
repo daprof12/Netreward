@@ -1,4 +1,8 @@
 import { Buffer } from 'buffer';
+import { registerSW } from 'virtual:pwa-register';
+
+registerSW({ immediate: true });
+
 if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
 }

@@ -4,6 +4,8 @@
 -- ==========================================
 -- 1. P2P Disputes
 -- ==========================================
+DROP TABLE IF EXISTS public.p2p_disputes CASCADE;
+
 CREATE TABLE IF NOT EXISTS public.p2p_disputes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,

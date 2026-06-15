@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -55,6 +55,15 @@ export default function Campaigns() {
   // 1. ALL HOOKS MUST BE AT THE TOP
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'joined'>(initialTab);
+  
+  // Sync tab state when URL changes
+  useEffect(() => {
+    const tab = queryParams.get('tab') as 'all' | 'joined';
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
+
   const [showFilters, setShowFilters] = useState(false);
   const [filterSearch, setFilterSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
@@ -62,6 +71,7 @@ export default function Campaigns() {
   const [filterRewardMin, setFilterRewardMin] = useState<number | null>(null);
   const [filterRewardMax, setFilterRewardMax] = useState<number | null>(null);
   const [filterLocation, setFilterLocation] = useState('All');
+  const [consoleModal, setConsoleModal] = useState<{ show: boolean; platform: string; campaignTitle: string } | null>(null);
 
   // Join / earning state
   const [joiningId, setJoiningId] = useState<string | null>(null);
@@ -427,7 +437,18 @@ export default function Campaigns() {
                                       whileTap={{ scale: 0.9 }}
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        if (p.url) window.open(p.url, '_blank', 'noopener,noreferrer');
+                                        if (['playstation', 'xbox', 'nintendo_switch', 'oculus_vr'].includes(p.platform)) {
+                                          setConsoleModal({ show: true, platform: p.label, campaignTitle: campaign.title });
+                                        } else if (p.platform === 'android') {
+                                          if (/android/i.test(navigator.userAgent) && campaign.android_package_name) {
+                                            window.location.href = `intent://#Intent;package=${campaign.android_package_name};scheme=https;end;`;
+                                            setTimeout(() => { if (p.url) window.open(p.url, '_blank', 'noopener,noreferrer'); }, 2000);
+                                          } else if (p.url) {
+                                            window.open(p.url, '_blank', 'noopener,noreferrer');
+                                          }
+                                        } else if (p.url) {
+                                          window.open(p.url, '_blank', 'noopener,noreferrer');
+                                        }
                                       }}
                                       title={`Launch on ${p.label}`}
                                       className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group"
@@ -921,6 +942,42 @@ export default function Campaigns() {
                   )}
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Console Play Assurance Modal ───────────────────────────────────── */}
+      <AnimatePresence>
+        {consoleModal?.show && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setConsoleModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-sm glass rounded-2xl border border-glass-border p-6 flex flex-col items-center text-center shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-16 h-16 rounded-full bg-accent-primary/10 flex items-center justify-center mb-4">
+                <Gamepad2 size={32} className="text-accent-primary" />
+              </div>
+              <h3 className="text-lg font-bold text-text-primary mb-2">Play on {consoleModal.platform}</h3>
+              <p className="text-sm text-text-secondary leading-relaxed mb-6">
+                Turn on your {consoleModal.platform} and launch <strong>{consoleModal.campaignTitle}</strong>. 
+                Rest assured, your telemetry tracking is actively capturing data and you will be rewarded with NRT!
+              </p>
+              <button
+                onClick={() => setConsoleModal(null)}
+                className="w-full py-3 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20 active:scale-[0.98] transition-transform"
+              >
+                Got it
+              </button>
             </motion.div>
           </motion.div>
         )}

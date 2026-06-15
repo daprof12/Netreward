@@ -104,7 +104,7 @@ export default function OnboardingScreen() {
           <Text style={styles.buttonText}>
             {currentIndex === slides.length - 1 ? 'Start Earning' : 'Continue'}
           </Text>
-          <ArrowRight size={20} color="#0f172a" />
+          <ArrowRight size={20} color={colors.bgPrimary} />
         </Pressable>
       </View>
     </SafeAreaView>
@@ -193,6 +193,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   buttonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.bgPrimary,
   },
 });

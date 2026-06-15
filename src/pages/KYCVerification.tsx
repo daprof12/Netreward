@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { getRoleKycStatus } from '@/lib/kycUtils';
 
 type KycStatus = 'none' | 'pending' | 'verified' | 'rejected';
 type TargetRole = 'user' | 'sp' | 'isp';
@@ -294,10 +295,15 @@ export default function KYCVerification() {
 
       if (error) throw error;
 
-      // Update user's kyc_status to pending in the users table
+      // Update user's role-specific KYC status to pending in the users table
+      const updateData: Record<string, string> = {};
+      if (targetRole === 'sp') updateData.kyc_sp_status = 'pending';
+      else if (targetRole === 'isp') updateData.kyc_isp_status = 'pending';
+      else updateData.kyc_user_status = 'pending';
+
       await supabase
         .from('users')
-        .update({ kyc_status: 'pending' })
+        .update(updateData)
         .eq('id', user.id);
 
       showToast('KYC submitted successfully! Pending admin review.', 'success');
@@ -351,15 +357,15 @@ export default function KYCVerification() {
         {pageStep === 'status' && (
           <div className="space-y-6">
             <div className="flex flex-col items-center mt-6 text-center">
-              {existingSubmission?.status === 'verified' ? (
+              {getRoleKycStatus(profile, targetRole) === 'verified' || existingSubmission?.status === 'verified' ? (
                 <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mb-4 border-4 border-green-500/20">
                   <CheckCircle2 size={40} className="text-green-500" />
                 </div>
-              ) : existingSubmission?.status === 'pending' ? (
+              ) : getRoleKycStatus(profile, targetRole) === 'pending' || existingSubmission?.status === 'pending' ? (
                 <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-4 border-4 border-blue-500/20">
                   <Clock size={40} className="text-blue-400" />
                 </div>
-              ) : existingSubmission?.status === 'rejected' ? (
+              ) : getRoleKycStatus(profile, targetRole) === 'rejected' || existingSubmission?.status === 'rejected' ? (
                 <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-4 border-4 border-red-500/20">
                   <XCircle size={40} className="text-red-500" />
                 </div>
@@ -370,20 +376,20 @@ export default function KYCVerification() {
               )}
 
               <h2 className="text-2xl font-bold">
-                {profile?.kyc_status === 'verified' || existingSubmission?.status === 'verified'
+                {getRoleKycStatus(profile, targetRole) === 'verified' || existingSubmission?.status === 'verified'
                   ? 'Account Verified'
-                  : profile?.kyc_status === 'pending' || existingSubmission?.status === 'pending'
+                  : getRoleKycStatus(profile, targetRole) === 'pending' || existingSubmission?.status === 'pending'
                   ? 'Under Review'
-                  : profile?.kyc_status === 'rejected' || existingSubmission?.status === 'rejected'
+                  : getRoleKycStatus(profile, targetRole) === 'rejected' || existingSubmission?.status === 'rejected'
                   ? 'Verification Rejected'
                   : `Verify as ${roleLabel}`}
               </h2>
               <p className="text-text-secondary mt-2 text-sm max-w-xs leading-relaxed">
-                {profile?.kyc_status === 'verified' || existingSubmission?.status === 'verified'
+                {getRoleKycStatus(profile, targetRole) === 'verified' || existingSubmission?.status === 'verified'
                   ? `Your ${roleLabel} KYC has been approved. You have full access.`
-                  : profile?.kyc_status === 'pending' || existingSubmission?.status === 'pending'
+                  : getRoleKycStatus(profile, targetRole) === 'pending' || existingSubmission?.status === 'pending'
                   ? 'Your documents are being reviewed by our team. This typically takes 1-2 business days.'
-                  : profile?.kyc_status === 'rejected' || existingSubmission?.status === 'rejected'
+                  : getRoleKycStatus(profile, targetRole) === 'rejected' || existingSubmission?.status === 'rejected'
                   ? `Your submission was rejected. ${existingSubmission?.admin_note ? `Reason: "${existingSubmission.admin_note}"` : 'Please resubmit with correct documents.'}`
                   : `Submit your documents to verify your ${roleLabel} account and unlock all features.`}
               </p>
@@ -516,8 +522,8 @@ export default function KYCVerification() {
 
             {/* Action buttons */}
             <div className="space-y-3">
-              {(profile?.kyc_status === 'pending' || existingSubmission?.status === 'pending' || 
-                profile?.kyc_status === 'verified' || existingSubmission?.status === 'verified') ? (
+              {(getRoleKycStatus(profile, targetRole) === 'pending' || existingSubmission?.status === 'pending' || 
+                getRoleKycStatus(profile, targetRole) === 'verified' || existingSubmission?.status === 'verified') ? (
                 <button
                   onClick={() => navigate('/')}
                   className="w-full py-4 bg-bg-secondary text-text-primary font-bold rounded-xl border border-glass-border shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
@@ -529,7 +535,7 @@ export default function KYCVerification() {
                   onClick={() => setPageStep('liveness')}
                   className="w-full py-4 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20 active:scale-[0.98] transition-all"
                 >
-                  {profile?.kyc_status === 'rejected' || existingSubmission?.status === 'rejected' ? 'Resubmit KYC Documents' : 'Start Verification'}
+                  {getRoleKycStatus(profile, targetRole) === 'rejected' || existingSubmission?.status === 'rejected' ? 'Resubmit KYC Documents' : 'Start Verification'}
                 </button>
               )}
             </div>

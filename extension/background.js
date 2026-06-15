@@ -18,7 +18,7 @@ chrome.webRequest.onCompleted.addListener(
       });
     }
   },
-  { urls: ["<all_urls>"] },
+  { urls: ["*://*.netflix.com/*", "*://*.spotify.com/*", "*://*.youtube.com/*"] },
   ["responseHeaders"]
 );
 

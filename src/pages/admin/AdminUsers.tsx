@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit2, Trash2, X, Smartphone, Users, ShieldCheck, Activity, RefreshCw, MapPin, Wallet, Gift, Loader2, UserPlus } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Smartphone, Users, ShieldCheck, ShieldAlert, ShieldX, Shield, Activity, RefreshCw, MapPin, Wallet, Gift, Loader2, UserPlus } from 'lucide-react';
 import LocationSearch from '@/components/LocationSearch';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
@@ -18,7 +18,9 @@ interface AdminUser {
   avatar_url: string | null;
   country: string | null;
   status: string;
-  kyc_status: string;
+  kyc_user_status: string;
+  kyc_sp_status: string;
+  kyc_isp_status: string;
   created_at: string;
   nrt_balance: number;
   device_count: number;
@@ -81,9 +83,9 @@ export default function AdminUsers() {
         .from('users')
         .select('*, wallets(nrt_balance), devices(id), referrals:referrals!referrer_id(reward_nrt)')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      
+
       setUsers((data || []).map((u: any) => {
         const wallet = Array.isArray(u.wallets) ? u.wallets[0] : u.wallets;
         const referrals = Array.isArray(u.referrals) ? u.referrals : [];
@@ -94,7 +96,9 @@ export default function AdminUsers() {
           device_count: u.devices?.length || 0,
           referral_count: referrals.length,
           referral_bonus: referrals.reduce((sum: number, r: any) => sum + (Number(r.reward_nrt) || 0), 0),
-          kyc_status: u.kyc_status || 'none',
+          kyc_user_status: u.kyc_user_status || 'none',
+          kyc_sp_status: u.kyc_sp_status || 'none',
+          kyc_isp_status: u.kyc_isp_status || 'none',
           status: u.status || 'active',
           country: u.country || 'Unknown',
         };
@@ -176,9 +180,9 @@ export default function AdminUsers() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Total Users" value={users.length.toLocaleString()} sub="registered accounts" icon={Users} color="#3B82F6" loading={loading} />
-        <KpiCard label="Verified Partners" value={users.filter(u => (u.is_sp || u.is_isp) && u.kyc_status === 'verified').length.toLocaleString()} sub="SPs & ISPs" icon={ShieldCheck} color="#10B981" loading={loading} />
+        <KpiCard label="Verified Partners" value={users.filter(u => u.is_sp && u.kyc_sp_status === 'verified' || u.is_isp && u.kyc_isp_status === 'verified').length.toLocaleString()} sub="SPs & ISPs" icon={ShieldCheck} color="#10B981" loading={loading} />
         <KpiCard label="Active Status" value={users.filter(u => u.status === 'active').length.toLocaleString()} sub="currently active" icon={Activity} color="#8B5CF6" loading={loading} />
-        <KpiCard label="Pending KYC" value={users.filter(u => u.kyc_status === 'pending').length.toLocaleString()} sub="requires review" icon={UserPlus} color="#F59E0B" loading={loading} />
+        <KpiCard label="Pending KYC" value={users.filter(u => [u.kyc_user_status, u.kyc_sp_status, u.kyc_isp_status].includes('pending')).length.toLocaleString()} sub="requires review" icon={UserPlus} color="#F59E0B" loading={loading} />
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -239,7 +243,7 @@ export default function AdminUsers() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                      {user.status === 'active' 
+                      {user.status === 'active'
                         ? <button onClick={(e) => { e.stopPropagation(); updateUser(user.id, { status: 'suspended' }); }} className="px-2 py-1 bg-red-500/10 text-red-500 rounded-md text-[10px] font-bold">Suspend</button>
                         : <button onClick={(e) => { e.stopPropagation(); updateUser(user.id, { status: 'active' }); }} className="px-2 py-1 bg-emerald-500/10 text-emerald-500 rounded-md text-[10px] font-bold">Activate</button>
                       }
@@ -261,7 +265,7 @@ export default function AdminUsers() {
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setViewUser(null)}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
               className="bg-bg-card border border-glass-border rounded-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              
+
               <div className="p-5 border-b border-glass-border flex justify-between items-center bg-bg-secondary shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-accent-primary/20 text-accent-primary flex items-center justify-center overflow-hidden border border-accent-primary/30">
@@ -286,7 +290,7 @@ export default function AdminUsers() {
                   ...(viewUser.is_sp ? [{ id: 'sp' as const, label: 'Service Provider' }] : []),
                   ...(viewUser.is_isp ? [{ id: 'isp' as const, label: 'ISP Network' }] : []),
                 ].map(t => (
-                  <button key={t.id} onClick={() => setActiveTab(t.id)} 
+                  <button key={t.id} onClick={() => setActiveTab(t.id)}
                     className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${activeTab === t.id ? 'border-accent-primary text-accent-primary' : 'border-transparent text-text-secondary hover:text-text-primary'}`}>
                     {t.label}
                   </button>
@@ -312,19 +316,25 @@ export default function AdminUsers() {
                     </div>
 
                     <div>
-                      <h4 className="text-[10px] font-black text-text-secondary uppercase mb-3">Roles & Active Identity</h4>
+                      <h4 className="text-[10px] font-black text-text-secondary uppercase mb-3">Role KYC Verification</h4>
                       <div className="grid grid-cols-3 gap-3">
                         {[
-                          { label: 'Standard User', active: true, color: roleColor.user, isActiveRole: (viewUser.active_role || viewUser.role) === 'user' },
-                          { label: 'Service Provider', active: viewUser.is_sp, color: roleColor.sp, isActiveRole: (viewUser.active_role || viewUser.role) === 'sp' },
-                          { label: 'ISP Network', active: viewUser.is_isp, color: roleColor.isp, isActiveRole: (viewUser.active_role || viewUser.role) === 'isp' },
-                        ].map(r => (
-                          <div key={r.label} className={`p-3 rounded-xl border relative ${r.active ? 'border-accent-primary/30 bg-accent-primary/5' : 'border-glass-border opacity-40'} flex flex-col items-center gap-2`}>
-                            {r.isActiveRole && <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-accent-primary shadow-[0_0_8px_rgba(var(--accent-primary-rgb),0.8)]" />}
-                            <ShieldCheck size={20} style={{ color: r.active ? r.color : '#6B7280' }} />
-                            <span className="text-[9px] font-black text-center leading-tight uppercase">{r.label}</span>
-                          </div>
-                        ))}
+                          { label: 'Standard User', roleKey: 'kyc_user_status', active: true, color: roleColor.user, isActiveRole: (viewUser.active_role || viewUser.role) === 'user', status: viewUser.kyc_user_status },
+                          { label: 'Service Provider', roleKey: 'kyc_sp_status', active: viewUser.is_sp, color: roleColor.sp, isActiveRole: (viewUser.active_role || viewUser.role) === 'sp', status: viewUser.kyc_sp_status },
+                          { label: 'ISP Network', roleKey: 'kyc_isp_status', active: viewUser.is_isp, color: roleColor.isp, isActiveRole: (viewUser.active_role || viewUser.role) === 'isp', status: viewUser.kyc_isp_status },
+                        ].map(r => {
+                          const s = (r.status || 'none') as string;
+                          const shieldColor = s === 'verified' ? '#10B981' : s === 'pending' ? '#F59E0B' : s === 'rejected' ? '#EF4444' : '#6B7280';
+                          const ShieldIcon = s === 'verified' ? ShieldCheck : s === 'pending' ? ShieldAlert : s === 'rejected' ? ShieldX : Shield;
+                          return (
+                            <div key={r.label} className={`p-3 rounded-xl border relative flex flex-col items-center gap-1.5 ${r.active ? 'border-glass-border' : 'border-glass-border opacity-40'}`}>
+                              {r.isActiveRole && <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-accent-primary shadow-[0_0_8px_rgba(var(--accent-primary-rgb),0.8)]" />}
+                              <ShieldIcon size={22} style={{ color: shieldColor }} />
+                              <span className="text-[9px] font-black text-center leading-tight uppercase">{r.label}</span>
+                              <span className="text-[8px] font-bold capitalize" style={{ color: shieldColor }}>{s === 'none' ? 'Not Started' : s}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -335,10 +345,9 @@ export default function AdminUsers() {
                         { label: 'Joined Date', value: new Date(viewUser.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) },
                         { label: 'Primary Email', value: viewUser.email },
                         { label: 'Region/Country', value: viewUser.country },
-                        { label: 'KYC Status', value: viewUser.kyc_status.toUpperCase() },
                         { label: 'Total Referral Bonus', value: `${Number(viewUser.referral_bonus || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} NRT` },
                       ].map((item, i) => (
-                        <div key={item.label} className={`flex items-center justify-between p-3.5 ${i !== 6 ? 'border-b border-glass-border' : ''}`}>
+                        <div key={item.label} className={`flex items-center justify-between p-3.5 ${i !== 5 ? 'border-b border-glass-border' : ''}`}>
                           <span className="text-[10px] font-black text-text-secondary uppercase">{item.label}</span>
                           <span className="text-xs font-bold text-text-primary">{item.value}</span>
                         </div>
@@ -352,9 +361,9 @@ export default function AdminUsers() {
                     <div className="glass p-5 rounded-xl border border-glass-border flex justify-between items-center bg-emerald-500/5">
                       <div>
                         <p className="text-[10px] text-text-secondary uppercase font-bold mb-1">Service Provider Verification</p>
-                        <Badge label={viewUser.kyc_status} color={kycColor[viewUser.kyc_status]} />
+                        <Badge label={viewUser.kyc_sp_status || 'none'} color={kycColor[viewUser.kyc_sp_status || 'none']} />
                       </div>
-                      <ShieldCheck size={32} className="text-emerald-500 opacity-30" />
+                      {viewUser.kyc_sp_status === 'verified' ? <ShieldCheck size={32} className="text-emerald-500 opacity-60" /> : viewUser.kyc_sp_status === 'pending' ? <ShieldAlert size={32} className="text-amber-500 opacity-60" /> : <ShieldX size={32} className="text-red-500 opacity-60" />}
                     </div>
 
                     <div className="space-y-4">
@@ -386,9 +395,9 @@ export default function AdminUsers() {
                     <div className="glass p-5 rounded-xl border border-glass-border flex justify-between items-center bg-blue-500/5">
                       <div>
                         <p className="text-[10px] text-text-secondary uppercase font-bold mb-1">ISP Network Authority</p>
-                        <Badge label={viewUser.kyc_status} color={kycColor[viewUser.kyc_status]} />
+                        <Badge label={viewUser.kyc_isp_status || 'none'} color={kycColor[viewUser.kyc_isp_status || 'none']} />
                       </div>
-                      <Activity size={32} className="text-blue-500 opacity-30" />
+                      {viewUser.kyc_isp_status === 'verified' ? <ShieldCheck size={32} className="text-blue-500 opacity-60" /> : viewUser.kyc_isp_status === 'pending' ? <ShieldAlert size={32} className="text-amber-500 opacity-60" /> : <ShieldX size={32} className="text-red-500 opacity-60" />}
                     </div>
 
                     <div className="space-y-4">
@@ -417,7 +426,7 @@ export default function AdminUsers() {
               </div>
 
               <div className="p-4 border-t border-glass-border bg-bg-secondary shrink-0 flex gap-3">
-                <button onClick={() => { setEditUser({ ...viewUser }); setViewUser(null); }} 
+                <button onClick={() => { setEditUser({ ...viewUser }); setViewUser(null); }}
                   className="flex-1 py-3 bg-accent-primary text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg shadow-accent-primary/20">
                   <Edit2 size={14} /> Update Account Records
                 </button>
@@ -456,17 +465,28 @@ export default function AdminUsers() {
                       {ROLES.map(r => <option key={r} value={r}>{r.toUpperCase()}</option>)}
                     </select>
                   </div>
-                   <div>
+                  <div>
                     <label className="text-[10px] font-black text-text-secondary uppercase mb-1.5 block">Status</label>
                     <select value={editUser.status} onChange={e => setEditUser({ ...editUser, status: e.target.value as any })} className="w-full bg-bg-secondary border border-glass-border rounded-xl px-3 py-2.5 text-sm outline-none">
                       {STATUSES.map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black text-text-secondary uppercase mb-1.5 block">KYC Status</label>
-                    <select value={editUser.kyc_status} onChange={e => setEditUser({ ...editUser, kyc_status: e.target.value as any })} className="w-full bg-bg-secondary border border-glass-border rounded-xl px-3 py-2.5 text-sm outline-none">
-                      {KYC.map(k => <option key={k} value={k}>{k.toUpperCase()}</option>)}
-                    </select>
+                  <div className="col-span-2 space-y-3">
+                    <p className="text-[10px] font-black text-text-secondary uppercase">Per-Role KYC Status</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { key: 'kyc_user_status' as const, label: 'User KYC' },
+                        { key: 'kyc_sp_status' as const, label: 'SP KYC' },
+                        { key: 'kyc_isp_status' as const, label: 'ISP KYC' },
+                      ].map(({ key, label }) => (
+                        <div key={key}>
+                          <label className="text-[10px] font-black text-text-secondary uppercase mb-1.5 block">{label}</label>
+                          <select value={(editUser as any)[key] || 'none'} onChange={e => setEditUser({ ...editUser, [key]: e.target.value } as any)} className="w-full bg-bg-secondary border border-glass-border rounded-xl px-3 py-2 text-xs outline-none">
+                            {KYC.map(k => <option key={k} value={k}>{k.toUpperCase()}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-4 p-3 bg-bg-secondary border border-glass-border rounded-xl">
@@ -482,7 +502,7 @@ export default function AdminUsers() {
               </div>
               <div className="p-4 border-t border-glass-border bg-bg-secondary flex gap-3">
                 <button onClick={() => setEditUser(null)} className="flex-1 py-2.5 rounded-xl bg-bg-primary border border-glass-border text-xs font-bold uppercase hover:bg-glass-bg transition-colors">Cancel</button>
-                <button onClick={() => { updateUser(editUser.id, { display_name: editUser.display_name, status: editUser.status, kyc_status: editUser.kyc_status, role: editUser.role, active_role: editUser.active_role, is_sp: editUser.is_sp, is_isp: editUser.is_isp }); setEditUser(null); }} className="flex-1 py-2.5 rounded-xl bg-accent-primary text-white text-xs font-bold uppercase hover:opacity-90 transition-opacity">Save Changes</button>
+                <button onClick={() => { updateUser(editUser.id, { display_name: editUser.display_name, status: editUser.status, kyc_user_status: (editUser as any).kyc_user_status, kyc_sp_status: (editUser as any).kyc_sp_status, kyc_isp_status: (editUser as any).kyc_isp_status, role: editUser.role, active_role: editUser.active_role, is_sp: editUser.is_sp, is_isp: editUser.is_isp }); setEditUser(null); }} className="flex-1 py-2.5 rounded-xl bg-accent-primary text-white text-xs font-bold uppercase hover:opacity-90 transition-opacity">Save Changes</button>
               </div>
             </motion.div>
           </motion.div>

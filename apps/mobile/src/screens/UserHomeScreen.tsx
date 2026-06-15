@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Bell, Wallet, ArrowRightLeft, QrCode, Users, Flame, Zap, History,
   ChevronRight, Activity as ActivityIcon, X, CheckCircle2, ArrowDownToLine,
-  Clock, Globe, Wifi, MapPin, Loader2,
+  Clock, Globe, Wifi, MapPin, Loader2, Star, ShieldCheck, ShieldAlert,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -24,6 +24,8 @@ import NrtAmount from '@/components/ui/NrtAmount';
 import PulseDot from '@/components/ui/PulseDot';
 import ActiveCampaignCard from '@/components/ui/ActiveCampaignCard';
 import NotificationBell from '@/components/ui/NotificationBell';
+import { useP2PStore } from '@/stores/useP2PStore';
+import { getRoleKycStatus } from '@/lib/kycUtils';
 
 // Helper to add alpha to hex safely
 const getRgba = (hex: string, alpha: number) => {
@@ -43,6 +45,16 @@ const quickActions = [
   { icon: Users, label: 'Referral', to: '/wallet/referral', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
   { icon: Bell, label: 'Support', to: '/support', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
 ];
+
+function relativeTime(ts: number): string {
+  const now = Date.now();
+  const diff = now - ts;
+  if (diff < 60_000) return 'Just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  if (diff < 172_800_000) return 'Yesterday';
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 function SignalBars({ strength = 4 }: { strength?: number }) {
   return (
@@ -70,6 +82,10 @@ export default function UserHomeScreen() {
   const { wallet, isLoading: isWalletLoading, claimRewards, isClaiming } = useWallet();
   const { userEnrollments, isLoading: isCampaignsLoading, leaveCampaign } = useCampaigns();
   const { devices } = useDevices();
+  const { offers } = useP2PStore();
+  const userOffers = offers.filter(o => o.userId === user?.id || o.userName === (user?.user_metadata?.display_name || user?.email?.split('@')[0]));
+  const hasOffers = userOffers.length > 0;
+  const avgRating = hasOffers ? (userOffers.reduce((sum: number, o: any) => sum + (o.rating || 0), 0) / userOffers.length).toFixed(1) : null;
   const { userHeatmap, isUserHeatmapLoading } = useTelemetry();
   const { selectedCurrency, convertNrt } = useCurrencyStore();
   const { showToast } = useToastStore();
@@ -102,7 +118,7 @@ export default function UserHomeScreen() {
     let intervalId: ReturnType<typeof setInterval>;
     const fetchActivities = async () => {
       if (!user?.id) return;
-      
+
       const [sessionsRes, txRes] = await Promise.all([
         supabase.from('device_data_sessions')
           .select('campaign_id, session_end')
@@ -118,27 +134,39 @@ export default function UserHomeScreen() {
       if (sessionsRes.data) {
         setRecentActivityRaw(sessionsRes.data);
       }
-      
+
+      // Build a map of campaign_id → most recent session_end
+      const latestSessionMap: Record<string, number> = {};
+      if (sessionsRes.data) {
+        for (const s of sessionsRes.data) {
+          const t = new Date(s.session_end).getTime();
+          if (!latestSessionMap[s.campaign_id] || t > latestSessionMap[s.campaign_id]) {
+            latestSessionMap[s.campaign_id] = t;
+          }
+        }
+      }
+
       const activities: any[] = [];
-      
+
       if (userEnrollments) {
         userEnrollments.forEach((en: any) => {
           const earned = (en.nrt_earned || 0) + (en.unclaimed_nrt || 0);
           if (earned > 0) {
+            const lastSessionTs = latestSessionMap[en.campaign_id] || new Date(en.updated_at || en.created_at || 0).getTime();
             activities.push({
               id: `en_${en.id}`,
               icon: Zap,
               type: 'earn',
               amount: earned,
               title: en.campaigns?.title || 'Unknown',
-              time: new Date(en.updated_at || en.created_at || 0).getTime(),
-              timeStr: new Date(en.updated_at || en.created_at || 0).toLocaleDateString(),
+              time: lastSessionTs,
+              timeStr: relativeTime(lastSessionTs),
               color: '#10b981'
             });
           }
         });
       }
-      
+
       if (txRes.data) {
         txRes.data.forEach((t: any) => {
           const isSender = t.sender_id === user.id;
@@ -146,7 +174,7 @@ export default function UserHomeScreen() {
           const icon = isSender ? ArrowRightLeft : QrCode;
           const color = isSender ? '#ef4444' : '#10b981';
           const title = t.tx_type === 'scan2pay' ? 'Scan2Pay' : 'Transfer';
-          
+
           activities.push({
             id: `tx_${t.id}`,
             icon,
@@ -155,12 +183,12 @@ export default function UserHomeScreen() {
             amount: Number(t.amount),
             title,
             time: new Date(t.created_at).getTime(),
-            timeStr: new Date(t.created_at).toLocaleDateString(),
+            timeStr: relativeTime(new Date(t.created_at).getTime()),
             color
           });
         });
       }
-      
+
       activities.sort((a, b) => b.time - a.time);
       setRecentActivity(activities.slice(0, 4));
     };
@@ -182,7 +210,7 @@ export default function UserHomeScreen() {
   const activeDevices = devices?.filter((d: any) => d.status === 'active') || [];
   const uniqueDeviceIds = new Set(activeDevices.map((d: any) => d.id));
   const deviceCount = uniqueDeviceIds.size;
-  
+
   const activeEnrollments = userEnrollments?.filter((en: any) => en.status === 'active') || [];
   const uniqueCampaignIds = new Set(activeEnrollments.map((en: any) => en.campaign_id));
   const enrollmentCount = uniqueCampaignIds.size;
@@ -232,8 +260,8 @@ export default function UserHomeScreen() {
     durationSecs >= 3600
       ? `${(durationSecs / 3600).toFixed(1)} hrs`
       : durationSecs >= 60
-      ? `${Math.floor(durationSecs / 60)} min ${durationSecs % 60}s`
-      : `${durationSecs}s`;
+        ? `${Math.floor(durationSecs / 60)} min ${durationSecs % 60}s`
+        : `${durationSecs}s`;
 
   const isSessionRecent = (campId: string) =>
     recentActivityRaw.some(
@@ -260,17 +288,41 @@ export default function UserHomeScreen() {
             <Text style={styles.greeting}>{greeting} 👋</Text>
             <View style={styles.nameContainer}>
               <Text style={styles.name}>{displayName}</Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleText}>USER</Text>
-              </View>
+              {getRoleKycStatus(profile, 'user') === 'verified' ? (
+                <View style={[styles.roleBadge, { backgroundColor: getRgba(colors.success, 0.15), borderColor: getRgba(colors.success, 0.2) }]}>
+                  <ShieldCheck size={12} color={colors.success} style={{ marginRight: 4 }} />
+                  <Text style={[styles.roleText, { color: colors.success }]}>USER</Text>
+                </View>
+              ) : getRoleKycStatus(profile, 'user') === 'pending' ? (
+                <View style={[styles.roleBadge, { backgroundColor: getRgba('#F59E0B', 0.15), borderColor: getRgba('#F59E0B', 0.2) }]}>
+                  <Clock size={12} color="#F59E0B" style={{ marginRight: 4 }} />
+                  <Text style={[styles.roleText, { color: '#F59E0B' }]}>PENDING REVIEW</Text>
+                </View>
+              ) : getRoleKycStatus(profile, 'user') === 'rejected' ? (
+                <View style={[styles.roleBadge, { backgroundColor: getRgba(colors.error, 0.15), borderColor: getRgba(colors.error, 0.2) }]}>
+                  <ShieldAlert size={12} color={colors.error} style={{ marginRight: 4 }} />
+                  <Text style={[styles.roleText, { color: colors.error }]}>REJECTED</Text>
+                </View>
+              ) : (
+                <View style={[styles.roleBadge, { backgroundColor: getRgba(colors.textSecondary, 0.15), borderColor: getRgba(colors.textSecondary, 0.2) }]}>
+                  <ShieldAlert size={12} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                  <Text style={[styles.roleText, { color: colors.textSecondary }]}>UNVERIFIED USER</Text>
+                </View>
+              )}
+              {hasOffers && (
+                <View style={styles.ratingBadge}>
+                  <Star size={10} color={colors.accentPrimary} fill={colors.accentPrimary} style={{ marginRight: 4 }} />
+                  <Text style={styles.ratingText}>{avgRating}</Text>
+                </View>
+              )}
             </View>
           </View>
           <View style={styles.headerRight}>
-              <NotificationBell />
-              <Pressable onPress={() => router.push('/settings')} style={styles.avatar}>
-                <Text style={styles.avatarText}>{displayName[0]?.toUpperCase()}</Text>
-              </Pressable>
-            </View>
+            <NotificationBell />
+            <Pressable onPress={() => router.push('/settings')} style={styles.avatar}>
+              <Text style={styles.avatarText}>{displayName[0]?.toUpperCase()}</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Balance Card */}
@@ -365,7 +417,7 @@ export default function UserHomeScreen() {
             </View>
           </View>
 
-          <View style={styles.heatmapGrid}>
+          <View style={[styles.heatmapGrid, { width: '100%' }]}>
             <View style={styles.heatmapDays}>
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
                 <View key={d} style={styles.heatmapDayWrapper}>
@@ -378,10 +430,13 @@ export default function UserHomeScreen() {
             ) : (!userHeatmap || userHeatmap.length === 0) ? (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                 <ActivityIcon size={24} color={colors.textSecondary} style={{ marginBottom: 8 }} />
-                <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center' }}>No Activity Yet</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', fontWeight: 'bold' }}>No Activity Yet</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 10, textAlign: 'center', marginTop: 4, paddingHorizontal: 12 }}>
+                  Connect a device and join a campaign to start tracking your daily NRT earnings here.
+                </Text>
               </View>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
+              <View style={{ flex: 1, flexDirection: 'row', gap: 4 }}>
                 {[...Array(16)].map((_, weekIdx) => (
                   <View key={weekIdx} style={styles.heatmapCol}>
                     {[...Array(7)].map((_, dayIdx) => {
@@ -391,15 +446,15 @@ export default function UserHomeScreen() {
 
                       const bgColor =
                         intensity === 4 ? colors.accentPrimary :
-                        intensity === 3 ? getRgba(colors.accentPrimary, 0.75) :
-                        intensity === 2 ? getRgba(colors.accentPrimary, 0.5) :
-                        intensity === 1 ? getRgba(colors.accentPrimary, 0.25) :
-                        'rgba(128,128,128,0.15)';
+                          intensity === 3 ? getRgba(colors.accentPrimary, 0.75) :
+                            intensity === 2 ? getRgba(colors.accentPrimary, 0.5) :
+                              intensity === 1 ? getRgba(colors.accentPrimary, 0.25) :
+                                'rgba(128,128,128,0.15)';
 
                       return (
-                        <Pressable 
-                          key={dayIdx} 
-                          style={[styles.heatmapCell, { backgroundColor: bgColor }]} 
+                        <Pressable
+                          key={dayIdx}
+                          style={[styles.heatmapCell, { backgroundColor: bgColor }]}
                           onPress={() => {
                             if (dayData && dayData.activity_date) {
                               showToast(`${dayData.activity_date}: ${dayData.value} NRT`, 'success');
@@ -410,7 +465,7 @@ export default function UserHomeScreen() {
                     })}
                   </View>
                 ))}
-              </ScrollView>
+              </View>
             )}
           </View>
         </View>
@@ -420,7 +475,7 @@ export default function UserHomeScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Active Campaigns</Text>
             {enrollmentCount > 0 && (
-              <Pressable onPress={() => router.push('/campaigns')}>
+              <Pressable onPress={() => router.push('/campaigns?tab=joined')}>
                 <Text style={styles.viewAll}>View all →</Text>
               </Pressable>
             )}
@@ -428,11 +483,12 @@ export default function UserHomeScreen() {
 
           {enrollmentCount === 0 ? (
             <View style={styles.card}>
-              <View style={{ alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                <Zap size={24} color={colors.textSecondary} style={{ marginBottom: 8 }} />
-                <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', marginBottom: 12 }}>No Active Campaigns</Text>
+              <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 32 }}>
+                <Zap size={32} color={colors.textSecondary} style={{ marginBottom: 12, opacity: 0.5 }} />
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 8 }}>No Active Campaigns</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', maxWidth: 250, lineHeight: 18, marginBottom: 12 }}>Join data-reward campaigns to start monetizing your internet usage.</Text>
                 <Pressable onPress={() => router.push('/campaigns')}>
-                  <Text style={{ color: colors.accentPrimary, fontWeight: 'bold' }}>Browse Campaigns</Text>
+                  <Text style={{ color: colors.accentPrimary, fontWeight: 'bold', fontSize: 12 }}>Browse Campaigns</Text>
                 </Pressable>
               </View>
             </View>
@@ -447,8 +503,7 @@ export default function UserHomeScreen() {
                   enrollment={en}
                   isRecent={isRecent}
                   onPress={() => setEarningCampaign(camp)}
-                  onLeave={() => handleLeave(camp.id)}
-                  isLeaving={leavingId === camp.id}
+                  hideActions={true}
                 />
               );
             })
@@ -463,9 +518,10 @@ export default function UserHomeScreen() {
 
           <View style={styles.recentList}>
             {recentActivity.length === 0 ? (
-              <View style={{ alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-                <History size={24} color={colors.textSecondary} style={{ marginBottom: 8 }} />
-                <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center' }}>No Recent Activity</Text>
+              <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 32 }}>
+                <History size={32} color={colors.textSecondary} style={{ marginBottom: 12, opacity: 0.5 }} />
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 8 }}>No Recent Activity</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', maxWidth: 250, lineHeight: 18 }}>Your rewards and activity will appear here once you start using connected apps.</Text>
               </View>
             ) : (
               recentActivity.map((activity) => {
@@ -488,10 +544,10 @@ export default function UserHomeScreen() {
                       </View>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <NrtAmount 
-                        value={activity.type === 'tx' && activity.action === 'Sent' ? -activity.amount : activity.amount} 
-                        showSign 
-                        style={{ fontSize: 14, color: activity.color, fontWeight: '700' }} 
+                      <NrtAmount
+                        value={activity.type === 'tx' && activity.action === 'Sent' ? -activity.amount : activity.amount}
+                        showSign
+                        style={{ fontSize: 14, color: activity.color, fontWeight: '700' }}
                       />
                     </View>
                   </View>
@@ -524,8 +580,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   greeting: { fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
   nameContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontSize: 24, fontWeight: 'bold', color: colors.textPrimary, textTransform: 'capitalize' },
-  roleBadge: { backgroundColor: 'rgba(5, 150, 105, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(5, 150, 105, 0.2)' },
+  roleBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(5, 150, 105, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(5, 150, 105, 0.2)' },
   roleText: { color: colors.accentPrimary, fontSize: 10, fontWeight: '900' },
+  ratingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.2)' },
+  ratingText: { color: colors.accentPrimary, fontSize: 10, fontWeight: '900' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   bellContainer: { position: 'relative' },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accentPrimary, alignItems: 'center', justifyContent: 'center' },
@@ -546,10 +604,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   claimText: { color: 'rgba(255,255,255,0.4)', fontWeight: '600', fontSize: 14 },
   claimTextActive: { color: '#6366f1' },
 
-  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   statBox: { flex: 1, backgroundColor: colors.bgSecondary, borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.glassBorder },
   statBoxLabel: { fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
-  statBoxValue: { fontSize: 20, fontWeight: 'bold', color: colors.textPrimary },
+  statBoxValue: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary },
 
   section: { marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16 },
@@ -569,11 +627,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   heatmapLegendText: { fontSize: 9, color: colors.textSecondary },
   heatmapDot: { width: 10, height: 10, borderRadius: 2 },
   heatmapGrid: { flexDirection: 'row', gap: 4 },
-  heatmapDays: { justifyContent: 'space-between', paddingVertical: 2, marginRight: 8 },
-  heatmapDayWrapper: { height: 12, justifyContent: 'center' },
+  heatmapDays: { justifyContent: 'space-between', marginRight: 8, gap: 4 },
+  heatmapDayWrapper: { flex: 1, justifyContent: 'center' },
   heatmapDayText: { fontSize: 10, color: colors.textSecondary },
-  heatmapCol: { justifyContent: 'space-between', gap: 4 },
-  heatmapCell: { width: 12, height: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3 },
+  heatmapCol: { flex: 1, justifyContent: 'space-between', gap: 4 },
+  heatmapCell: { width: '100%', aspectRatio: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3 },
 
   campaignCard: { backgroundColor: colors.bgSecondary, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: colors.glassBorder, marginBottom: 12 },
   campLogo: { width: 48, height: 48, borderRadius: 12, backgroundColor: colors.bgPrimary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: colors.glassBorder },

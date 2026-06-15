@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, Settings, DollarSign, Gift, Users, Clock, Info } from 'lucide-react';
+import { Save, Settings, DollarSign, Gift, Users, Clock, Info, Activity } from 'lucide-react';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -457,9 +457,115 @@ function FeesTab() {
   );
 }
 
+function CategoryLimitsTab() {
+  const { showToast } = useToastStore();
+  const [saving, setSaving] = useState(false);
+  const [limits, setLimits] = useState({
+    default: 100, // MB/s
+    cloud: 50,
+    streaming: 10,
+    social: 8,
+    ai: 5,
+    browsing: 4,
+    gaming: 0.25,
+  });
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('kv_settings').select('value').eq('key', 'category_bandwidth_limits').single();
+      if (data?.value) {
+        try {
+          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          setLimits(l => ({ ...l, ...parsed }));
+        } catch {}
+      }
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await supabase.from('kv_settings').upsert(
+        {
+          key: 'category_bandwidth_limits',
+          value: JSON.stringify(limits),
+          category: 'rewards',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'key' }
+      );
+      showToast('Category limits saved.', 'success');
+    } catch (e: any) {
+      showToast(e.message || 'Save failed', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const InputRow = ({ label, field, desc }: { label: string, field: keyof typeof limits, desc: string }) => (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-3 border-b border-glass-border last:border-0">
+      <div className="flex-1">
+        <p className="font-bold text-sm text-text-primary">{label}</p>
+        <p className="text-xs text-text-secondary">{desc}</p>
+      </div>
+      <div className="flex items-center gap-2 w-full sm:w-48 shrink-0">
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={limits[field]}
+          onChange={e => setLimits(l => ({ ...l, [field]: Number(e.target.value) }))}
+          className="flex-1 bg-bg-secondary border border-glass-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-accent-primary"
+        />
+        <span className="text-xs font-bold text-text-secondary whitespace-nowrap">MB/s</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">Category Bandwidth Limits</h2>
+          <p className="text-sm text-text-secondary">Configure max data speeds per category for fraud detection</p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-accent-primary/20 hover:opacity-90 transition-opacity disabled:opacity-60"
+        >
+          {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={16} />}
+          Save Changes
+        </button>
+      </div>
+
+      <div className="bg-bg-card border border-glass-border rounded-xl p-5 space-y-2">
+        <InputRow label="Absolute Limit (Default)" field="default" desc="Fallback limit applied to any category not explicitly defined." />
+        <InputRow label="Cloud" field="cloud" desc="Cloud syncs and backups can fully saturate connections." />
+        <InputRow label="Streaming" field="streaming" desc="4K video streaming peaks, including pre-buffering bursts." />
+        <InputRow label="Social" field="social" desc="Infinite scrolling platforms with heavy image/video content." />
+        <InputRow label="AI / AI Service" field="ai" desc="Receiving streams of generated content or heavy AI model responses." />
+        <InputRow label="Browsing / Ecommerce" field="browsing" desc="Standard web page assets, images, and scripts." />
+        <InputRow label="Gaming" field="gaming" desc="Multiplayer games use very low continuous bandwidth (0.25 MB/s = 250 KB/s)." />
+      </div>
+      
+      <div className="bg-blue-500/5 rounded-lg p-3 border border-blue-500/10 flex gap-2 mt-4">
+        <Info size={14} className="text-blue-400 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">How it works</p>
+          <p className="text-[11px] text-text-secondary leading-relaxed">
+            The telemetry engine divides the reported bytes by the session duration to get the average speed.
+            If the average speed exceeds these limits, the session is flagged as an anomaly (`HIGH_VOLUME`), reducing its validation score.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminRewardSettings() {
   usePageTitle('Admin — Rewards');
-  const [activeTab, setActiveTab] = useState<'rewards' | 'referral' | 'fees'>('rewards');
+  const [activeTab, setActiveTab] = useState<'rewards' | 'referral' | 'fees' | 'limits'>('rewards');
 
   return (
     <motion.div className="space-y-5" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -493,6 +599,14 @@ export default function AdminRewardSettings() {
         >
           <DollarSign size={16} /> Fees
         </button>
+        <button
+          onClick={() => setActiveTab('limits')}
+          className={`flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+            activeTab === 'limits' ? 'bg-bg-primary shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          <Activity size={16} /> Limits
+        </button>
       </div>
 
       <AnimatePresence mode="wait">
@@ -500,6 +614,7 @@ export default function AdminRewardSettings() {
           {activeTab === 'rewards'  && <RewardTab />}
           {activeTab === 'referral' && <ReferralTab />}
           {activeTab === 'fees'     && <FeesTab />}
+          {activeTab === 'limits'   && <CategoryLimitsTab />}
         </motion.div>
       </AnimatePresence>
     </motion.div>

@@ -269,6 +269,42 @@ export default function CampaignsPage() {
                     Ends {new Date(campaign.end_date).toLocaleDateString()}
                   </p>
                 )}
+                {campaign.enrolled && (() => {
+                  const platformButtons = [
+                    { platform: 'steam', url: campaign.steam_url, label: 'Steam' },
+                    { platform: 'playstation', url: campaign.playstation_url, label: 'PSN' },
+                    { platform: 'xbox', url: campaign.xbox_url, label: 'Xbox' },
+                    { platform: 'oculus_vr', url: campaign.oculus_url, label: 'Oculus' },
+                    { platform: 'nintendo_switch', url: campaign.nintendo_url, label: 'Switch' },
+                    { platform: 'android', url: campaign.android_url, label: 'Android' },
+                    { platform: 'ios', url: campaign.ios_url, label: 'iOS' },
+                    { platform: 'web', url: campaign.web_url, label: 'Web' }
+                  ].filter(p => !!p.url);
+
+                  if (platformButtons.length === 0) return null;
+
+                  return (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4, alignItems: 'center' }}>
+                      <span style={{ fontSize: 9, color: 'var(--text-secondary)', fontWeight: 800 }}>LAUNCH:</span>
+                      {platformButtons.map(p => (
+                        <span 
+                          key={p.platform} 
+                          style={{ fontSize: 9, color: 'var(--accent-primary)', cursor: 'pointer', fontWeight: 600, background: 'rgba(99,102,241,0.1)', padding: '2px 6px', borderRadius: 4 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (['playstation', 'xbox', 'nintendo_switch', 'oculus_vr'].includes(p.platform)) {
+                               alert(`Play on ${p.label}\n\nTurn on your ${p.label} and launch ${campaign.title}. Rest assured, your telemetry tracking is actively capturing data and you will be rewarded with NRT!`);
+                            } else {
+                               window.open(p.url, '_blank');
+                            }
+                          }}
+                        >
+                          {p.label}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Toggle */}

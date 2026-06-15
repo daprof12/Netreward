@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { 
   Zap, ArrowRight, TrendingUp, 
   Wallet, Bell, ChevronRight, Flame, Award, Users, QrCode, ArrowRightLeft, History,
-  X, CheckCircle2, ArrowDownToLine, Clock, Globe, Wifi, MapPin
+  X, CheckCircle2, ArrowDownToLine, Clock, Globe, Wifi, MapPin, ShieldCheck, ShieldAlert
 } from 'lucide-react';
+import { getRoleKycStatus } from '@/lib/kycUtils';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useWallet } from '@/hooks/useWallet';
@@ -26,6 +27,16 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import NrtAmount from '@/components/ui/NrtAmount';
 import MarqueeText from '@/components/ui/MarqueeText';
 import { formatNrtText } from '@/lib/formatNrt';
+
+function relativeTime(ts: number): string {
+  const now = Date.now();
+  const diff = now - ts;
+  if (diff < 60_000) return 'Just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  if (diff < 172_800_000) return 'Yesterday';
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 const quickActions = [
   { icon: ArrowRightLeft, label: 'P2P', to: '/wallet/deposit/p2p', color: '#3b82f6', bg: 'bg-blue-500/10' },
@@ -130,6 +141,17 @@ export default function UserHome() {
         setRecentActivityRaw(sessionsRes.data);
       }
       
+      // Build a map of campaign_id → most recent session_end
+      const latestSessionMap: Record<string, number> = {};
+      if (sessionsRes.data) {
+        for (const s of sessionsRes.data) {
+          const t = new Date(s.session_end).getTime();
+          if (!latestSessionMap[s.campaign_id] || t > latestSessionMap[s.campaign_id]) {
+            latestSessionMap[s.campaign_id] = t;
+          }
+        }
+      }
+      
       const activities: any[] = [];
       
       // Group earnings by campaign using userEnrollments
@@ -137,14 +159,15 @@ export default function UserHome() {
         userEnrollments.forEach((en: any) => {
           const earned = (en.nrt_earned || 0) + (en.unclaimed_nrt || 0);
           if (earned > 0) {
+            const lastSessionTs = latestSessionMap[en.campaign_id] || new Date(en.updated_at || en.created_at || 0).getTime();
             activities.push({
               id: `en_${en.id}`,
               icon: Zap,
               type: 'earn',
               amount: earned,
               title: en.campaigns?.title || 'Unknown',
-              time: new Date(en.updated_at || en.created_at || 0).getTime(),
-              timeStr: new Date(en.updated_at || en.created_at || 0).toLocaleDateString(),
+              time: lastSessionTs,
+              timeStr: relativeTime(lastSessionTs),
               color: '#10b981'
             });
           }
@@ -167,7 +190,7 @@ export default function UserHome() {
             amount: Number(t.amount),
             title,
             time: new Date(t.created_at).getTime(),
-            timeStr: new Date(t.created_at).toLocaleDateString(),
+            timeStr: relativeTime(new Date(t.created_at).getTime()),
             color
           });
         });
@@ -235,7 +258,33 @@ export default function UserHome() {
           <p className="text-sm text-text-secondary">{greeting} 👋</p>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-text-primary capitalize">{displayName}</h1>
-            <span className="px-2 py-0.5 bg-accent-primary/10 text-accent-primary text-[10px] font-black rounded-md border border-accent-primary/20 tracking-tighter">USER</span>
+            {getRoleKycStatus(profile, 'user') === 'verified' ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-500 text-[10px] font-black rounded-md border border-green-500/20 tracking-tighter">
+                <ShieldCheck size={12} />
+                USER
+              </span>
+            ) : getRoleKycStatus(profile, 'user') === 'pending' ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-500 text-[10px] font-black rounded-md border border-amber-500/20 tracking-tighter">
+                <Clock size={12} />
+                PENDING REVIEW
+              </span>
+            ) : getRoleKycStatus(profile, 'user') === 'rejected' ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-red-500/10 text-red-500 text-[10px] font-black rounded-md border border-red-500/20 tracking-tighter">
+                <ShieldAlert size={12} />
+                REJECTED
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-text-secondary/10 text-text-secondary text-[10px] font-black rounded-md border border-glass-border tracking-tighter">
+                <ShieldAlert size={12} />
+                UNVERIFIED USER
+              </span>
+            )}
+            {hasOffers && (
+              <div className="flex items-center gap-1 bg-accent-primary/10 px-2 py-0.5 rounded-full border border-accent-primary/20">
+                <Star size={10} className="text-accent-primary fill-accent-primary" />
+                <span className="text-[10px] font-bold text-accent-primary">{avgRating}</span>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -248,12 +297,6 @@ export default function UserHome() {
                 displayName[0]
               )}
             </div>
-            {hasOffers && (
-              <div className="flex items-center gap-1 bg-accent-primary/10 px-2 py-0.5 rounded-full border border-accent-primary/20">
-                <Star size={10} className="text-accent-primary fill-accent-primary" />
-                <span className="text-[10px] font-bold text-accent-primary">{avgRating}</span>
-              </div>
-            )}
           </Link>
         </div>
       </div>
@@ -434,13 +477,12 @@ export default function UserHome() {
         </div>
         
         {enrollmentCount === 0 ? (
-          <EmptyState 
-            icon={<Zap size={24} />}
-            title="No Active Campaigns"
-            message="Join data-reward campaigns to start monetizing your internet usage."
-            action={{ label: "Browse Campaigns", onClick: () => window.location.href = "/campaigns" }}
-            className="py-6"
-          />
+          <div className="glass p-8 rounded-xl border border-glass-border flex flex-col items-center justify-center text-center">
+            <Zap size={32} className="text-text-secondary mb-3 opacity-20" />
+            <p className="text-sm font-bold text-text-primary mb-1">No Active Campaigns</p>
+            <p className="text-xs text-text-secondary max-w-[250px] mb-3">Join data-reward campaigns to start monetizing your internet usage.</p>
+            <Link to="/campaigns" className="text-accent-primary text-xs font-bold">Browse Campaigns</Link>
+          </div>
         ) : (
           <div className="space-y-3">
             {([...(userEnrollments || [])].sort((a: any, b: any) => {
@@ -485,7 +527,7 @@ export default function UserHome() {
                         <div className="flex justify-between items-start gap-2">
                           <div className="min-w-0 flex-1">
                             <p className="font-bold text-text-primary text-sm flex items-center gap-2 min-w-0">
-                              <MarqueeText text={camp?.title || 'Campaign'} className="flex-1" />
+                              <MarqueeText text={camp?.title || 'Campaign'} className="min-w-0" />
                               {recentActivityRaw?.some((s: any) => s.campaign_id === camp.id && (new Date().getTime() - new Date(s.session_end).getTime() < 15 * 60 * 1000)) && (
                                 <span className="relative flex h-2 w-2 shrink-0">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-100"></span>
@@ -533,12 +575,11 @@ export default function UserHome() {
         </div>
         
         {recentActivity.length === 0 ? (
-          <EmptyState 
-            icon={<History size={24} />}
-            title="No Recent Activity"
-            message="Your rewards and activity will appear here once you start using connected apps."
-            className="py-6"
-          />
+          <div className="glass p-8 rounded-xl border border-glass-border flex flex-col items-center justify-center text-center">
+            <History size={32} className="text-text-secondary mb-3 opacity-20" />
+            <p className="text-sm font-bold text-text-primary mb-1">No Recent Activity</p>
+            <p className="text-xs text-text-secondary max-w-[250px]">Your rewards and activity will appear here once you start using connected apps.</p>
+          </div>
         ) : (
           <div className="glass rounded-xl border border-glass-border divide-y divide-glass-border/50 overflow-hidden">
             {recentActivity.slice(0, visibleCount).map((activity, i) => {

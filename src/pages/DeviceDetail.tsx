@@ -22,9 +22,8 @@ function SignalBars({ strength }: { strength: number }) {
       {[1, 2, 3, 4].map(i => (
         <div
           key={i}
-          className={`w-[3px] rounded-sm transition-colors ${
-            i <= strength ? 'bg-accent-primary' : 'bg-bg-secondary'
-          }`}
+          className={`w-[3px] rounded-sm transition-colors ${i <= strength ? 'bg-accent-primary' : 'bg-bg-secondary'
+            }`}
           style={{ height: `${25 + i * 20}%` }}
         />
       ))}
@@ -92,7 +91,7 @@ export default function DeviceDetail() {
   };
 
   const totalNrt = filteredApps.reduce((sum, a) => sum + Number(a.nrt_earned || 0), 0);
-  
+
   // Mock icons temporarily until we have dynamic icons based on campaign
   const getAppIcon = (name: string) => {
     if (name.includes('Net') || name.includes('Stream')) return { icon: Tv, color: '#E50914' };
@@ -176,11 +175,10 @@ export default function DeviceDetail() {
             <button
               key={f}
               onClick={() => setTimeFilter(f)}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
-                timeFilter === f
+              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${timeFilter === f
                   ? 'bg-accent-primary text-primary-foreground shadow-sm'
                   : 'text-text-secondary hover:text-text-primary'
-              }`}
+                }`}
             >
               {f}
             </button>
@@ -190,7 +188,7 @@ export default function DeviceDetail() {
         <div className="h-44 w-full relative">
           {(!currentData || currentData.length === 0 || currentData.every(d => d.data === 0 && d.nrt === 0)) ? (
             <div className="absolute inset-0 flex items-center justify-center border border-glass-border rounded-xl">
-              <EmptyState 
+              <EmptyState
                 icon={<Activity size={24} />}
                 title="No Device Data"
                 message="Keep your device connected to start tracking data usage and NRT earnings."
@@ -242,7 +240,7 @@ export default function DeviceDetail() {
       {/* App Usage Header + Filter Button */}
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-lg">App Usage</h3>
-        <button 
+        <button
           onClick={() => setShowFilters(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 glass rounded-lg border border-glass-border text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
         >
@@ -287,11 +285,10 @@ export default function DeviceDetail() {
                     <button
                       key={cat}
                       onClick={() => setFilterCategory(cat)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-                        filterCategory === cat
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${filterCategory === cat
                           ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
                           : 'bg-bg-secondary border-glass-border text-text-secondary'
-                      }`}
+                        }`}
                     >
                       {cat}
                     </button>
@@ -307,11 +304,10 @@ export default function DeviceDetail() {
                     <button
                       key={isp}
                       onClick={() => setFilterISP(isp)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-                        filterISP === isp
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${filterISP === isp
                           ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
                           : 'bg-bg-secondary border-glass-border text-text-secondary'
-                      }`}
+                        }`}
                     >
                       {isp}
                     </button>
@@ -327,11 +323,10 @@ export default function DeviceDetail() {
                     <button
                       key={st}
                       onClick={() => setFilterStatus(st)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors capitalize ${
-                        filterStatus === st
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors capitalize ${filterStatus === st
                           ? 'bg-accent-primary/20 border-accent-primary text-accent-primary'
                           : 'bg-bg-secondary border-glass-border text-text-secondary'
-                      }`}
+                        }`}
                     >
                       {st}
                     </button>
@@ -368,8 +363,8 @@ export default function DeviceDetail() {
         {filteredApps.map((app, i) => {
           const isClaimed = claimedIds.has(app.campaign_id);
           const { icon: AppIcon, color: iconColor } = getAppIcon(app.app_name);
-          const appStatus = (dynamicStatus === 'offline') 
-            ? 'offline' 
+          const appStatus = (dynamicStatus === 'offline')
+            ? 'offline'
             : (dynamicStatus === 'idle' ? 'idle' : app.status);
 
           return (
@@ -391,14 +386,13 @@ export default function DeviceDetail() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 min-w-0">
-                      <h4 className="font-semibold text-text-primary text-sm min-w-0 flex-1">
+                      <h4 className="font-semibold text-text-primary text-sm min-w-0 shrink overflow-hidden">
                         <MarqueeText text={app.app_name} />
                       </h4>
-                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 ${
-                        app.service_category === 'Network' 
+                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 ${app.service_category === 'Network'
                           ? 'bg-purple-500/10 text-purple-500 border-purple-500/20'
                           : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                      }`}>
+                        }`}>
                         {app.service_category}
                       </span>
                     </div>
@@ -406,13 +400,12 @@ export default function DeviceDetail() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md flex items-center gap-1.5 ${
-                    appStatus === 'active'
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md flex items-center gap-1.5 ${appStatus === 'active'
                       ? 'bg-green-500/10 text-green-400'
                       : appStatus === 'idle'
                         ? 'bg-yellow-500/10 text-yellow-400'
                         : 'bg-bg-secondary text-text-secondary'
-                  }`}>
+                    }`}>
                     {appStatus === 'active' && (
                       <span className="relative flex h-1.5 w-1.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -459,11 +452,10 @@ export default function DeviceDetail() {
                   whileTap={!isClaimed ? { scale: 0.95 } : {}}
                   disabled={isClaimed}
                   onClick={() => handleClaim(app.campaign_id)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                    isClaimed
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${isClaimed
                       ? 'bg-bg-secondary text-text-secondary border border-glass-border'
                       : 'bg-accent-primary text-primary-foreground shadow-md shadow-accent-primary/20'
-                  }`}
+                    }`}
                 >
                   {isClaimed ? 'Claimed ✓' : 'Claim'}
                 </motion.button>

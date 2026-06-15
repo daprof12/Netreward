@@ -7,7 +7,7 @@ import {
   Target, Layers, Network, Smartphone, Gift,
   Settings, Coins, Code,
   MessageSquare, Headphones, UserSquare,
-  Activity, Gauge, Lock, Wrench, AlertTriangle, Database, Rocket,
+  Activity, Gauge, Lock, Wrench, AlertTriangle, Database, Rocket, Trophy,
   LogOut, Menu, X, ChevronDown, Bell, Shield, Moon, Sun
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -43,6 +43,7 @@ const NAV: NavGroup[] = [
     { label: 'Devices', to: '/admin/devices', icon: Smartphone },
     { label: 'Tracking', to: '/admin/tracking', icon: Activity },
     { label: 'Referrals', to: '/admin/referrals', icon: Gift },
+    { label: 'Leaderboard', to: '/admin/leaderboard', icon: Trophy },
   ]},
   { group: 'Configuration', items: [
     { label: 'Rewards & Fees', to: '/admin/config/rewards', icon: Settings },

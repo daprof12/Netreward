@@ -17,6 +17,7 @@ export interface IspNetwork {
   asn?: string; // e.g. "AS6453"
   ipRanges?: string[]; // CIDR blocks e.g. ["197.210.0.0/16"]
   handshakeUrl?: string; // ISP endpoint for BGP challenge-response
+  webhookUrl?: string;
   apiKey?: string;
   apiSecret?: string;
   createdAt: string;
@@ -104,6 +105,7 @@ export const useIspStore = create<IspStore>()(
             verified: d.verified, country: d.country, signalStrength: d.signal_strength,
             coverage: d.coverage, asn: d.asn, ipRanges: d.ip_ranges || [],
             handshakeUrl: d.handshake_url,
+            webhookUrl: d.webhook_url,
             apiKey: d.api_key, createdAt: d.created_at
           }));
 
@@ -140,6 +142,7 @@ export const useIspStore = create<IspStore>()(
             name: network.name, category: network.category, logo_url: network.logoUrl,
             country: network.country, signal_strength: network.signalStrength, coverage: network.coverage,
             asn: network.asn, ip_ranges: network.ipRanges as any, handshake_url: network.handshakeUrl,
+            webhook_url: network.webhookUrl,
             api_key: network.apiKey
           };
           
@@ -172,6 +175,7 @@ export const useIspStore = create<IspStore>()(
           if (updates.asn !== undefined) dbUpdates.asn = updates.asn;
           if (updates.ipRanges !== undefined) dbUpdates.ip_ranges = updates.ipRanges;
           if (updates.handshakeUrl !== undefined) dbUpdates.handshake_url = updates.handshakeUrl;
+          if (updates.webhookUrl !== undefined) dbUpdates.webhook_url = updates.webhookUrl;
           if (updates.apiKey !== undefined) dbUpdates.api_key = updates.apiKey;
           if (updates.verified !== undefined) dbUpdates.verified = updates.verified;
           

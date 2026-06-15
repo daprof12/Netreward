@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import NetworkStatusManager from '@/components/NetworkStatusManager';
+import NrtLoader from '@/components/ui/NrtLoader';
 
 const queryClient = new QueryClient();
 
@@ -45,11 +46,7 @@ export default function RootLayout() {
   }, [user, isOnboarded, isLoading, isReady, segments]);
 
   if (!isReady || isLoading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bgPrimary, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.accentPrimary} />
-      </View>
-    );
+    return <NrtLoader message="Initializing..." size="lg" />;
   }
 
   return (

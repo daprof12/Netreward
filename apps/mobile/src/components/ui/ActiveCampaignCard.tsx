@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Image, Platform, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, Platform, Linking, ActivityIndicator, Alert } from 'react-native';
 import { useThemeColors } from '@/theme';
 import { GAMING_PLATFORMS, type GamingPlatform } from '@/hooks/useGamingAccounts';
 import NrtAmount from './NrtAmount';
@@ -13,9 +13,10 @@ interface ActiveCampaignCardProps {
   onPress: () => void;
   onLeave?: () => void;
   isLeaving?: boolean;
+  hideActions?: boolean;
 }
 
-export default function ActiveCampaignCard({ campaign, enrollment, isRecent, onPress, onLeave, isLeaving }: ActiveCampaignCardProps) {
+export default function ActiveCampaignCard({ campaign, enrollment, isRecent, onPress, onLeave, isLeaving, hideActions = false }: ActiveCampaignCardProps) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
 
@@ -83,7 +84,7 @@ export default function ActiveCampaignCard({ campaign, enrollment, isRecent, onP
       </Pressable>
 
       {/* Platform buttons (Launch row) */}
-      {platformButtons.length > 0 ? (
+      {!hideActions && platformButtons.length > 0 ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 12, borderTopWidth: 1, borderTopColor: colors.glassBorder + '20', paddingTop: 8 }}>
           <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.textSecondary, textTransform: 'uppercase', marginRight: 2 }}>Launch:</Text>
           {platformButtons.map(p => {
@@ -97,10 +98,17 @@ export default function ActiveCampaignCard({ campaign, enrollment, isRecent, onP
                   { backgroundColor: brandColor, opacity: pressed ? 0.8 : 1 }
                 ]}
                 onPress={() => {
-                  if (p.url) {
-                    Linking.openURL(p.url).catch((err) => {
-                      console.error("Failed to open platform URL:", err);
-                    });
+                  if (['playstation', 'xbox', 'nintendo_switch', 'oculus_vr'].includes(p.platform)) {
+                    Alert.alert(
+                      `Play on ${p.label}`,
+                      `Turn on your ${p.label} and launch ${campaign?.title}. Rest assured, your telemetry tracking is actively capturing data and you will be rewarded with NRT!`
+                    );
+                  } else {
+                    if (p.url) {
+                      Linking.openURL(p.url).catch((err) => {
+                        console.error("Failed to open platform URL:", err);
+                      });
+                    }
                   }
                 }}
               >
@@ -112,7 +120,7 @@ export default function ActiveCampaignCard({ campaign, enrollment, isRecent, onP
       ) : null}
 
       {/* View Earnings + Unjoin row (Bottom Actions) */}
-      {onLeave && (
+      {!hideActions && onLeave && (
         <View style={styles.actionRow}>
           <Pressable
             style={({ pressed }) => [

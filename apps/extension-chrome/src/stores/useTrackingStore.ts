@@ -93,7 +93,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
           *,
           sp:sp_profiles (company_name, logo_url, users (display_name)),
           isp:isp_profiles (isp_name, logo_url, users (display_name)),
-          svc:services (name, logo_url, category),
+          svc:services (name, logo_url, category, web_url, android_url, ios_url, android_package_name, ios_bundle_id, steam_url, playstation_url, xbox_url, oculus_url, nintendo_url),
           net:networks (name, logo_url, category)
         `)
         .eq('status', 'active')
@@ -101,7 +101,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
 
       const getSingle = (val: any) => Array.isArray(val) ? val[0] : val;
 
-      const enrolledIds = new Set((enrollments || []).map((e: any) => e.campaign_id));
+      const enrolledIds = new Set((enrollments || []).filter((e: any) => e.status === 'active').map((e: any) => e.campaign_id));
       const allCampaigns = (available || []).map((c: any) => {
         const sp = getSingle(c.sp);
         const isp = getSingle(c.isp);
@@ -116,6 +116,16 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
           category: svc?.category || net?.category || (sp ? 'Service' : isp ? 'Network' : 'General'),
           enrolled: enrolledIds.has(c.id),
           enrollment: (enrollments || []).find((e: any) => e.campaign_id === c.id),
+          web_url: svc?.web_url || null,
+          android_url: svc?.android_url || null,
+          ios_url: svc?.ios_url || null,
+          android_package_name: svc?.android_package_name || null,
+          ios_bundle_id: svc?.ios_bundle_id || null,
+          steam_url: svc?.steam_url || null,
+          playstation_url: svc?.playstation_url || null,
+          xbox_url: svc?.xbox_url || null,
+          oculus_url: svc?.oculus_url || null,
+          nintendo_url: svc?.nintendo_url || null
         };
       });
 

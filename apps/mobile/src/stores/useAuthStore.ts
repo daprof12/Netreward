@@ -20,6 +20,9 @@ interface UserProfile {
   avatar_url: string | null;
   kyc_verified: boolean;
   kyc_status: 'none' | 'pending' | 'verified' | 'rejected';
+  kyc_user_status: 'none' | 'pending' | 'verified' | 'rejected';
+  kyc_sp_status:   'none' | 'pending' | 'verified' | 'rejected';
+  kyc_isp_status:  'none' | 'pending' | 'verified' | 'rejected';
   country: string | null;
 }
 

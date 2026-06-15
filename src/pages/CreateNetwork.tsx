@@ -52,22 +52,21 @@ export default function CreateNetwork() {
   const [generatedApiSecret] = useState(`nrt_secret_${crypto.randomUUID().replace(/-/g, '')}`);
 
   const handleContinue = () => {
-    try {
-      networkSchema.parse({
-        name, category, country, signalStrength, coverage, asn, ipRanges, handshakeUrl, webhookUrl
+    const result = networkSchema.safeParse({
+      name, category, country, signalStrength, coverage, asn, ipRanges, handshakeUrl, webhookUrl
+    });
+
+    if (!result.success) {
+      const newErrors: Record<string, string> = {};
+      result.error.errors.forEach(e => {
+        if (e.path[0]) newErrors[e.path[0] as string] = e.message;
       });
-      setErrors({});
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {};
-        error.errors.forEach(e => {
-          if (e.path[0]) newErrors[e.path[0] as string] = e.message;
-        });
-        setErrors(newErrors);
-        showToast('Please fix the errors in the form', 'danger');
-        return;
-      }
+      setErrors(newErrors);
+      showToast('Please fix the errors in the form', 'danger');
+      return;
     }
+    
+    setErrors({});
     
     setStep('verifying');
     

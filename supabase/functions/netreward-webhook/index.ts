@@ -21,11 +21,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type, x-nrt-signature',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || 'https://netreward.app';
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'content-type, x-nrt-signature',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
 
 // ── HMAC helpers (Deno — same Web Crypto API as the browser) ─────────────────
 
@@ -54,10 +57,10 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 // ── Response helper ───────────────────────────────────────────────────────────
 
-function json(body: Record<string, unknown>, status = 200) {
+function json(req: Request, body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 }
 
@@ -172,18 +175,18 @@ async function handlePaymentFailed(
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: getCorsHeaders(req) });
   }
 
   if (req.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405);
+    return json(req, { error: 'Method not allowed' }, 405);
   }
 
   try {
     const webhookSecret = Deno.env.get('NRT_WEBHOOK_SECRET');
     if (!webhookSecret) {
       console.error('[NRT Webhook] NRT_WEBHOOK_SECRET env var is not set');
-      return json({ error: 'Webhook secret not configured' }, 500);
+      return json(req, { error: 'Webhook secret not configured' }, 500);
     }
 
     // ── 1. Read raw body BEFORE parsing — HMAC must be over exact bytes ──────
@@ -195,7 +198,7 @@ serve(async (req) => {
 
     if (!timingSafeEqual(receivedSig, expectedSig)) {
       console.warn('[NRT Webhook] Signature mismatch — rejecting request');
-      return json({ error: 'Invalid signature' }, 400);
+      return json(req, { error: 'Invalid signature' }, 400);
     }
 
     // ── 3. Parse event ────────────────────────────────────────────────────────
@@ -203,11 +206,11 @@ serve(async (req) => {
     try {
       event = JSON.parse(rawBody);
     } catch {
-      return json({ error: 'Invalid JSON payload' }, 400);
+      return json(req, { error: 'Invalid JSON payload' }, 400);
     }
 
     if (!event.type || !event.id) {
-      return json({ error: 'Missing event.type or event.id' }, 400);
+      return json(req, { error: 'Missing event.type or event.id' }, 400);
     }
 
     // ── 4. Create Supabase client (service role — bypasses RLS) ──────────────
@@ -229,10 +232,10 @@ serve(async (req) => {
         console.log(`[NRT Webhook] Unhandled event type: ${event.type}`);
     }
 
-    return json({ received: true, event_id: event.id });
+    return json(req, { received: true, event_id: event.id });
 
   } catch (err) {
     console.error('[NRT Webhook] Unexpected error:', err);
-    return json({ error: (err as Error).message ?? 'Internal error' }, 500);
+    return json(req, { error: (err as Error).message ?? 'Internal error' }, 500);
   }
 });

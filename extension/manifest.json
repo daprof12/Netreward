@@ -4,7 +4,12 @@
   "version": "1.0.0",
   "description": "Earn NRT rewards for your data consumption.",
   "permissions": ["webRequest", "storage", "alarms"],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": [
+    "*://*.netflix.com/*",
+    "*://*.spotify.com/*",
+    "*://*.youtube.com/*",
+    "https://api.netreward.online/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },

@@ -31,6 +31,7 @@ import NrtTokenInfo from '@/pages/NrtTokenInfo';
 import SdkDocumentation from '@/pages/SdkDocumentation';
 import PaymentApiDocumentation from '@/pages/PaymentApiDocumentation';
 import Referral from '@/pages/Referral';
+import Leaderboard from '@/pages/Leaderboard';
 import ProfileSettings from '@/pages/ProfileSettings';
 import KYCVerification from '@/pages/KYCVerification';
 import ResetPassword from '@/pages/ResetPassword';
@@ -87,6 +88,7 @@ import AdminServices from './pages/admin/AdminServices';
 import AdminNetworks from './pages/admin/AdminNetworks';
 import AdminDevices from './pages/admin/AdminDevices';
 import AdminReferrals from './pages/admin/AdminReferrals';
+import AdminLeaderboard from './pages/admin/AdminLeaderboard';
 import AdminTracking from './pages/admin/AdminTracking';
 import AdminRewardSettings from './pages/admin/AdminRewardSettings';
 import AdminTokenConfig from './pages/admin/AdminTokenConfig';
@@ -334,6 +336,7 @@ function App() {
               <Route path="devices" element={<AdminDevices />} />
               <Route path="tracking" element={<AdminTracking />} />
               <Route path="referrals" element={<AdminReferrals />} />
+              <Route path="leaderboard" element={<AdminLeaderboard />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="config/rewards" element={<AdminRewardSettings />} />
               <Route path="config/token" element={<AdminTokenConfig />} />
@@ -386,6 +389,7 @@ function App() {
               <Route path="/wallet/scan-to-pay" element={<ScanToPay />} />
               <Route path="/pay" element={<PaymentAuthorize />} />
               <Route path="/wallet/referral" element={<Referral />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/profile" element={<ProfileSettings />} />

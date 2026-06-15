@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator, Modal, Dimensions, Image } from 'react-native';
 import { useThemeColors } from '@/theme';
@@ -14,6 +14,7 @@ import Slider from '@react-native-community/slider';
 import EarningsDetailModal from '@/components/EarningsDetailModal';
 import NrtAmount from '@/components/ui/NrtAmount';
 import ActiveCampaignCard from '@/components/ui/ActiveCampaignCard';
+import { useLocalSearchParams } from 'expo-router';
 
 const SERVICE_CATEGORIES = ['All', 'Streaming', 'AI Service', 'Gaming', 'Social', 'Browsing', 'Cloud', 'Broadband', 'Telecommunication', 'Satellite', 'Fiber', 'Mobile Network', 'Other'];
 const STATUSES = ['All', 'active', 'paused', 'completed'];
@@ -35,6 +36,13 @@ export default function UserCampaignsView() {
 
   const [activeTab, setActiveTab] = useState<'available' | 'joined'>('available');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const params = useLocalSearchParams();
+  useEffect(() => {
+    if (params.tab === 'joined' || params.tab === 'available') {
+      setActiveTab(params.tab as 'available' | 'joined');
+    }
+  }, [params.tab]);
   
   // Filter state
   const [showFilters, setShowFilters] = useState(false);

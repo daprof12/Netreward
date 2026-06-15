@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 
 import BottomSheet from '@/components/ui/BottomSheet';
 import LogoutConfirmModal from '@/components/ui/LogoutConfirmModal';
+import { getRoleKycStatus } from '@/lib/kycUtils';
 
 export default function SettingsScreen() {
   const colors = useThemeColors();
@@ -38,7 +39,7 @@ export default function SettingsScreen() {
   const { theme, setTheme } = useThemeStore();
   const [language, setLanguage] = useState('English (US)');
 
-  const [kycStatus, setKycStatus] = useState<'none' | 'pending' | 'verified' | 'rejected'>('none');
+  const [selectedUpgradeRole, setSelectedUpgradeRole] = useState<'user' | 'sp' | 'isp'>('sp');
 
   // Modal States
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -62,19 +63,6 @@ export default function SettingsScreen() {
   // Switch Account States
   const [showUpgradeSheet, setShowUpgradeSheet] = useState(false);
   const [upgradeStep, setUpgradeStep] = useState<'select' | 'details'>('select');
-  const [selectedUpgradeRole, setSelectedUpgradeRole] = useState<'user' | 'sp' | 'isp'>('sp');
-
-  useEffect(() => {
-    if (!user?.id) return;
-    supabase
-      .from('users')
-      .select('kyc_status')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => {
-        if (data?.kyc_status) setKycStatus(data.kyc_status as any);
-      });
-  }, [user?.id]);
 
   const handleLogout = async () => {
     try {
@@ -106,7 +94,9 @@ export default function SettingsScreen() {
     </Pressable>
   );
 
-  const kycLabel = kycStatus === 'verified' ? '✓ Verified' : kycStatus === 'pending' ? 'Pending Review' : kycStatus === 'rejected' ? 'Rejected' : 'Unverified';
+  const currentKycStatus = getRoleKycStatus(profile, role === 'sp' ? 'sp' : role === 'isp' ? 'isp' : 'user');
+  const upgradeKycStatus = getRoleKycStatus(profile, selectedUpgradeRole);
+  const kycLabel = currentKycStatus === 'verified' ? '✓ Verified' : currentKycStatus === 'pending' ? 'Pending Review' : currentKycStatus === 'rejected' ? 'Rejected' : 'Unverified';
   const displayRole = role === 'admin' ? 'Super Admin' : role === 'isp' ? 'ISP Account' : role === 'sp' ? 'Service Provider' : 'Standard User';
   const avatarUrl = role === 'sp' ? spLogo : role === 'isp' ? ispLogo : profile?.avatar_url;
 
@@ -170,7 +160,7 @@ export default function SettingsScreen() {
         {/* Menu Groups */}
         {renderGroup('Account', [
           { icon: User, label: 'Profile', value: user?.email || 'demo@netreward.online', href: '/settings/profile' },
-          { icon: ShieldCheck, label: 'KYC Verification', value: kycLabel, highlight: kycStatus !== 'verified', onPress: () => router.push({ pathname: '/settings/kyc', params: { targetRole: role === 'sp' ? 'sp' : role === 'isp' ? 'isp' : 'user' } } as any) },
+          { icon: ShieldCheck, label: 'KYC Verification', value: kycLabel, highlight: currentKycStatus !== 'verified', onPress: () => router.push({ pathname: '/settings/kyc', params: { targetRole: role === 'sp' ? 'sp' : role === 'isp' ? 'isp' : 'user' } } as any) },
           { icon: Lock, label: 'Security & 2FA', href: '/settings/security' },
           { icon: UserCog, label: 'Switch Account Type', onPress: () => { setUpgradeStep('select'); setShowUpgradeSheet(true); } },
           { icon: Gamepad2, label: 'Gaming Accounts', value: gamingAccounts.length > 0 ? `${gamingAccounts.length} Linked` : 'None', highlight: gamingAccounts.length === 0, href: '/settings/gaming' },
@@ -294,7 +284,7 @@ export default function SettingsScreen() {
                     showToast(e.message || 'Failed to switch role', 'danger');
                   }
                 } else {
-                  if (kycStatus !== 'verified') {
+                  if (upgradeKycStatus !== 'verified') {
                     setUpgradeStep('details');
                   } else {
                     try {
@@ -314,7 +304,7 @@ export default function SettingsScreen() {
           </View>
         ) : (
           <View style={styles.upgradeContent}>
-            {kycStatus === 'pending' ? (
+            {upgradeKycStatus === 'pending' ? (
               <View style={styles.alertBoxInfo}>
                 <AlertCircle size={20} color="#60a5fa" />
                 <View style={{ flex: 1 }}>
@@ -347,10 +337,10 @@ export default function SettingsScreen() {
               <Pressable style={styles.backBtn} onPress={() => setUpgradeStep('select')}>
                 <Text style={styles.backBtnText}>Back</Text>
               </Pressable>
-              {kycStatus !== 'pending' && (
+              {upgradeKycStatus !== 'pending' && (
                 <Pressable style={[styles.primaryBtn, { flex: 1, marginTop: 0 }]} onPress={() => {
                   setShowUpgradeSheet(false);
-                  router.push('/settings/kyc');
+                  router.push({ pathname: '/settings/kyc', params: { targetRole: selectedUpgradeRole } } as any);
                 }}>
                   <Text style={styles.primaryBtnText}>Start KYC</Text>
                 </Pressable>

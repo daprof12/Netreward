@@ -4,14 +4,18 @@ import { createTransferInstruction, getAssociatedTokenAddressSync, createAssocia
 import bs58 from "npm:bs58";
 import { createClient } from "npm:@supabase/supabase-js";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || 'https://netreward.app';
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: getCorsHeaders(req) });
   }
 
   try {
@@ -108,13 +112,13 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ success: true, signature }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      { headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' }, status: 200 }
     );
 
   } catch (error: any) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      { headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' }, status: 400 }
     );
   }
 });

@@ -1,0 +1,25 @@
+name: Build Mobile App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Install dependencies
+        run: cd apps/mobile && npm ci
+      - name: Build on EAS
+        run: cd apps/mobile && eas build --platform all --non-interactive --profile production

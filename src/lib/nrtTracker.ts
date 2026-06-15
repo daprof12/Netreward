@@ -25,23 +25,29 @@ let _tracker: NetRewardTracker | null = null;
 
 function getTracker(): NetRewardTracker {
   if (!_tracker) {
-    const apiKey = import.meta.env.VITE_NRT_API_KEY;
-    const apiSecret = import.meta.env.VITE_NRT_API_SECRET;
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
-    if (!apiKey || !apiSecret) {
-      console.warn('[NrtTracker] VITE_NRT_API_KEY or VITE_NRT_API_SECRET not set. Tracking disabled.');
-      // Return a no-op tracker so callers never crash
-      return createNoopTracker();
-    }
-
+    // Use a placeholder for apiSecret since the proxy handles HMAC signing
+    // The SDK requires these fields, so we pass dummy values
     _tracker = new NetRewardTracker({
-      apiKey,
-      apiSecret,
-      // Tracking endpoint is our own Supabase Edge Function, not api.netreward.online
-      endpoint: `${supabaseUrl}/functions/v1/tracking`,
-      flushIntervalMs: 60_000,  // flush every 60 s
+      apiKey: 'proxy-auth',
+      apiSecret: 'proxy-secret',
+      // Send events to the secure proxy instead of direct to tracking
+      endpoint: `${supabaseUrl}/functions/v1/sp-tracking-proxy`,
+      flushIntervalMs: 60_000,
       maxBatchSize: 50,
+      // Pass the current user's JWT so the proxy can authenticate the request
+      customHeaders: () => {
+        const authStore = localStorage.getItem('auth-storage');
+        if (!authStore) return {};
+        try {
+          const parsed = JSON.parse(authStore);
+          const token = parsed?.state?.session?.access_token;
+          return token ? { 'Authorization': `Bearer ${token}` } : {};
+        } catch (e) {
+          return {};
+        }
+      }
     });
   }
   return _tracker;

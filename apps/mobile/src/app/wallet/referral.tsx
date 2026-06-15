@@ -10,6 +10,8 @@ import { useThemeColors } from '@/theme';
 import { formatNrtText } from '@/lib/formatNrt';
 import NrtAmount from '@/components/ui/NrtAmount';
 
+import LeaderboardCard from '@/components/ui/LeaderboardCard';
+
 export default function ReferralScreen() {
   const router = useRouter();
   const colors = useThemeColors();
@@ -61,6 +63,8 @@ export default function ReferralScreen() {
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+
+        <LeaderboardCard />
 
         {/* Hero Card */}
         <LinearGradient

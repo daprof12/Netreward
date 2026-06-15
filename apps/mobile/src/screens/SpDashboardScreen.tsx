@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions, ActivityIndicator, Image } from 'react-native';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { getRoleKycStatus } from '@/lib/kycUtils';
 import PulseDot from '@/components/ui/PulseDot';
 import { useSpStore } from '@/stores/useSpStore';
 import { useSystemStore } from '@/stores/useSystemStore';
@@ -11,7 +12,7 @@ import { useThemeColors, shadows } from '@/theme';
 import WebViewChart from '@/components/WebViewChart';
 import CampaignAnalyticsModal from '@/components/CampaignAnalyticsModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Activity, Users, Zap, DollarSign, Key, Code, Bell, ChevronLeft, ChevronRight, BarChart3, Info, TrendingUp, PieChart, MapPin } from 'lucide-react-native';
+import { Activity, Users, Zap, DollarSign, Key, Code, Bell, ChevronLeft, ChevronRight, BarChart3, Info, TrendingUp, PieChart, MapPin, ShieldCheck, Clock, ShieldAlert, Shield } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import NotificationBell from '@/components/ui/NotificationBell';
 import NrtAmount from '@/components/ui/NrtAmount';
@@ -90,7 +91,7 @@ export default function SpDashboardScreen() {
     }));
   }, [campaignStats, chartView]);
 
-  const sdkStatus = 'verified'; // Mock status logic can be expanded
+  const derivedSdkStatus = services.length > 0 ? 'verified' : 'not_integrated';
 
   const displayName = profile?.display_name || user?.email?.split('@')[0] || 'Partner';
   const hour = new Date().getHours();
@@ -106,9 +107,27 @@ export default function SpDashboardScreen() {
             <Text style={styles.greeting}>{greeting} 👋</Text>
             <View style={styles.nameContainer}>
               <Text style={styles.name}>{displayName}</Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleText}>SP</Text>
-              </View>
+              {getRoleKycStatus(profile, 'sp') === 'verified' ? (
+                <View style={[styles.roleBadge, { backgroundColor: getRgba(colors.success, 0.15) }]}>
+                  <ShieldCheck size={12} color={colors.success} style={{ marginRight: 4 }} />
+                  <Text style={[styles.roleText, { color: colors.success }]}>SP</Text>
+                </View>
+              ) : getRoleKycStatus(profile, 'sp') === 'pending' ? (
+                <View style={[styles.roleBadge, { backgroundColor: getRgba('#F59E0B', 0.15) }]}>
+                  <Clock size={12} color="#F59E0B" style={{ marginRight: 4 }} />
+                  <Text style={[styles.roleText, { color: '#F59E0B' }]}>PENDING REVIEW</Text>
+                </View>
+              ) : getRoleKycStatus(profile, 'sp') === 'rejected' ? (
+                <View style={[styles.roleBadge, { backgroundColor: getRgba(colors.error, 0.15) }]}>
+                  <ShieldAlert size={12} color={colors.error} style={{ marginRight: 4 }} />
+                  <Text style={[styles.roleText, { color: colors.error }]}>REJECTED</Text>
+                </View>
+              ) : (
+                <View style={[styles.roleBadge, { backgroundColor: getRgba(colors.textSecondary, 0.15) }]}>
+                  <Shield size={12} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                  <Text style={[styles.roleText, { color: colors.textSecondary }]}>SP (UNVERIFIED)</Text>
+                </View>
+              )}
             </View>
           </View>
           <View style={styles.headerRight}>
@@ -159,7 +178,7 @@ export default function SpDashboardScreen() {
 
         {/* SDK Integration Card */}
         <View style={styles.card}>
-          {profile?.kyc_status !== 'verified' ? (
+          {getRoleKycStatus(profile, 'sp') !== 'verified' ? (
             <View style={{ alignItems: 'center', paddingVertical: 16 }}>
               <View style={{ width: 64, height: 64, backgroundColor: colors.bgSecondary, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                 <Code size={32} color={colors.textSecondary} style={{ opacity: 0.5 }} />
@@ -181,10 +200,10 @@ export default function SpDashboardScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Code size={18} color={colors.accentPrimary} />
                   <Text style={styles.cardTitle}>SDK Integration</Text>
-                  <View style={styles.verifiedBadge}>
-                    <Text style={styles.verifiedText}>{sdkStatus.replace('_', ' ').toUpperCase()}</Text>
+                  <View style={[styles.verifiedBadge, derivedSdkStatus !== 'verified' && { backgroundColor: 'rgba(128,128,128,0.1)' }]}>
+                    <Text style={[styles.verifiedText, derivedSdkStatus !== 'verified' && { color: colors.textSecondary }]}>{derivedSdkStatus.replace('_', ' ').toUpperCase()}</Text>
                   </View>
-                  {sdkStatus === 'verified' && (
+                  {derivedSdkStatus === 'verified' && (
                     <PulseDot size={8} color="#10b981" />
                   )}
                 </View>
@@ -258,15 +277,17 @@ export default function SpDashboardScreen() {
                   </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.networkName}>NO SERVICES</Text>
-                    <Text style={styles.networkDesc}>Create a service to get your API key</Text>
+                    <Pressable onPress={() => router.push('/campaigns' as any)}>
+                      <Text style={[styles.networkDesc, { color: colors.accentPrimary, fontWeight: 'bold' }]}>Create a service to get your API key</Text>
+                    </Pressable>
                   </View>
                 </View>
               )}
 
               <View style={styles.sdkFooter}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <PulseDot size={8} color="#10b981" />
-                  <Text style={styles.sdkFooterText}>Last Ping: <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>Just now</Text></Text>
+                  {derivedSdkStatus === 'verified' && <PulseDot size={8} color="#10b981" />}
+                  <Text style={styles.sdkFooterText}>Last Ping: <Text style={{ color: colors.textPrimary, fontWeight: 'bold' }}>{derivedSdkStatus === 'verified' ? 'Just now' : 'Never'}</Text></Text>
                 </View>
                 <Pressable onPress={() => router.push('/documentation/sdk' as any)}>
                   <Text style={styles.sdkFooterLink}>View Documentation</Text>
@@ -602,7 +623,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   greeting: { fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
   nameContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontSize: 24, fontWeight: 'bold', color: colors.textPrimary, textTransform: 'capitalize' },
-  roleBadge: { backgroundColor: 'rgba(59, 130, 246, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' },
+  roleBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(59, 130, 246, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' },
   roleText: { color: '#3b82f6', fontSize: 10, fontWeight: '900' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accentPrimary, alignItems: 'center', justifyContent: 'center' },

@@ -35,6 +35,8 @@ interface MenuGroup {
   items: MenuItem[];
 }
 
+import { getRoleKycStatus } from '@/lib/kycUtils';
+
 export default function Settings() {
   usePageTitle('Settings');
   const navigate = useNavigate();
@@ -44,22 +46,8 @@ export default function Settings() {
   const { profile, switchRole, isSwitchingRole } = useProfile();
   const { gamingAccounts } = useGamingAccounts();
 
-  // KYC status fetched from Supabase
-  const [kycStatus, setKycStatus] = useState<'none' | 'pending' | 'verified' | 'rejected'>('none');
-  
   useEffect(() => {
     if (!user?.id) return;
-    
-    // Fetch KYC
-    supabase
-      .from('users')
-      .select('kyc_status')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => {
-        if (data?.kyc_status) setKycStatus(data.kyc_status as any);
-      });
-      
     // Initialize Stores
     if (role === 'isp') {
       initIsp(user.id);
@@ -69,6 +57,8 @@ export default function Settings() {
     }
   }, [user?.id, role, initIsp]);
 
+  const targetRole = role === 'sp' ? 'sp' : role === 'isp' ? 'isp' : 'user';
+  const kycStatus = getRoleKycStatus(profile, targetRole);
   const kycLabel = kycStatus === 'verified' ? '✓ Verified' : kycStatus === 'pending' ? 'Pending Review' : kycStatus === 'rejected' ? 'Rejected' : 'Unverified';
   const kycHighlight = kycStatus !== 'verified';
 
@@ -448,7 +438,8 @@ export default function Settings() {
                             }
                           } else {
                             // Check KYC status before allowing upgrade
-                            if (kycStatus !== 'verified') {
+                            const targetKycStatus = selectedUpgradeRole === 'sp' ? profile?.kyc_sp_status : profile?.kyc_isp_status;
+                            if (targetKycStatus !== 'verified') {
                               setUpgradeStep('details');
                             } else {
                               try {
@@ -477,7 +468,9 @@ export default function Settings() {
                       exit={{ opacity: 0, x: -20 }}
                       className="space-y-4"
                     >
-                      {kycStatus === 'pending' ? (
+                      {(() => {
+                        const targetKycStatus = selectedUpgradeRole === 'sp' ? profile?.kyc_sp_status : profile?.kyc_isp_status;
+                        return targetKycStatus === 'pending' ? (
                         <div className="flex items-start gap-3 bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-4">
                           <AlertCircle size={20} className="text-blue-400 mt-0.5 shrink-0" />
                           <div className="space-y-1">
@@ -516,7 +509,8 @@ export default function Settings() {
                             </div>
                           </div>
                         </>
-                      )}
+                      );
+                      })()}
 
                       <div className="flex gap-3 pt-2">
                         <button 
@@ -525,17 +519,20 @@ export default function Settings() {
                         >
                           Back
                         </button>
-                        {kycStatus !== 'pending' && (
-                          <button 
-                            onClick={() => { 
-                              setShowUpgradeSheet(false); 
-                              navigate('/settings/kyc', { state: { targetRole: selectedUpgradeRole } }); 
-                            }}
-                            className="flex-1 py-3.5 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20"
-                          >
-                            Start KYC
-                          </button>
-                        )}
+                        {(() => {
+                          const targetKycStatus = selectedUpgradeRole === 'sp' ? profile?.kyc_sp_status : profile?.kyc_isp_status;
+                          return targetKycStatus !== 'pending' && (
+                            <button 
+                              onClick={() => { 
+                                setShowUpgradeSheet(false); 
+                                navigate('/settings/kyc', { state: { targetRole: selectedUpgradeRole } }); 
+                              }}
+                              className="flex-1 py-3.5 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-accent-primary/20"
+                            >
+                              Start KYC
+                            </button>
+                          )
+                        })()}
                       </div>
                     </motion.div>
                   )}

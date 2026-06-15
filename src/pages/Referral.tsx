@@ -9,6 +9,7 @@ import { useReferrals } from '@/hooks/useReferrals';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import NrtAmount from '@/components/ui/NrtAmount';
+import LeaderboardCard from '@/components/LeaderboardCard';
 
 // ── Social share targets ────────────────────────────────────────────────────
 
@@ -155,6 +156,9 @@ export default function Referral() {
             <p className="text-xs text-text-secondary">Earn NRT for every friend you invite</p>
           </div>
         </div>
+
+        {/* Leaderboard */}
+        <LeaderboardCard />
 
         {/* Hero card */}
         <motion.div

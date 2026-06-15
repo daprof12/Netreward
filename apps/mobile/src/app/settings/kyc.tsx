@@ -12,6 +12,7 @@ import { useThemeColors } from '@/theme';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { supabase } from '@/lib/supabase';
+import { getRoleKycStatus } from '@/lib/kycUtils';
 
 type KycStatus = 'none' | 'pending' | 'verified' | 'rejected';
 type TargetRole = 'user' | 'sp' | 'isp';
@@ -168,7 +169,13 @@ export default function KycScreen() {
       });
 
       if (error) throw error;
-      await supabase.from('users').update({ kyc_status: 'pending' }).eq('id', user.id);
+
+      const updateData: Record<string, string> = {};
+      if (targetRole === 'sp') updateData.kyc_sp_status = 'pending';
+      else if (targetRole === 'isp') updateData.kyc_isp_status = 'pending';
+      else updateData.kyc_user_status = 'pending';
+
+      await supabase.from('users').update(updateData).eq('id', user.id);
       
       showToast('KYC submitted successfully!', 'success');
       setExistingSubmission({ status: 'pending', target_role: targetRole, created_at: new Date().toISOString() });
@@ -204,15 +211,15 @@ export default function KycScreen() {
         {pageStep === 'status' && (
           <View style={styles.statusView}>
             <View style={styles.statusIconContainer}>
-              {existingSubmission?.status === 'verified' ? (
+              {getRoleKycStatus(profile, targetRole) === 'verified' || existingSubmission?.status === 'verified' ? (
                 <View style={[styles.iconCircle, { borderColor: 'rgba(34, 197, 94, 0.2)', backgroundColor: 'rgba(34, 197, 94, 0.1)' }]}>
                   <CheckCircle2 size={40} color="#22c55e" />
                 </View>
-              ) : existingSubmission?.status === 'pending' ? (
+              ) : getRoleKycStatus(profile, targetRole) === 'pending' || existingSubmission?.status === 'pending' ? (
                 <View style={[styles.iconCircle, { borderColor: 'rgba(59, 130, 246, 0.2)', backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
                   <Clock size={40} color="#3b82f6" />
                 </View>
-              ) : existingSubmission?.status === 'rejected' ? (
+              ) : getRoleKycStatus(profile, targetRole) === 'rejected' || existingSubmission?.status === 'rejected' ? (
                 <View style={[styles.iconCircle, { borderColor: 'rgba(239, 68, 68, 0.2)', backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
                   <XCircle size={40} color="#ef4444" />
                 </View>
@@ -223,21 +230,21 @@ export default function KycScreen() {
               )}
               
               <Text style={styles.statusTitle}>
-                {profile?.kyc_status === 'verified' || existingSubmission?.status === 'verified'
+                {getRoleKycStatus(profile, targetRole) === 'verified' || existingSubmission?.status === 'verified'
                   ? 'Account Verified'
-                  : profile?.kyc_status === 'pending' || existingSubmission?.status === 'pending'
+                  : getRoleKycStatus(profile, targetRole) === 'pending' || existingSubmission?.status === 'pending'
                   ? 'Under Review'
-                  : profile?.kyc_status === 'rejected' || existingSubmission?.status === 'rejected'
+                  : getRoleKycStatus(profile, targetRole) === 'rejected' || existingSubmission?.status === 'rejected'
                   ? 'Verification Rejected'
                   : `Verify as ${roleLabel}`}
               </Text>
               
               <Text style={styles.statusDesc}>
-                {profile?.kyc_status === 'verified' || existingSubmission?.status === 'verified'
+                {getRoleKycStatus(profile, targetRole) === 'verified' || existingSubmission?.status === 'verified'
                   ? `Your ${roleLabel} KYC has been approved. You have full access.`
-                  : profile?.kyc_status === 'pending' || existingSubmission?.status === 'pending'
+                  : getRoleKycStatus(profile, targetRole) === 'pending' || existingSubmission?.status === 'pending'
                   ? 'Your documents are being reviewed. This typically takes 1-2 business days.'
-                  : profile?.kyc_status === 'rejected' || existingSubmission?.status === 'rejected'
+                  : getRoleKycStatus(profile, targetRole) === 'rejected' || existingSubmission?.status === 'rejected'
                   ? `Your submission was rejected. Please resubmit.`
                   : `Submit your documents to verify your ${roleLabel} account.`}
               </Text>
@@ -278,7 +285,7 @@ export default function KycScreen() {
               </View>
             )}
 
-            {(profile?.kyc_status === 'pending' || existingSubmission?.status === 'pending' || profile?.kyc_status === 'verified' || existingSubmission?.status === 'verified') ? (
+            {(getRoleKycStatus(profile, targetRole) === 'pending' || existingSubmission?.status === 'pending' || getRoleKycStatus(profile, targetRole) === 'verified' || existingSubmission?.status === 'verified') ? (
               <Pressable style={styles.secondaryBtn} onPress={() => router.replace('/(tabs)')}>
                 <UserIcon size={18} color={colors.textPrimary} />
                 <Text style={styles.secondaryBtnText}>Back to Dashboard</Text>
@@ -286,7 +293,7 @@ export default function KycScreen() {
             ) : (
               <Pressable style={styles.primaryBtn} onPress={() => setPageStep('liveness')}>
                 <Text style={styles.primaryBtnText}>
-                  {profile?.kyc_status === 'rejected' || existingSubmission?.status === 'rejected' ? 'Resubmit KYC Documents' : 'Start Verification'}
+                  {getRoleKycStatus(profile, targetRole) === 'rejected' || existingSubmission?.status === 'rejected' ? 'Resubmit KYC Documents' : 'Start Verification'}
                 </Text>
               </Pressable>
             )}

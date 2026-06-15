@@ -82,16 +82,25 @@ export default function AdminKYC() {
 
       if (kycError) throw kycError;
 
-      // 2. Update users table (kyc_status and potentially role)
-      const updates: any = { kyc_status: status === 'approved' ? 'verified' : 'rejected' };
+      // 2. Update the role-specific KYC status column
+      const kycCol = targetRole === 'sp' ? 'kyc_sp_status'
+                   : targetRole === 'isp' ? 'kyc_isp_status'
+                   : 'kyc_user_status';
+
+      const userUpdates: any = {
+        [kycCol]: status === 'approved' ? 'verified' : 'rejected',
+      };
+
+      // On approval: unlock role flags and mark kyc_verified
       if (status === 'approved') {
-        updates.role = targetRole;
-        updates.kyc_verified = true;
+        userUpdates.kyc_verified = true;
+        if (targetRole === 'sp')  userUpdates.is_sp  = true;
+        if (targetRole === 'isp') userUpdates.is_isp = true;
       }
 
       const { error: userError } = await supabase
         .from('users')
-        .update(updates)
+        .update(userUpdates)
         .eq('id', userId);
 
       if (userError) throw userError;
@@ -114,6 +123,7 @@ export default function AdminKYC() {
       setIsProcessing(false);
     }
   };
+
 
   const statusColor: Record<string, string> = { approved: '#10B981', pending: '#F59E0B', rejected: '#EF4444' };
   const statusIcon: Record<string, typeof CheckCircle2> = { approved: CheckCircle2, pending: Clock, rejected: XCircle };

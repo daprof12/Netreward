@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, Activity, Users, Zap, DollarSign, BarChart3, TrendingUp as TrendingUpIcon, Key, CheckCircle2, Code, MapPin, PieChart as PieIcon, Info, Loader2 } from 'lucide-react';
+import { LogOut, Activity, Users, Zap, DollarSign, BarChart3, TrendingUp as TrendingUpIcon, Key, CheckCircle2, Code, MapPin, PieChart as PieIcon, Info, Loader2, ShieldCheck, ShieldAlert, ShieldX, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useSpStore } from '@/stores/useSpStore';
@@ -17,6 +17,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import NrtAmount from '@/components/ui/NrtAmount';
 import CampaignAnalyticsModal from '@/components/campaigns/CampaignAnalyticsModal';
 import { AnimatePresence } from 'framer-motion';
+import { getRoleKycStatus } from '@/lib/kycUtils';
 
 type TimeFilter = '24H' | '7D' | '3M' | 'All';
 
@@ -35,9 +36,10 @@ export default function SpDashboard() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24H');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isTestingSdk, setIsTestingSdk] = useState(false);
-  const [sdkStatus, setSdkStatus] = useState<'verified' | 'test_pending' | 'not_integrated'>('verified');
   const [activeServiceIndex, setActiveServiceIndex] = useState(0);
   const [viewingCampaignDetails, setViewingCampaignDetails] = useState<any | null>(null);
+
+  const derivedSdkStatus = services.length > 0 ? 'verified' : 'not_integrated';
 
   const carouselRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -146,7 +148,27 @@ export default function SpDashboard() {
           <p className="text-sm text-text-secondary">{greeting} 👋</p>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-text-primary capitalize">{profile?.display_name || user?.email?.split('@')[0] || 'Partner'}</h1>
-            <span className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-[10px] font-black rounded-md border border-blue-500/20 tracking-tighter">SP</span>
+            {getRoleKycStatus(profile, 'sp') === 'verified' ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 text-green-500 text-[10px] font-black rounded-md border border-green-500/20 tracking-tighter">
+                <ShieldCheck size={12} />
+                SP
+              </span>
+            ) : getRoleKycStatus(profile, 'sp') === 'pending' ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-500 text-[10px] font-black rounded-md border border-amber-500/20 tracking-tighter">
+                <Clock size={12} />
+                PENDING REVIEW
+              </span>
+            ) : getRoleKycStatus(profile, 'sp') === 'rejected' ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-red-500/10 text-red-500 text-[10px] font-black rounded-md border border-red-500/20 tracking-tighter">
+                <ShieldAlert size={12} />
+                REJECTED
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-text-secondary/10 text-text-secondary text-[10px] font-black rounded-md border border-glass-border tracking-tighter">
+                <ShieldAlert size={12} />
+                UNVERIFIED SP
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -198,17 +220,31 @@ export default function SpDashboard() {
       <div className="bg-bg-card border border-glass-border rounded-[20px] p-5 mt-6 relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-32 h-32 bg-accent-primary/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
 
-        {profile?.kyc_status !== 'verified' ? (
+        {getRoleKycStatus(profile, 'sp') !== 'verified' ? (
           <div className="flex flex-col text-center items-center py-4">
             <div className="w-16 h-16 bg-bg-secondary rounded-full flex items-center justify-center mb-4">
-              <Code size={32} className="text-text-secondary opacity-50" />
+              {getRoleKycStatus(profile, 'sp') === 'pending' ? (
+                <ShieldAlert size={32} className="text-amber-500" />
+              ) : getRoleKycStatus(profile, 'sp') === 'rejected' ? (
+                <ShieldX size={32} className="text-red-500" />
+              ) : (
+                <Code size={32} className="text-text-secondary opacity-50" />
+              )}
             </div>
-            <h3 className="font-bold text-lg mb-2">SDK Not Connected</h3>
+            <h3 className="font-bold text-lg mb-2">
+              {getRoleKycStatus(profile, 'sp') === 'pending' ? 'SP Verification Under Review' :
+               getRoleKycStatus(profile, 'sp') === 'rejected' ? 'SP Verification Rejected' :
+               'SP Verification Required'}
+            </h3>
             <p className="text-sm text-text-secondary max-w-md mx-auto mb-6 leading-relaxed">
-              NetReward Tracker SDK must be active for your campaigns to correctly report data usage. Setup to get your unique API key to track user data used on your connected platforms or service and get <strong className="text-accent-primary">{useSystemStore.getState().settings.spCashbackPercentage}%</strong> of NRT user earned.
+              {getRoleKycStatus(profile, 'sp') === 'pending'
+                ? 'Your Service Provider KYC application is being reviewed by our team. You will be notified once approved.'
+                : getRoleKycStatus(profile, 'sp') === 'rejected'
+                ? 'Your SP verification was rejected. Please review the feedback and resubmit your application.'
+                : 'Complete your Service Provider verification to access the full dashboard and manage campaigns.'}
             </p>
             <Link to="/settings/kyc" state={{ targetRole: 'sp' }} className="w-full sm:w-auto px-8 py-3.5 bg-accent-primary text-primary-foreground font-bold rounded-xl shadow-lg active:scale-95 transition-all inline-block text-center">
-              Get Started with Verification
+              {getRoleKycStatus(profile, 'sp') === 'rejected' ? 'Resubmit SP Verification' : getRoleKycStatus(profile, 'sp') === 'pending' ? 'View Verification Status' : 'Start SP Verification'}
             </Link>
           </div>
         ) : (
@@ -226,13 +262,13 @@ export default function SpDashboard() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${sdkStatus === 'verified' ? 'bg-green-500/10 text-green-500' :
-                  sdkStatus === 'test_pending' ? 'bg-amber-500/10 text-amber-500' :
-                    'bg-red-500/10 text-red-500'
+                <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${derivedSdkStatus === 'verified' ? 'bg-green-500/10 text-green-500' :
+                  derivedSdkStatus === 'test_pending' ? 'bg-amber-500/10 text-amber-500' :
+                    'bg-text-secondary/10 text-text-secondary'
                   }`}>
-                  {sdkStatus.replace('_', ' ')}
+                  {derivedSdkStatus.replace('_', ' ')}
                 </span>
-                {sdkStatus === 'verified' && (
+                {derivedSdkStatus === 'verified' && (
                   <span className="relative flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
@@ -323,7 +359,7 @@ export default function SpDashboard() {
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5">No Services</p>
-                      <p className="text-xs text-text-secondary">Create a service to get your API key</p>
+                      <Link to="/campaigns/create-service" className="text-xs text-text-secondary hover:text-accent-primary">Create a service to get your API key</Link>
                     </div>
                   </div>
                 </div>
@@ -332,7 +368,7 @@ export default function SpDashboard() {
               <div className="flex justify-between items-center text-xs">
                 <div className="flex items-center gap-1.5 text-text-secondary">
                   <Activity size={14} />
-                  <span>Last Ping: <strong className="text-text-primary">{sdkStatus === 'verified' ? 'Just now' : 'Never'}</strong></span>
+                  <span>Last Ping: <strong className="text-text-primary">{derivedSdkStatus === 'verified' ? 'Just now' : 'Never'}</strong></span>
                 </div>
                 <Link to="/documentation/sdk" className="text-accent-primary font-bold hover:underline">View Documentation</Link>
               </div>

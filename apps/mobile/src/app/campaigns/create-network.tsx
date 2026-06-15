@@ -7,6 +7,8 @@ import { ChevronLeft, Image as ImageIcon, ArrowRight, Loader2, CheckCircle2, Cop
 import { useIspStore } from '@/stores/useIspStore';
 import { useToastStore } from '@/stores/useToastStore';
 import Slider from '@react-native-community/slider';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 
 const CATEGORIES = ['Telecommunication', 'Satellite', 'Fiber', 'Mobile Network', 'Broadband', 'Other'];
 
@@ -27,11 +29,26 @@ export default function CreateNetworkScreen() {
   const [asn, setAsn] = useState('');
   const [ipRanges, setIpRanges] = useState('');
   const [handshakeUrl, setHandshakeUrl] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiKey, setApiKey] = useState('');
 
   const canContinue = name.trim().length >= 2 && country.trim().length > 0;
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      setLogoPreview(result.assets[0].uri);
+    }
+  };
 
   const handleContinue = () => {
     if (!canContinue) return;
@@ -52,6 +69,8 @@ export default function CreateNetworkScreen() {
           asn,
           ipRanges: ipRanges ? ipRanges.split('\n').map(s => s.trim()).filter(Boolean) : undefined,
           handshakeUrl,
+          webhookUrl,
+          logoUrl: logoPreview || undefined,
           apiKey: generatedApiKey
         });
         setStep('success');
@@ -81,10 +100,16 @@ export default function CreateNetworkScreen() {
       {step === 'form' && (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
           
-          <View style={styles.imageUpload}>
-            <ImageIcon size={28} color={colors.textSecondary} />
-            <Text style={styles.imageUploadText}>LOGO</Text>
-          </View>
+          <Pressable onPress={pickImage} style={[styles.imageUpload, { overflow: 'hidden' }]}>
+            {logoPreview ? (
+              <Image source={{ uri: logoPreview }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+            ) : (
+              <>
+                <ImageIcon size={28} color={colors.textSecondary} />
+                <Text style={styles.imageUploadText}>LOGO</Text>
+              </>
+            )}
+          </Pressable>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Network Name *</Text>
@@ -166,6 +191,11 @@ export default function CreateNetworkScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Handshake URL</Text>
               <TextInput style={styles.input} placeholder="https://..." placeholderTextColor={colors.textSecondary} value={handshakeUrl} onChangeText={setHandshakeUrl} keyboardType="url" autoCapitalize="none" />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Webhook URL</Text>
+              <TextInput style={styles.input} placeholder="https://..." placeholderTextColor={colors.textSecondary} value={webhookUrl} onChangeText={setWebhookUrl} keyboardType="url" autoCapitalize="none" />
             </View>
           </View>
 

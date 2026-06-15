@@ -4,11 +4,38 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
 import { cloudflare } from "@cloudflare/vite-plugin";
+import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss(), cloudflare()],
+  plugins: [
+    react(), 
+    tailwindcss(), 
+    cloudflare(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'nrt-logo.svg'],
+      manifest: {
+        name: 'NetReward Dashboard',
+        short_name: 'NetReward',
+        description: 'Manage your NRT rewards, active campaigns, and ISP/SP integrations.',
+        theme_color: '#7C3AED',
+        background_color: '#09090b',
+        icons: [
+          {
+            src: 'nrt-logo.svg',
+            sizes: 'any',
+            type: 'image/svg+xml'
+          }
+        ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+        maximumFileSizeToCacheInBytes: 4000000 // 4MB to accommodate the web3 deps
+      }
+    })
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

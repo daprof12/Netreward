@@ -22,11 +22,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-sp-api-key, x-isp-api-key, x-hmac-sig',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || 'https://netreward.app';
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-sp-api-key, x-isp-api-key, x-hmac-sig',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
 const MAX_BATCH_SIZE = 100;
 
@@ -89,7 +93,8 @@ function validateTelemetry(
   category: string,
   bytesUp: number,
   bytesDown: number,
-  durationSec: number
+  durationSec: number,
+  limits: Record<string, number>
 ): { isAnomaly: boolean; flagType: string; details: string } {
   const totalBytes = bytesUp + bytesDown;
   if (durationSec <= 0) {
@@ -102,101 +107,126 @@ function validateTelemetry(
 
   const bytesPerSec = totalBytes / durationSec;
 
-  // Absolute physical boundary for standard consumer connections (100 MB/s)
-  const ABSOLUTE_MAX_BYTES_PER_SEC = 100 * 1024 * 1024;
+  const getLimit = (cat: string) => {
+    const mbLimit = limits[cat] || limits.default || 100;
+    return mbLimit * 1024 * 1024;
+  };
+
+  // Absolute physical boundary for standard consumer connections
+  const ABSOLUTE_MAX_BYTES_PER_SEC = getLimit('default');
   if (bytesPerSec > ABSOLUTE_MAX_BYTES_PER_SEC) {
     return {
       isAnomaly: true,
       flagType: 'IMPOSSIBLE_SPEED',
-      details: `Sustained rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds hardware speed limits (100 MB/s).`
+      details: `Sustained rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds hardware speed limits (${limits.default || 100} MB/s).`
     };
   }
 
   // Category-specific heuristics
   if (category === 'streaming') {
-    // 320 kbps streaming = 40 KB/s. Enforce generous 10 MB/s upper threshold for pre-buffering.
-    const STREAMING_MAX_BYTES_PER_SEC = 10 * 1024 * 1024;
-    if (bytesPerSec > STREAMING_MAX_BYTES_PER_SEC) {
+    const limit = getLimit('streaming');
+    if (bytesPerSec > limit) {
       return {
         isAnomaly: true,
         flagType: 'HIGH_VOLUME',
-        details: `Streaming average speed of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds logical limit (10 MB/s).`
+        details: `Streaming average speed of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds logical limit (${limits.streaming || 10} MB/s).`
       };
     }
   } else if (category === 'gaming') {
-    // Gaming bandwidth is extremely light (rarely exceeding 150 KB/s). Enforce a 250 KB/s cap.
-    const GAMING_MAX_BYTES_PER_SEC = 250 * 1024;
-    if (bytesPerSec > GAMING_MAX_BYTES_PER_SEC) {
+    const limit = getLimit('gaming');
+    if (bytesPerSec > limit) {
       return {
         isAnomaly: true,
         flagType: 'HIGH_VOLUME',
-        details: `Gaming average transfer rate of ${(bytesPerSec / 1024).toFixed(2)} KB/s exceeds logical cap (250 KB/s).`
+        details: `Gaming average transfer rate of ${(bytesPerSec / 1024).toFixed(2)} KB/s exceeds logical cap (${(limits.gaming || 0.25) * 1024} KB/s).`
       };
     }
   } else if (category === 'ai' || category === 'ai service') {
-    // AI queries consume up to 5 MB/s on bursts.
-    const AI_MAX_BYTES_PER_SEC = 5 * 1024 * 1024;
-    if (bytesPerSec > AI_MAX_BYTES_PER_SEC) {
+    const limit = getLimit('ai');
+    if (bytesPerSec > limit) {
       return {
         isAnomaly: true,
         flagType: 'HIGH_VOLUME',
-        details: `AI service average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds threshold (5 MB/s).`
+        details: `AI service average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds threshold (${limits.ai || 5} MB/s).`
       };
     }
   } else if (category === 'browsing' || category === 'ecommerce') {
-    // Browsing/ecommerce average rate cap is 4 MB/s.
-    const BROWSING_MAX_BYTES_PER_SEC = 4 * 1024 * 1024;
-    if (bytesPerSec > BROWSING_MAX_BYTES_PER_SEC) {
+    const limit = getLimit('browsing');
+    if (bytesPerSec > limit) {
       return {
         isAnomaly: true,
         flagType: 'HIGH_VOLUME',
-        details: `Browsing/Ecommerce average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds speed threshold (4 MB/s).`
+        details: `Browsing/Ecommerce average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds speed threshold (${limits.browsing || 4} MB/s).`
       };
     }
   } else if (category === 'social') {
-    // Social average rate cap is 8 MB/s.
-    const SOCIAL_MAX_BYTES_PER_SEC = 8 * 1024 * 1024;
-    if (bytesPerSec > SOCIAL_MAX_BYTES_PER_SEC) {
+    const limit = getLimit('social');
+    if (bytesPerSec > limit) {
       return {
         isAnomaly: true,
         flagType: 'HIGH_VOLUME',
-        details: `Social average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds threshold (8 MB/s).`
+        details: `Social average transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds threshold (${limits.social || 8} MB/s).`
       };
     }
   } else if (category === 'cloud') {
-    // Cloud sync/backups can use up to 50 MB/s.
-    const CLOUD_MAX_BYTES_PER_SEC = 50 * 1024 * 1024;
-    if (bytesPerSec > CLOUD_MAX_BYTES_PER_SEC) {
+    const limit = getLimit('cloud');
+    if (bytesPerSec > limit) {
       return {
         isAnomaly: true,
         flagType: 'HIGH_VOLUME',
-        details: `Cloud transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds logical limit (50 MB/s).`
+        details: `Cloud transfer rate of ${(bytesPerSec / (1024 * 1024)).toFixed(2)} MB/s exceeds logical limit (${limits.cloud || 50} MB/s).`
       };
     }
   }
 
   return { isAnomaly: false, flagType: 'UNKNOWN', details: '' };
 }
+const rateLimiter = new Map<string, { count: number; resetAt: number }>();
+const MAX_REQUESTS_PER_MINUTE = 60;
+
+function checkRateLimit(ip: string | null, apiKey: string | null): boolean {
+  const key = `${ip || 'unknown'}-${apiKey || 'unknown'}`;
+  const now = Date.now();
+  const entry = rateLimiter.get(key);
+
+  if (entry && now < entry.resetAt) {
+    if (entry.count >= MAX_REQUESTS_PER_MINUTE) return false;
+    entry.count++;
+  } else {
+    rateLimiter.set(key, { count: 1, resetAt: now + 60000 });
+  }
+
+  // Cleanup old entries randomly to prevent memory leak
+  if (Math.random() < 0.01) {
+    for (const [k, v] of rateLimiter.entries()) {
+      if (Date.now() > v.resetAt) rateLimiter.delete(k);
+    }
+  }
+
+  return true;
+}
 
 serve(async (req) => {
-  const origin = req.headers.get('Origin') || '*';
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-sp-api-key, x-isp-api-key, x-hmac-sig',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Credentials': 'true',
-  };
-
   function jsonResponse(body: Record<string, unknown>, status = 200) {
     return new Response(JSON.stringify(body), {
       status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
   }
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: getCorsHeaders(req) });
+  }
+
+  const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || null;
+  const url = new URL(req.url);
+  const tempSpKey = req.headers.get('x-sp-api-key') || url.searchParams.get('sp_key');
+  const tempIspKey = req.headers.get('x-isp-api-key') || url.searchParams.get('isp_key');
+  const tempApiKey = tempSpKey || tempIspKey;
+
+  if (!checkRateLimit(clientIp, tempApiKey)) {
+    return jsonResponse({ error: 'Too many requests' }, 429);
   }
 
   if (req.method === 'GET') {
@@ -286,15 +316,26 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // ── 1. Extract API key ─────────────────────────────────────
+    // ── 1. Extract API key & JWT ─────────────────────────────────────
     // Support both headers (fetch) and query params (sendBeacon fallback)
     const url = new URL(req.url);
     const spApiKey = req.headers.get('x-sp-api-key') || url.searchParams.get('sp_key');
     const ispApiKey = req.headers.get('x-isp-api-key') || url.searchParams.get('isp_key');
     const hmacSig = req.headers.get('x-hmac-sig');
+    
+    const authHeader = req.headers.get('authorization');
+    let jwtUserId: string | null = null;
 
-    if (!spApiKey && !ispApiKey) {
-      return jsonResponse({ error: 'Missing API key. Provide x-sp-api-key or x-isp-api-key header.' }, 401);
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const { data: userObj, error: authErr } = await supabase.auth.getUser(token);
+      if (!authErr && userObj?.user) {
+        jwtUserId = userObj.user.id;
+      }
+    }
+
+    if (!spApiKey && !ispApiKey && !jwtUserId) {
+      return jsonResponse({ error: 'Missing Authentication. Provide x-sp-api-key, x-isp-api-key, or Authorization JWT header.' }, 401);
     }
 
     // For CDN integration, hmac signature is optional. If provided, we verify it.
@@ -326,11 +367,14 @@ serve(async (req) => {
 
     if (spApiKey) {
       // 1. Try centralized sp_api_keys table
-      const { data: centralKey } = await supabase
+      const { data: centralKey, error: centralKeyErr } = await supabase
         .from('sp_api_keys')
         .select('webhook_secret, status, sp_email')
         .eq('sdk_key', spApiKey)
         .maybeSingle();
+
+      console.log('SP_API_KEY received:', spApiKey);
+      console.log('Central Key DB result:', { centralKey, centralKeyErr });
 
       if (centralKey) {
         if (centralKey.status !== 'active') {
@@ -445,6 +489,17 @@ serve(async (req) => {
         .limit(1)
         .maybeSingle();
       if (camp) autoCampaignId = camp.id;
+    } else if (jwtUserId) {
+      // If authenticating via JWT (Chrome Extension), fallback to user's most recent active campaign
+      const { data: enrollment } = await supabase
+        .from('user_campaigns')
+        .select('campaign_id')
+        .eq('user_id', jwtUserId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (enrollment) autoCampaignId = enrollment.campaign_id;
     }
 
     // ── 3b. Device fingerprint resolver ────────────────────────────────────
@@ -573,6 +628,35 @@ serve(async (req) => {
         }
       }
 
+      // 5. JWT User Fallback (Chrome Extension)
+      if (jwtUserId) {
+        const { data: userDevice } = await supabase
+          .from('devices')
+          .select('id')
+          .eq('user_id', jwtUserId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (userDevice) {
+           await supabase.from('devices').update({ fingerprint: rawDeviceId }).eq('id', userDevice.id);
+           return userDevice.id;
+        } else {
+           // Create one
+           const { data: newDevice, error: insertErr } = await supabase.from('devices').insert({
+              user_id: jwtUserId,
+              device_name: 'Web Browser',
+              device_type: 'other',
+              os: 'Web',
+              fingerprint: rawDeviceId,
+              status: 'active',
+              signal_strength: 100,
+           }).select('id').single();
+           if (!insertErr && newDevice) return newDevice.id;
+        }
+      }
+
       console.error(`[Device Resolver] No device found for fingerprint: ${rawDeviceId}`);
       return null;
     }
@@ -619,12 +703,12 @@ serve(async (req) => {
       return null;
     }
 
-    // Verify HMAC signature if provided or if this is an ISP (ISPs must always use HMAC)
-    if (providerType === 'isp' && !hmacSig) {
-      return jsonResponse({ error: 'ISPs must sign requests with x-hmac-sig.' }, 401);
-    }
+    // Verify HMAC signature for ALL providers (unless using JWT)
+    if (!jwtUserId) {
+      if (!hmacSig) {
+        return jsonResponse({ error: 'All requests must be signed with x-hmac-sig.' }, 401);
+      }
 
-    if (hmacSig) {
       if (!secretKey) {
         return jsonResponse({ error: 'Service/network has no secret key configured. Generate credentials in the dashboard.' }, 403);
       }
@@ -634,7 +718,20 @@ serve(async (req) => {
       }
     }
 
-    // ── 4. Process batch ───────────────────────────────────────
+    // ── 4. Fetch Global Config & Process batch ─────────────────
+    let bandwidthLimits = {
+      default: 100, cloud: 50, streaming: 10, social: 8, ai: 5, browsing: 4, gaming: 0.25
+    };
+    try {
+      const { data: limitsData } = await supabase.from('kv_settings').select('value').eq('key', 'category_bandwidth_limits').maybeSingle();
+      if (limitsData?.value) {
+        const parsed = typeof limitsData.value === 'string' ? JSON.parse(limitsData.value) : limitsData.value;
+        bandwidthLimits = { ...bandwidthLimits, ...parsed };
+      }
+    } catch (e) {
+      console.error('Failed to fetch category limits, using defaults', e);
+    }
+
     const results: Array<Record<string, unknown>> = [];
     let successCount = 0;
     let errorCount = 0;
@@ -642,6 +739,8 @@ serve(async (req) => {
     // Caching resolved campaign categories to minimize DB queries in batch
     const categoryCache: Record<string, string> = {};
 
+    // First pass: extract all events and filter invalid ones
+    const validEvents = [];
     for (const event of events) {
       const {
         device_id: rawDeviceId,
@@ -652,13 +751,11 @@ serve(async (req) => {
         duration_seconds = 60,
         session_start,
         session_end,
-        // Optional gaming metadata: set by tracker.js data-gaming-platform attribute
         gaming_platform = null,
       } = event as Record<string, unknown>;
 
       let finalCampaignId = campaign_id || autoCampaignId;
 
-      // Validate required fields (raw)
       if (!rawDeviceId || !finalCampaignId || !session_id) {
         results.push({
           session_id: session_id || 'unknown',
@@ -668,28 +765,31 @@ serve(async (req) => {
         errorCount++;
         continue;
       }
+      
+      validEvents.push({
+        rawDeviceId, finalCampaignId, session_id, bytes_up, bytes_down, duration_seconds, session_start, session_end, gaming_platform
+      });
+    }
 
-      // Resolve rawDeviceId (may be a fingerprint) → actual devices.id
-      const device_id = await resolveDeviceId(rawDeviceId as string, finalCampaignId as string);
+    // Process valid events
+    const anomalyInserts: any[] = [];
+    const batchRpcPayloads: any[] = [];
+    const parallelIspPayloads: any[] = [];
+
+    // Since resolveDeviceId has complex fallback logic, we can still use it.
+    // Deno runs this very fast concurrently.
+    const resolvedEvents = await Promise.all(validEvents.map(async (ve) => {
+      const device_id = await resolveDeviceId(ve.rawDeviceId as string, ve.finalCampaignId as string);
+      
       if (!device_id) {
-        results.push({
-          session_id,
-          status: 'error',
-          message: `Device not found. Ensure the device is registered in NetReward before sending telemetry. (lookup: ${rawDeviceId})`,
-        });
-        errorCount++;
-        continue;
+        return { error: `Device not found for fingerprint: ${ve.rawDeviceId}`, ve };
       }
 
-      // Fetch device user_id and isp_name to support parallel ISP tracking
+      // Fetch device user_id and isp_name
       let deviceUserId: string | null = null;
       let deviceIspName: string | null = null;
       try {
-        const { data: devObj } = await supabase
-          .from('devices')
-          .select('user_id, isp_name')
-          .eq('id', device_id)
-          .maybeSingle();
+        const { data: devObj } = await supabase.from('devices').select('user_id, isp_name').eq('id', device_id).maybeSingle();
         if (devObj) {
           deviceUserId = devObj.user_id;
           deviceIspName = devObj.isp_name;
@@ -698,224 +798,192 @@ serve(async (req) => {
         console.error('Error fetching device user/isp info:', e);
       }
 
-      // Dynamic Telemetry Sanitizer Validation
-      let category = categoryCache[finalCampaignId as string];
+      let category = categoryCache[ve.finalCampaignId as string];
       if (!category) {
-        category = await getCampaignCategory(supabase, finalCampaignId as string);
-        categoryCache[finalCampaignId as string] = category;
+        category = await getCampaignCategory(supabase, ve.finalCampaignId as string);
+        categoryCache[ve.finalCampaignId as string] = category;
       }
 
       const validation = validateTelemetry(
-        category,
-        Number(bytes_up),
-        Number(bytes_down),
-        Number(duration_seconds)
+        category, Number(ve.bytes_up), Number(ve.bytes_down), Number(ve.duration_seconds), bandwidthLimits
       );
 
-      if (validation.isAnomaly) {
-        // Option B: Log to tracking_anomalies, but proceed with RPC processing
-        try {
-          const { data: userData } = await supabase
-            .from('devices')
-            .select('users(email)')
-            .eq('id', device_id)
-            .maybeSingle();
-          
-          const userEmail = (userData?.users as any)?.email || 'unknown@netreward.online';
+      return {
+        device_id, deviceUserId, deviceIspName, category, validation, ve
+      };
+    }));
 
-          await supabase.from('tracking_anomalies').insert({
-            session_id: session_id as string,
+    for (const res of resolvedEvents) {
+      if (res.error) {
+        results.push({ session_id: res.ve.session_id, status: 'error', message: res.error });
+        errorCount++;
+        continue;
+      }
+
+      const { device_id, deviceUserId, deviceIspName, category, validation, ve } = res;
+
+      if (validation.isAnomaly) {
+        try {
+          const { data: userData } = await supabase.from('devices').select('users(email)').eq('id', device_id).maybeSingle();
+          const userEmail = (userData?.users as any)?.email || 'unknown@netreward.online';
+          anomalyInserts.push({
+            session_id: ve.session_id as string,
             user_email: userEmail,
             flag_type: validation.flagType,
             details: `[Category: ${category.toUpperCase()}] ${validation.details}`,
             status: 'open'
           });
-
-          console.log(`[Telemetry Anomaly Logged] Session: ${session_id}, Flag: ${validation.flagType}, Details: ${validation.details}`);
-        } catch (anomalyErr) {
-          console.error('Failed to log tracking anomaly:', anomalyErr);
-        }
+        } catch (e) {}
       }
 
-      // Call the Reward Engine RPC
-      const { data, error } = await supabase.rpc('process_tracking_report', {
-        p_device_id: device_id,
-        p_campaign_id: finalCampaignId,
-        p_session_id: session_id,
-        p_bytes_up: Number(bytes_up),
-        p_bytes_down: Number(bytes_down),
-        p_duration_seconds: Number(duration_seconds),
-        p_session_start: (session_start as string) || new Date(Date.now() - Number(duration_seconds) * 1000).toISOString(),
-        p_session_end: (session_end as string) || new Date().toISOString(),
-        p_gaming_platform: gaming_platform as string | null
+      batchRpcPayloads.push({
+        req_device_fingerprint: ve.rawDeviceId,
+        req_campaign_id: ve.finalCampaignId,
+        device_id,
+        campaign_id: ve.finalCampaignId,
+        session_id: ve.session_id,
+        bytes_up: Number(ve.bytes_up),
+        bytes_down: Number(ve.bytes_down),
+        duration_seconds: Number(ve.duration_seconds),
+        session_start: (ve.session_start as string) || new Date(Date.now() - Number(ve.duration_seconds) * 1000).toISOString(),
+        session_end: (ve.session_end as string) || new Date().toISOString(),
+        gaming_platform: ve.gaming_platform as string | null
       });
 
-      if (error) {
-        results.push({
-          session_id,
-          status: 'error',
-          message: error.message,
-        });
-        errorCount++;
-      } else {
-        const rpcData = data as Record<string, unknown>;
-        results.push(rpcData);
-        successCount++;
-
-        // Write to tracking_sessions for admin visibility
-        // Resolve user email and campaign name for the admin table
-        try {
-          const { data: deviceUser } = await supabase
-            .from('devices')
-            .select('users(email)')
-            .eq('id', device_id)
-            .maybeSingle();
-
-          const { data: campInfo } = await supabase
-            .from('campaigns')
-            .select(`
-              title,
-              sp:sp_profiles(users(email)),
-              isp:isp_profiles(users(email))
-            `)
-            .eq('id', finalCampaignId)
-            .maybeSingle();
-
-          const userEmail = (deviceUser?.users as any)?.email || 'unknown';
-          const campaignName = campInfo?.title || String(finalCampaignId);
-          const spArr = campInfo?.sp;
-          const spEmail = spArr
-            ? (Array.isArray(spArr) ? (spArr[0]?.users as any)?.email : (spArr as any)?.users?.email) || ''
-            : '';
-
-          const nrtAwarded = rpcData.status === 'success'
-            ? Number((rpcData.splits as any)?.user ?? 0)
-            : 0;
-
-          // Resolve gaming context from RPC response (populated for gaming campaigns)
-          const rpcGamingPlatform = rpcData.gaming_platform as string | null || gaming_platform as string | null || null;
-          const rpcGamingUsername = rpcData.gaming_username as string | null || null;
-
-          // Determine source label
-          let sessionSource = providerType === 'isp' ? 'isp_sdk' : 'sdk';
-          if (rpcGamingPlatform) sessionSource = `gaming_${rpcGamingPlatform}`;
-
-          // Map all RPC statuses to tracking_sessions status values
-          const rpcStatus = rpcData.status as string;
-          const tsStatus =
-            rpcStatus === 'success' ? 'verified' :
-            rpcStatus === 'recorded' ? 'verified' :
-            rpcStatus === 'duplicate' ? 'duplicate' :
-            rpcStatus === 'pending_gaming_account' ? 'pending' :
-            rpcStatus === 'skipped' ? 'skipped' : 'error';
-
-          const rejectReason =
-            rpcStatus === 'pending_gaming_account'
-              ? 'Gaming account not linked — rewards withheld until account is linked'
-              : rpcStatus !== 'success' && rpcStatus !== 'recorded'
-                ? String(rpcData.message ?? '')
-                : '';
-
-          const rpcServiceId = rpcData.service_id as string | null || null;
-          const rpcNetworkId = rpcData.network_id as string | null || null;
-          const rpcCategory = rpcData.category as string | null || null;
-          const rpcGamingAccountId = rpcData.gaming_account_id as string | null || null;
-
-          await supabase.from('tracking_sessions').insert({
-            session_id: String(session_id),
-            user_email: userEmail,
-            campaign_name: campaignName,
-            sp_email: spEmail,
-            source: sessionSource,
-            device_ip: rpcGamingUsername ? `[gaming:${rpcGamingUsername}]` : '',
-            data_rx_bytes: Number(bytes_down),
-            data_tx_bytes: Number(bytes_up),
-            duration_seconds: Number(duration_seconds),
-            nrt_awarded: nrtAwarded,
-            validation_score: validation.isAnomaly ? 0.5 : 1.0,
-            status: tsStatus,
-            reject_reason: rejectReason,
-            service_id: rpcServiceId,
-            network_id: rpcNetworkId,
-            category: rpcCategory,
-            gaming_account_id: rpcGamingAccountId,
+      if (deviceUserId && deviceIspName) {
+        const ispCampaignId = await resolveIspCampaignId(deviceUserId, deviceIspName);
+        if (ispCampaignId && ispCampaignId !== ve.finalCampaignId) {
+          parallelIspPayloads.push({
+            req_device_fingerprint: ve.rawDeviceId,
+            req_campaign_id: ispCampaignId,
+            device_id,
+            campaign_id: ispCampaignId,
+            session_id: `${ve.session_id}_isp`,
+            bytes_up: Number(ve.bytes_up),
+            bytes_down: Number(ve.bytes_down),
+            duration_seconds: Number(ve.duration_seconds),
+            session_start: (ve.session_start as string) || new Date(Date.now() - Number(ve.duration_seconds) * 1000).toISOString(),
+            session_end: (ve.session_end as string) || new Date().toISOString(),
+            gaming_platform: null
           });
+        }
+      }
+    }
 
-          // Parallel ISP Tracking: if the device is on an ISP network and the user has joined that ISP campaign
-          if (deviceUserId && deviceIspName) {
-            const ispCampaignId = await resolveIspCampaignId(deviceUserId, deviceIspName);
-            if (ispCampaignId && ispCampaignId !== finalCampaignId) {
-              try {
-                const { data: ispData, error: ispError } = await supabase.rpc('process_tracking_report', {
-                  p_device_id: device_id,
-                  p_campaign_id: ispCampaignId,
-                  p_session_id: `${session_id}_isp`,
-                  p_bytes_up: Number(bytes_up),
-                  p_bytes_down: Number(bytes_down),
-                  p_duration_seconds: Number(duration_seconds),
-                  p_session_start: (session_start as string) || new Date(Date.now() - Number(duration_seconds) * 1000).toISOString(),
-                  p_session_end: (session_end as string) || new Date().toISOString(),
-                  p_gaming_platform: null
-                });
+    if (anomalyInserts.length > 0) {
+      await supabase.from('tracking_anomalies').insert(anomalyInserts);
+    }
 
-                if (ispError) {
-                  console.warn(`[ISP Parallel Tracking Failed] Campaign: ${ispCampaignId}, Error: ${ispError.message}`);
-                } else {
-                  console.log(`[ISP Parallel Tracking Succeeded] Campaign: ${ispCampaignId}`);
-                  
-                  // Write parallel entry to tracking_sessions for admin visibility
-                  try {
-                    const { data: ispCampInfo } = await supabase
-                      .from('campaigns')
-                      .select(`
-                        title,
-                        isp:isp_profiles(users(email))
-                      `)
-                      .eq('id', ispCampaignId)
-                      .maybeSingle();
+    const allRpcPayloads = [...batchRpcPayloads, ...parallelIspPayloads];
+    const trackingSessionInserts: any[] = [];
 
-                    const ispCampaignName = ispCampInfo?.title || String(ispCampaignId);
-                    const ispProfileArr = ispCampInfo?.isp;
-                    const ispEmail = ispProfileArr
-                      ? (Array.isArray(ispProfileArr) ? (ispProfileArr[0]?.users as any)?.email : (ispProfileArr as any)?.users?.email) || ''
-                      : '';
+    if (allRpcPayloads.length > 0) {
+      // Execute the massive batch in a single database RPC call!
+      const { data: batchResults, error: batchError } = await supabase.rpc('process_tracking_batch', {
+        p_events: allRpcPayloads
+      });
 
-                    const ispRpcData = ispData as Record<string, unknown>;
-                    const ispNrtAwarded = ispRpcData.status === 'success'
-                      ? Number((ispRpcData.splits as any)?.user ?? 0)
-                      : 0;
+      if (batchError) {
+        console.error('[Batch RPC Error]', batchError);
+        throw batchError;
+      }
 
-                    await supabase.from('tracking_sessions').insert({
-                      session_id: `${session_id}_isp`,
-                      user_email: userEmail,
-                      campaign_name: ispCampaignName,
-                      sp_email: '',
-                      source: 'isp_sdk',
-                      device_ip: '',
-                      data_rx_bytes: Number(bytes_down),
-                      data_tx_bytes: Number(bytes_up),
-                      duration_seconds: Number(duration_seconds),
-                      nrt_awarded: ispNrtAwarded,
-                      validation_score: validation.isAnomaly ? 0.5 : 1.0,
-                      status: ispRpcData.status === 'success' || ispRpcData.status === 'recorded' ? 'verified' : 'error',
-                      reject_reason: ispRpcData.status !== 'success' && ispRpcData.status !== 'recorded' ? String(ispRpcData.message ?? '') : '',
-                      service_id: null,
-                      network_id: (ispRpcData as any).network_id || null,
-                      category: 'broadband',
-                      gaming_account_id: null
-                    });
-                  } catch (tsIspErr) {
-                    console.error('[ISP tracking_sessions write failed]', tsIspErr);
-                  }
-                }
-              } catch (ispRpcErr) {
-                console.error('[ISP Parallel Tracking RPC Exception]', ispRpcErr);
-              }
-            }
+      const rpcArray = (batchResults as Record<string, unknown>[]) || [];
+      
+      // We need to bulk resolve user emails and campaign names for tracking_sessions
+      const uniqueDeviceIds = [...new Set(allRpcPayloads.map(p => p.device_id))];
+      const uniqueCampaignIds = [...new Set(allRpcPayloads.map(p => p.campaign_id))];
+      
+      const { data: devicesInfo } = await supabase.from('devices').select('id, users(email)').in('id', uniqueDeviceIds);
+      const deviceEmailMap = new Map((devicesInfo || []).map(d => [d.id, (d.users as any)?.email]));
+      
+      const { data: campaignsInfo } = await supabase.from('campaigns').select('id, title, sp:sp_profiles(users(email)), isp:isp_profiles(users(email))').in('id', uniqueCampaignIds);
+      const campInfoMap = new Map((campaignsInfo || []).map(c => [c.id, c]));
+
+      // Map results
+      for (let i = 0; i < allRpcPayloads.length; i++) {
+        const payload = allRpcPayloads[i];
+        const rpcData = rpcArray[i]; // Maintains order matching payload via PLPGSQL loop mapping if we matched them, but wait, process_tracking_batch iterates over p_events so the output array exactly matches the input array order!
+
+        if (!rpcData) continue;
+        
+        const isParallelIsp = payload.session_id.endsWith('_isp');
+
+        if (rpcData.status === 'error') {
+          if (!isParallelIsp) {
+            results.push({ session_id: payload.session_id, status: 'error', message: rpcData.message });
+            errorCount++;
           }
+          continue;
+        }
+
+        if (!isParallelIsp) {
+          results.push(rpcData);
+          successCount++;
+        }
+
+        const userEmail = deviceEmailMap.get(payload.device_id) || 'unknown';
+        const campInfo = campInfoMap.get(payload.campaign_id);
+        const campaignName = campInfo?.title || String(payload.campaign_id);
+        
+        let spEmail = '';
+        if (!isParallelIsp) {
+          const spArr = campInfo?.sp;
+          spEmail = spArr ? (Array.isArray(spArr) ? (spArr[0]?.users as any)?.email : (spArr as any)?.users?.email) || '' : '';
+        }
+
+        const nrtAwarded = rpcData.status === 'success' ? Number((rpcData.splits as any)?.user ?? 0) : 0;
+        const rpcGamingPlatform = rpcData.gaming_platform as string | null || payload.gaming_platform as string | null;
+        const rpcGamingUsername = rpcData.gaming_username as string | null;
+
+        let sessionSource = isParallelIsp ? 'isp_sdk' : (providerType === 'isp' ? 'isp_sdk' : 'sdk');
+        if (!isParallelIsp && rpcGamingPlatform) sessionSource = `gaming_${rpcGamingPlatform}`;
+
+        const rpcStatus = rpcData.status as string;
+        const tsStatus =
+          rpcStatus === 'success' ? 'verified' :
+          rpcStatus === 'recorded' ? 'verified' :
+          rpcStatus === 'duplicate' ? 'duplicate' :
+          rpcStatus === 'pending_gaming_account' ? 'pending' :
+          rpcStatus === 'skipped' ? 'skipped' : 'error';
+
+        const rejectReason =
+          rpcStatus === 'pending_gaming_account'
+            ? 'Gaming account not linked — rewards withheld until account is linked'
+            : rpcStatus !== 'success' && rpcStatus !== 'recorded'
+              ? String(rpcData.message ?? '')
+              : '';
+
+        // Validation score approximation from earlier
+        const isAnomaly = anomalyInserts.some(a => a.session_id === payload.session_id);
+
+        trackingSessionInserts.push({
+          session_id: payload.session_id,
+          user_email: userEmail,
+          campaign_name: campaignName,
+          sp_email: spEmail,
+          source: sessionSource,
+          device_ip: rpcGamingUsername ? `[gaming:${rpcGamingUsername}]` : '',
+          data_rx_bytes: payload.bytes_down,
+          data_tx_bytes: payload.bytes_up,
+          duration_seconds: payload.duration_seconds,
+          nrt_awarded: nrtAwarded,
+          validation_score: isAnomaly ? 0.5 : 1.0,
+          status: tsStatus,
+          reject_reason: rejectReason,
+          service_id: rpcData.service_id || null,
+          network_id: rpcData.network_id || (isParallelIsp ? payload.campaign_id : null), // For parallel ISP we default to campaign_id if null
+          category: rpcData.category || (isParallelIsp ? 'broadband' : null),
+          gaming_account_id: rpcData.gaming_account_id || null,
+        });
+      }
+
+      if (trackingSessionInserts.length > 0) {
+        try {
+          // Bulk insert the logs!
+          await supabase.from('tracking_sessions').insert(trackingSessionInserts);
         } catch (tsErr) {
-          // Non-fatal: log but don't fail the response
-          console.error('[tracking_sessions write failed]', tsErr);
+          console.error('[tracking_sessions bulk insert failed]', tsErr);
         }
       }
     }

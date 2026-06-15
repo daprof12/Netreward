@@ -91,63 +91,76 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 // ── Flush Telemetry ─────────────────────────────────────────────────────────
+
 async function flushTelemetry() {
-  if (!isTracking || (bytesUp === 0 && bytesDown === 0)) return;
+  const result = await chrome.storage.local.get('nrt_offline_queue');
+  let queue = result.nrt_offline_queue || [];
 
-  const payload = {
-    session_id: sessionId,
-    device_fingerprint: deviceFingerprint,
-    bytes_up: bytesUp,
-    bytes_down: bytesDown,
-    session_start: new Date(sessionStart).toISOString(),
-    session_end: new Date().toISOString(),
-    source: 'chrome-extension',
-  };
-
-  // Get the user's API key from storage
-  const result = await chrome.storage.local.get(['nrt_sp_api_key', 'nrt_isp_api_key']);
-  const apiKey = result.nrt_sp_api_key || result.nrt_isp_api_key;
-  
-  if (!apiKey) {
-    // No API key configured — queue locally
-    console.log('[NetReward] No API key, queueing telemetry locally');
-    await queueTelemetry(payload);
-    return;
+  if (isTracking && (bytesUp > 0 || bytesDown > 0)) {
+    queue.push({
+      device_id: deviceFingerprint,
+      session_id: sessionId,
+      bytes_up: bytesUp,
+      bytes_down: bytesDown,
+      session_start: new Date(sessionStart).toISOString(),
+      session_end: new Date().toISOString(),
+      gaming_platform: 'web',
+    });
   }
 
+  if (queue.length === 0) return;
+
+  // Max 100 events per batch (enforced by backend)
+  const batch = queue.slice(0, 100);
+  const remainingQueue = queue.slice(100);
+  const bodyText = JSON.stringify({ events: batch });
+
   try {
+    // Read Supabase auth token from storage
+    const storageKeys = await chrome.storage.local.get(null);
+    const authKey = Object.keys(storageKeys).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    
+    let jwtToken = null;
+    if (authKey && storageKeys[authKey]) {
+      const sessionData = typeof storageKeys[authKey] === 'string' 
+        ? JSON.parse(storageKeys[authKey]) 
+        : storageKeys[authKey];
+      jwtToken = sessionData?.access_token;
+    }
+
+    if (!jwtToken) {
+      console.log('[NetReward] User not logged in, queueing telemetry locally');
+      // Keep queue at max 100
+      if (queue.length > 100) queue = queue.slice(queue.length - 100);
+      await chrome.storage.local.set({ nrt_offline_queue: queue });
+      return;
+    }
+
     const response = await fetch(TRACKING_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${jwtToken}`,
       },
-      body: JSON.stringify(payload),
+      body: bodyText,
     });
 
     if (response.ok) {
-      console.log(`[NetReward] Flushed: ↑${bytesUp} ↓${bytesDown}`);
-      // Reset counters after successful flush
+      console.log(`[NetReward] Flushed ${batch.length} events. ↑${bytesUp} ↓${bytesDown}`);
       bytesUp = 0;
       bytesDown = 0;
+      await chrome.storage.local.set({ nrt_offline_queue: remainingQueue });
     } else {
       console.warn('[NetReward] Flush failed:', response.status);
-      await queueTelemetry(payload);
+      // Keep queue at max 100 to prevent memory leaks
+      if (queue.length > 100) queue = queue.slice(queue.length - 100);
+      await chrome.storage.local.set({ nrt_offline_queue: queue });
     }
   } catch (e) {
     console.warn('[NetReward] Flush error (offline?):', e);
-    await queueTelemetry(payload);
+    if (queue.length > 100) queue = queue.slice(queue.length - 100);
+    await chrome.storage.local.set({ nrt_offline_queue: queue });
   }
-}
-
-// ── Offline Queue ───────────────────────────────────────────────────────────
-async function queueTelemetry(payload) {
-  const result = await chrome.storage.local.get('nrt_offline_queue');
-  const queue = result.nrt_offline_queue || [];
-  queue.push(payload);
-  // Keep max 100 queued items
-  if (queue.length > 100) queue.shift();
-  await chrome.storage.local.set({ nrt_offline_queue: queue });
 }
 
 // ── Badge Update ────────────────────────────────────────────────────────────
