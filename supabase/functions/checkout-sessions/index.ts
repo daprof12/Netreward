@@ -192,7 +192,8 @@ serve(async (req) => {
         expires_at: expiresAt,
         metadata: metadata,
         success_url: success_url,
-        cancel_url: cancel_url
+        cancel_url: cancel_url,
+        is_subscription: body.is_subscription === true
       })
       .select('id')
       .single();

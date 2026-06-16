@@ -151,6 +151,7 @@ export default function Settings() {
       title: 'Reports & Finances',
       items: [
         { icon: History, label: 'Transaction History', to: '/transactions' },
+        { icon: CreditCard, label: 'Manage Subscriptions', to: '/settings/subscriptions' },
         { icon: FileText, label: 'Financial Reports', to: '/reports' },
         { icon: Gift, label: 'Referral Rewards', to: '/wallet/referral' },
       ]

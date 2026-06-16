@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft, Search, TrendingUp, TrendingDown,
   ArrowDownToLine, ShoppingCart, SlidersHorizontal,
@@ -65,8 +65,10 @@ export default function TransactionHistory() {
   const { role }   = useAuthStore();
 
   const { transactions, isLoading } = useTransactions();
+  const [searchParams] = useSearchParams();
+  const merchantFilter = searchParams.get('merchant');
 
-  const [activeTab,        setActiveTab]        = useState<'transactions' | 'checkouts'>('transactions');
+  const [activeTab,        setActiveTab]        = useState<'transactions' | 'checkouts'>(merchantFilter ? 'checkouts' : 'transactions');
   const [search,           setSearch]           = useState('');
   const [showFilter,       setShowFilter]       = useState(false);
 
@@ -110,19 +112,23 @@ export default function TransactionHistory() {
         to.setHours(23, 59, 59, 999);
         if (txDate > to) return false;
       }
+      
+      // Merchant filter (for scan2pay checkouts)
+      const mm = merchantFilter ? tx.merchant_id === merchantFilter : true;
 
-      return ms && mt && mv;
+      return ms && mt && mv && mm;
     });
-  }, [transactions, search, selectedTypes, selectedStatus, dateFrom, dateTo]);
+  }, [transactions, search, selectedTypes, selectedStatus, dateFrom, dateTo, merchantFilter]);
 
   const filteredCheckouts = useMemo(() => {
     return checkoutTransactions.filter(chk => {
       const q  = search.toLowerCase();
       const ms = chk.description.toLowerCase().includes(q);
       const mv = chkStatus === 'all' || (chk.status || 'completed') === chkStatus;
-      return ms && mv;
+      const mm = merchantFilter ? chk.merchant_id === merchantFilter : true;
+      return ms && mv && mm;
     });
-  }, [checkoutTransactions, search, chkStatus]);
+  }, [checkoutTransactions, search, chkStatus, merchantFilter]);
 
   const toggleType = (v: string) =>
     setSelectedTypes(p => p.includes(v) ? p.filter(x => x !== v) : [...p, v]);

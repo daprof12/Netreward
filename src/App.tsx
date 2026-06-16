@@ -25,6 +25,7 @@ import P2PMarketplace from '@/pages/P2PMarketplace';
 import CreateP2POffer from '@/pages/CreateP2POffer';
 import P2PPaymentAccounts from '@/pages/P2PPaymentAccounts';
 import DisputeCenter from '@/pages/DisputeCenter';
+import ManageSubscriptions from '@/pages/ManageSubscriptions';
 
 import NrtWalletAddress from '@/pages/NrtWalletAddress';
 import NrtTokenInfo from '@/pages/NrtTokenInfo';
@@ -404,6 +405,7 @@ function App() {
               <Route path="/about" element={<AboutPage />} />
               <Route path="/support" element={<Support />} />
               <Route path="/transactions" element={<TransactionHistory />} />
+              <Route path="/settings/subscriptions" element={<ManageSubscriptions />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             <BottomNav />

@@ -426,9 +426,9 @@ export default function UserHome() {
         ) : (
           <div className="flex gap-[3px] overflow-x-auto pb-2 scrollbar-hide">
             {/* Day labels */}
-            <div className="flex flex-col gap-[3px] pr-1 shrink-0">
+            <div className="flex flex-col gap-[3px] pr-1 shrink-0 w-6">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div key={day} className="aspect-square w-5 flex items-center justify-end">
+                <div key={day} className="flex-1 flex items-center justify-end">
                   <span className="text-[9px] text-text-secondary leading-none">{day}</span>
                 </div>
               ))}

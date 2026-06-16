@@ -168,6 +168,7 @@ export default function SettingsScreen() {
 
         {renderGroup('Reports & Finances', [
           { icon: History, label: 'Transaction History', href: '/transactions' },
+          { icon: CreditCard, label: 'Manage Subscriptions', href: '/settings/subscriptions' },
           { icon: FileText, label: 'Financial Reports', href: '/reports' },
           { icon: Gift, label: 'Referral Rewards', href: '/wallet/referral' },
         ])}

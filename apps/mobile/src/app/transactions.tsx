@@ -1,7 +1,7 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Modal } from 'react-native';;
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Search, TrendingUp, TrendingDown, ArrowDownToLine, ShoppingCart, SlidersHorizontal, QrCode, Gift, X, Check, Repeat, Coins, Lock, RefreshCw, AlertCircle } from 'lucide-react-native';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useTransactions, type Transaction } from '@/hooks/useTransactions';
@@ -43,12 +43,13 @@ function formatDate(dateStr: string) {
 
 export default function TransactionsScreen() {
   const router = useRouter();
+  const { merchant: merchantFilter } = useLocalSearchParams<{ merchant?: string }>();
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { role } = useAuthStore();
   const { transactions, isLoading } = useTransactions();
 
-  const [activeTab, setActiveTab] = useState<'transactions' | 'checkouts'>('transactions');
+  const [activeTab, setActiveTab] = useState<'transactions' | 'checkouts'>(merchantFilter ? 'checkouts' : 'transactions');
   const [search, setSearch] = useState('');
   const [showFilter, setShowFilter] = useState(false);
 
@@ -69,16 +70,19 @@ export default function TransactionsScreen() {
       const ms = tx.description.toLowerCase().includes(q) || tx.id.includes(q);
       const mt = selectedTypes.length === 0 || selectedTypes.includes(tx.tx_type);
       const mv = selectedStatus === 'all' || (tx.status || 'completed') === selectedStatus;
-      return ms && mt && mv;
+      const mm = merchantFilter ? tx.merchant_id === merchantFilter : true;
+      return ms && mt && mv && mm;
     });
-  }, [transactions, search, selectedTypes, selectedStatus]);
+  }, [transactions, search, selectedTypes, selectedStatus, merchantFilter]);
 
   const filteredCheckouts = useMemo(() => {
     return checkoutTransactions.filter(chk => {
       const q = search.toLowerCase();
-      return chk.description.toLowerCase().includes(q);
+      const ms = chk.description.toLowerCase().includes(q);
+      const mm = merchantFilter ? chk.merchant_id === merchantFilter : true;
+      return ms && mm;
     });
-  }, [checkoutTransactions, search]);
+  }, [checkoutTransactions, search, merchantFilter]);
 
   const toggleType = (v: string) =>
     setSelectedTypes(p => p.includes(v) ? p.filter(x => x !== v) : [...p, v]);
